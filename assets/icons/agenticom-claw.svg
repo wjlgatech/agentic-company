@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="clawGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FF4500;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#CC3700;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E0E0E0;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A0A0A0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#707070;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bgGradClaw" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f0f23;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a3e;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glowOrange">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="3" dy="3" stdDeviation="5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="url(#bgGradClaw)"/>
+
+  <!-- Grid pattern -->
+  <g stroke="#FF4500" stroke-width="1" opacity="0.15">
+    <line x1="0" y1="128" x2="512" y2="128"/>
+    <line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="0" y1="384" x2="512" y2="384"/>
+    <line x1="128" y1="0" x2="128" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="384" y1="0" x2="384" y2="512"/>
+  </g>
+
+  <!-- Robot arm base -->
+  <rect x="220" y="380" width="72" height="100" rx="10" fill="url(#metalGrad)" filter="url(#shadow)"/>
+  <rect x="200" y="400" width="112" height="20" rx="5" fill="#505050"/>
+
+  <!-- Arm segment -->
+  <rect x="236" y="280" width="40" height="110" rx="5" fill="url(#metalGrad)" filter="url(#shadow)"/>
+
+  <!-- Claw mechanism -->
+  <ellipse cx="256" cy="270" rx="60" ry="40" fill="#404040" filter="url(#shadow)"/>
+  <ellipse cx="256" cy="265" rx="50" ry="30" fill="url(#metalGrad)"/>
+
+  <!-- Left claw finger -->
+  <g filter="url(#glowOrange)">
+    <path d="M190 250 Q150 200 120 120 Q115 100 130 95 Q145 90 155 110 Q180 180 210 240 Z"
+          fill="url(#clawGrad)" stroke="#CC3700" stroke-width="2"/>
+    <path d="M130 95 L120 70 Q118 60 130 58 Q142 56 145 70 L145 90"
+          fill="url(#clawGrad)" stroke="#CC3700" stroke-width="2"/>
+  </g>
+
+  <!-- Right claw finger -->
+  <g filter="url(#glowOrange)">
+    <path d="M322 250 Q362 200 392 120 Q397 100 382 95 Q367 90 357 110 Q332 180 302 240 Z"
+          fill="url(#clawGrad)" stroke="#CC3700" stroke-width="2"/>
+    <path d="M382 95 L392 70 Q394 60 382 58 Q370 56 367 70 L367 90"
+          fill="url(#clawGrad)" stroke="#CC3700" stroke-width="2"/>
+  </g>
+
+  <!-- Center claw finger -->
+  <g filter="url(#glowOrange)">
+    <path d="M240 240 Q230 180 230 100 Q230 80 256 75 Q282 80 282 100 Q282 180 272 240 Z"
+          fill="url(#clawGrad)" stroke="#CC3700" stroke-width="2"/>
+    <path d="M256 75 L256 50 Q256 40 256 35"
+          fill="none" stroke="url(#clawGrad)" stroke-width="15" stroke-linecap="round"/>
+  </g>
+
+  <!-- Glowing orb being grabbed -->
+  <circle cx="256" cy="170" r="35" fill="#00FF88" opacity="0.3" filter="url(#glowOrange)"/>
+  <circle cx="256" cy="170" r="25" fill="#00FF88" opacity="0.5"/>
+  <circle cx="256" cy="170" r="15" fill="#00FFAA"/>
+  <text x="256" y="178" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#003322" text-anchor="middle">AI</text>
+
+  <!-- Energy lines -->
+  <g stroke="#00FF88" stroke-width="2" opacity="0.6">
+    <line x1="256" y1="200" x2="256" y2="230"/>
+    <line x1="230" y1="190" x2="210" y2="210"/>
+    <line x1="282" y1="190" x2="302" y2="210"/>
+  </g>
+
+  <!-- Title -->
+  <text x="256" y="485" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FF6B35" text-anchor="middle" filter="url(#glowOrange)">AGENTICOM</text>
+</svg>

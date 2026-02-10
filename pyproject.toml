@@ -81,6 +81,7 @@ all = [
 
 [project.scripts]
 agentic = "orchestration.cli:main"
+agenticom-launch = "orchestration.launcher:main"
 
 [project.urls]
 Homepage = "https://github.com/wjlgatech/agentic-company"

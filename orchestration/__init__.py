@@ -72,6 +72,15 @@ from orchestration.workflows import (
     init_workflow,
 )
 
+# LLM Integrations (OpenClaw + Nanobot)
+from orchestration.integrations import (
+    OpenClawExecutor,
+    NanobotExecutor,
+    UnifiedExecutor,
+    auto_setup_executor,
+    get_available_backends,
+)
+
 __all__ = [
     # Version
     "__version__",
@@ -129,4 +138,10 @@ __all__ = [
     "load_workflow",
     "load_workflows_from_directory",
     "init_workflow",
+    # LLM Integrations
+    "OpenClawExecutor",
+    "NanobotExecutor",
+    "UnifiedExecutor",
+    "auto_setup_executor",
+    "get_available_backends",
 ]

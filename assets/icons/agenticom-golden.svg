@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goldenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#DAA520;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8860B;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="noseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d2d2d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bgGradGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a237e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0d47a1;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glowGold">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="url(#bgGradGold)"/>
+
+  <!-- Decorative elements -->
+  <g fill="#FFD700" opacity="0.1">
+    <circle cx="80" cy="80" r="40"/>
+    <circle cx="432" cy="80" r="40"/>
+    <circle cx="80" cy="432" r="40"/>
+    <circle cx="432" cy="432" r="40"/>
+  </g>
+
+  <!-- Left ear -->
+  <ellipse cx="120" cy="200" rx="60" ry="100" fill="url(#goldenGrad)" filter="url(#glowGold)"/>
+  <ellipse cx="125" cy="210" rx="40" ry="70" fill="#B8860B" opacity="0.5"/>
+
+  <!-- Right ear -->
+  <ellipse cx="392" cy="200" rx="60" ry="100" fill="url(#goldenGrad)" filter="url(#glowGold)"/>
+  <ellipse cx="387" cy="210" rx="40" ry="70" fill="#B8860B" opacity="0.5"/>
+
+  <!-- Head -->
+  <ellipse cx="256" cy="280" rx="160" ry="150" fill="url(#goldenGrad)" filter="url(#glowGold)"/>
+
+  <!-- Forehead fluff -->
+  <ellipse cx="256" cy="180" rx="80" ry="50" fill="#DAA520"/>
+
+  <!-- Snout -->
+  <ellipse cx="256" cy="340" rx="90" ry="70" fill="#FFFACD"/>
+  <ellipse cx="256" cy="355" rx="70" ry="50" fill="#FFF8DC"/>
+
+  <!-- Nose -->
+  <ellipse cx="256" cy="320" rx="35" ry="25" fill="url(#noseGrad)"/>
+  <ellipse cx="250" cy="315" rx="10" ry="7" fill="#4a4a4a"/>
+
+  <!-- Eyes -->
+  <g filter="url(#glowGold)">
+    <ellipse cx="190" cy="250" rx="35" ry="40" fill="white"/>
+    <ellipse cx="322" cy="250" rx="35" ry="40" fill="white"/>
+    <circle cx="195" cy="255" r="22" fill="#5D4037"/>
+    <circle cx="327" cy="255" r="22" fill="#5D4037"/>
+    <circle cx="188" cy="248" r="12" fill="#1a1a1a"/>
+    <circle cx="320" cy="248" r="12" fill="#1a1a1a"/>
+    <circle cx="192" cy="243" r="5" fill="white"/>
+    <circle cx="324" cy="243" r="5" fill="white"/>
+  </g>
+
+  <!-- Eyebrows -->
+  <path d="M155 220 Q175 205 210 215" stroke="#B8860B" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <path d="M357 220 Q337 205 302 215" stroke="#B8860B" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+  <!-- Happy mouth -->
+  <path d="M200 370 Q256 420 312 370" stroke="#5D4037" stroke-width="6" fill="none" stroke-linecap="round"/>
+
+  <!-- Tongue -->
+  <ellipse cx="256" cy="395" rx="25" ry="30" fill="#FF6B6B"/>
+  <path d="M256 380 L256 410" stroke="#E74C3C" stroke-width="3"/>
+
+  <!-- AI collar tag -->
+  <ellipse cx="256" cy="445" rx="45" ry="35" fill="#00BFFF" filter="url(#glowGold)"/>
+  <text x="256" y="455" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#1a237e" text-anchor="middle">AI</text>
+
+  <!-- Title -->
+  <text x="256" y="495" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFD700" text-anchor="middle">AGENTICOM</text>
+</svg>

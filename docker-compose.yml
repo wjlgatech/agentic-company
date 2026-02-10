@@ -1,0 +1,215 @@
+# Agentic Company Docker Compose
+# Orchestrates all services for local development and production
+
+version: '3.8'
+
+services:
+  # ============== Main Application ==============
+  agentic:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: agentic-api
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - MEMORY_BACKEND=${MEMORY_BACKEND:-local}
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${WORKERS:-4}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== Development Mode ==============
+  agentic-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: agentic-dev
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./orchestration:/app/orchestration
+      - ./tests:/app/tests
+      - ./data:/app/data
+    depends_on:
+      - redis
+    profiles:
+      - dev
+    networks:
+      - agentic-network
+
+  # ============== Redis Cache ==============
+  redis:
+    image: redis:7-alpine
+    container_name: agentic-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== PostgreSQL Database ==============
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentic-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-agentic}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentic}
+      - POSTGRES_DB=${POSTGRES_DB:-agentic}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentic}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== Celery Worker ==============
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: agentic-celery-worker
+    command: celery -A orchestration.tasks worker --loglevel=info
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+    profiles:
+      - celery
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== Celery Beat Scheduler ==============
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: agentic-celery-beat
+    command: celery -A orchestration.tasks beat --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery-worker
+    profiles:
+      - celery
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== Prometheus Monitoring ==============
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: agentic-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    profiles:
+      - monitoring
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== Grafana Dashboards ==============
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: agentic-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+  # ============== Jaeger Tracing ==============
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: agentic-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    profiles:
+      - tracing
+    restart: unless-stopped
+    networks:
+      - agentic-network
+
+# ============== Networks ==============
+networks:
+  agentic-network:
+    driver: bridge
+
+# ============== Volumes ==============
+volumes:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:

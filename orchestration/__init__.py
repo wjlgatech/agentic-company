@@ -1,8 +1,10 @@
 """
-EpiLoop - AI Agent Orchestration System
+Agentic Company - AI Agent Orchestration System
 
 A comprehensive framework for building production-ready AI agent workflows
-with guardrails, memory, observability, and approval gates.
+with multi-agent teams, guardrails, memory, observability, and approval gates.
+
+Inspired by Antfarm's elegant simplicity + production-grade safety.
 """
 
 from orchestration._version import __version__
@@ -39,6 +41,37 @@ from orchestration.observability import (
 )
 from orchestration.pipeline import Pipeline, PipelineStep
 
+# Multi-Agent Teams (inspired by Antfarm)
+from orchestration.agents import (
+    Agent,
+    AgentRole,
+    AgentConfig,
+    AgentTeam,
+    TeamConfig,
+    TeamResult,
+    PlannerAgent,
+    DeveloperAgent,
+    VerifierAgent,
+    TesterAgent,
+    ReviewerAgent,
+)
+from orchestration.agents.team import (
+    TeamBuilder,
+    WorkflowStep,
+    create_feature_dev_team,
+    create_bug_fix_team,
+    create_security_audit_team,
+)
+
+# YAML Workflow Definitions
+from orchestration.workflows import (
+    WorkflowDefinition,
+    WorkflowParser,
+    load_workflow,
+    load_workflows_from_directory,
+    init_workflow,
+)
+
 __all__ = [
     # Version
     "__version__",
@@ -73,4 +106,27 @@ __all__ = [
     # Pipeline
     "Pipeline",
     "PipelineStep",
+    # Multi-Agent Teams
+    "Agent",
+    "AgentRole",
+    "AgentConfig",
+    "AgentTeam",
+    "TeamConfig",
+    "TeamResult",
+    "TeamBuilder",
+    "WorkflowStep",
+    "PlannerAgent",
+    "DeveloperAgent",
+    "VerifierAgent",
+    "TesterAgent",
+    "ReviewerAgent",
+    "create_feature_dev_team",
+    "create_bug_fix_team",
+    "create_security_audit_team",
+    # YAML Workflows
+    "WorkflowDefinition",
+    "WorkflowParser",
+    "load_workflow",
+    "load_workflows_from_directory",
+    "init_workflow",
 ]

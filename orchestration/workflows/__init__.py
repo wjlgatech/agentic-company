@@ -9,6 +9,7 @@ from orchestration.workflows.parser import (
     WorkflowDefinition,
     WorkflowParser,
     load_workflow,
+    load_ready_workflow,  # Ready-to-run workflow loading
     load_workflows_from_directory,
 )
 from orchestration.workflows.templates import (
@@ -23,6 +24,7 @@ __all__ = [
     "WorkflowDefinition",
     "WorkflowParser",
     "load_workflow",
+    "load_ready_workflow",  # NEW: Recommended for execution
     "load_workflows_from_directory",
     # Templates
     "FEATURE_DEV_TEMPLATE",

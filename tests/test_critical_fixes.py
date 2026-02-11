@@ -206,6 +206,77 @@ class TestAgentTeamExecution:
         print("✅ Agent correctly requires executor")
 
 
+class TestWorkflowExecutorWiring:
+    """Test that workflow loading can wire executors correctly."""
+
+    def test_load_workflow_without_auto_setup(self):
+        """Test that load_workflow() without auto_setup doesn't set executors."""
+        from orchestration.workflows import load_workflow
+
+        team = load_workflow('agenticom/bundled_workflows/feature-dev.yaml')
+
+        # Verify agents don't have executors
+        for role, agent in team.agents.items():
+            assert agent._executor is None, f"Agent {role} should not have executor without auto_setup"
+
+        print("✅ load_workflow() correctly leaves executors unset")
+
+    def test_load_workflow_with_auto_setup_needs_backend(self):
+        """Test that load_workflow(auto_setup=True) requires LLM backend."""
+        from orchestration.workflows import load_workflow
+        import os
+
+        # Ensure no API keys
+        old_keys = {}
+        for key in ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY']:
+            if key in os.environ:
+                old_keys[key] = os.environ.pop(key)
+
+        try:
+            try:
+                team = load_workflow('agenticom/bundled_workflows/feature-dev.yaml', auto_setup=True)
+                # If we get here, a backend was available
+                print("✅ load_workflow(auto_setup=True) configured executors")
+            except RuntimeError as e:
+                assert "No LLM backend" in str(e), f"Should mention missing backend: {e}"
+                print("✅ load_workflow(auto_setup=True) correctly requires LLM backend")
+        finally:
+            for key, value in old_keys.items():
+                os.environ[key] = value
+
+    def test_load_ready_workflow_requires_backend(self):
+        """Test that load_ready_workflow() requires LLM backend."""
+        from orchestration.workflows import load_ready_workflow
+        import os
+
+        # Ensure no API keys
+        old_keys = {}
+        for key in ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY']:
+            if key in os.environ:
+                old_keys[key] = os.environ.pop(key)
+
+        try:
+            try:
+                team = load_ready_workflow('agenticom/bundled_workflows/feature-dev.yaml')
+                print("✅ load_ready_workflow() configured executors (backend available)")
+            except RuntimeError as e:
+                assert "No LLM backend" in str(e), f"Should mention missing backend: {e}"
+                print("✅ load_ready_workflow() correctly requires LLM backend")
+        finally:
+            for key, value in old_keys.items():
+                os.environ[key] = value
+
+    def test_load_ready_workflow_exported(self):
+        """Test that load_ready_workflow is properly exported."""
+        from orchestration import load_ready_workflow
+        from orchestration.workflows import load_ready_workflow as lr2
+
+        assert load_ready_workflow is lr2, "Should be same function"
+        assert callable(load_ready_workflow), "Should be callable"
+
+        print("✅ load_ready_workflow correctly exported")
+
+
 def run_all_tests():
     """Run all tests and report results."""
     import traceback
@@ -215,6 +286,7 @@ def run_all_tests():
         TestCLIWorkflowExecution,
         TestWorkflowListDiscovery,
         TestAgentTeamExecution,
+        TestWorkflowExecutorWiring,
     ]
 
     total = 0

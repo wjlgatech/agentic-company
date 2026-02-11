@@ -235,19 +235,94 @@ class WorkflowParser:
         return team
 
 
-def load_workflow(file_path: str | Path) -> AgentTeam:
+def load_workflow(file_path: str | Path, auto_setup: bool = False) -> AgentTeam:
     """
-    Load workflow from YAML file and return executable AgentTeam.
+    Load workflow from YAML file and return AgentTeam.
+
+    Args:
+        file_path: Path to YAML workflow file
+        auto_setup: If True, automatically configure LLM executor for all agents
+
+    Returns:
+        AgentTeam (ready to execute if auto_setup=True)
+
+    Example:
+        # Without auto_setup (need to manually set executor):
+        team = load_workflow('workflow.yaml')
+        executor = auto_setup_executor()
+        for agent in team.agents.values():
+            agent.set_executor(lambda p, c: executor.execute(p, c))
+        result = await team.run("task")
+
+        # With auto_setup (ready to run):
+        team = load_workflow('workflow.yaml', auto_setup=True)
+        result = await team.run("task")
+    """
+    parser = WorkflowParser()
+    definition = parser.parse_file(Path(file_path))
+    team = parser.to_team(definition)
+
+    if auto_setup:
+        _setup_team_executor(team)
+
+    return team
+
+
+def load_ready_workflow(file_path: str | Path) -> AgentTeam:
+    """
+    Load workflow from YAML and configure with LLM executor - ready to run!
+
+    This is the recommended way to load workflows for execution.
+    Automatically detects and configures the best available LLM backend.
 
     Args:
         file_path: Path to YAML workflow file
 
     Returns:
-        AgentTeam ready to execute
+        AgentTeam ready to execute immediately
+
+    Raises:
+        RuntimeError: If no LLM backend is available
+
+    Example:
+        team = load_ready_workflow('feature-dev.yaml')
+        result = await team.run("Build a login page")
+        print(result.final_output)
     """
-    parser = WorkflowParser()
-    definition = parser.parse_file(Path(file_path))
-    return parser.to_team(definition)
+    team = load_workflow(file_path, auto_setup=False)
+    _setup_team_executor(team)
+    return team
+
+
+def _setup_team_executor(team: AgentTeam) -> None:
+    """
+    Configure all agents in a team with the auto-detected LLM executor.
+
+    Args:
+        team: AgentTeam to configure
+
+    Raises:
+        RuntimeError: If no LLM backend is available
+    """
+    from orchestration.integrations import auto_setup_executor
+    from orchestration.integrations.unified import get_ready_backends
+
+    ready = get_ready_backends()
+    if not ready:
+        raise RuntimeError(
+            "No LLM backend available. Configure one of:\n"
+            "  1. Set ANTHROPIC_API_KEY for Claude\n"
+            "  2. Set OPENAI_API_KEY for GPT-4\n"
+            "  3. Start Ollama locally: ollama serve"
+        )
+
+    executor = auto_setup_executor()
+
+    async def agent_executor(prompt: str, context) -> str:
+        return await executor.execute(prompt, context)
+
+    for agent in team.agents.values():
+        agent.set_executor(agent_executor)
 
 
 def load_workflows_from_directory(directory: str | Path) -> dict[str, AgentTeam]:

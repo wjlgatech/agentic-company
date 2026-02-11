@@ -68,6 +68,7 @@ from orchestration.workflows import (
     WorkflowDefinition,
     WorkflowParser,
     load_workflow,
+    load_ready_workflow,  # NEW: Ready-to-run workflow loading
     load_workflows_from_directory,
     init_workflow,
 )
@@ -144,6 +145,7 @@ __all__ = [
     "WorkflowDefinition",
     "WorkflowParser",
     "load_workflow",
+    "load_ready_workflow",
     "load_workflows_from_directory",
     "init_workflow",
     # LLM Integrations

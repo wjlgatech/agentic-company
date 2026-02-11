@@ -4,7 +4,7 @@
   <p>
     <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-    <img src="https://img.shields.io/badge/tests-10%2F10%20passed-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-14%2F14%20passed-brightgreen" alt="Tests">
     <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
   </p>
 </div>
@@ -73,8 +73,14 @@ TestAgentTeamExecution:
   ✅ Agent correctly requires executor
   ✅ AgentTeam has async run method
 
+TestWorkflowExecutorWiring:
+  ✅ load_workflow() correctly leaves executors unset
+  ✅ load_workflow(auto_setup=True) correctly requires LLM backend
+  ✅ load_ready_workflow() correctly requires LLM backend
+  ✅ load_ready_workflow correctly exported
+
 ============================================================
-RESULTS: 10/10 tests passed
+RESULTS: 14/14 tests passed
 ```
 
 **Critical Fixes Applied (2026-02-11):**
@@ -241,6 +247,41 @@ Then tell your assistant: *"Use agenticom feature-dev to research and design a m
 | **Multi-Backend** | ❌ | ✅ Ollama/Claude/GPT |
 | **Observability** | ❌ | ✅ Prometheus |
 | **Dashboard** | ✅ | ✅ |
+
+## 🐍 Python API
+
+### Load & Run Workflows (Recommended)
+
+```python
+import asyncio
+from orchestration import load_ready_workflow
+
+# Load workflow with LLM executor auto-configured
+team = load_ready_workflow('feature-dev.yaml')
+
+# Execute
+result = asyncio.run(team.run("Add a login button"))
+print(result.final_output)
+```
+
+### Manual Setup (More Control)
+
+```python
+from orchestration import load_workflow, auto_setup_executor
+
+# Load without executor
+team = load_workflow('feature-dev.yaml')
+
+# Configure executor manually
+executor = auto_setup_executor()
+for agent in team.agents.values():
+    agent.set_executor(lambda p, c: executor.execute(p, c))
+
+# Execute
+result = asyncio.run(team.run("Add a login button"))
+```
+
+---
 
 ## 🛠️ Verified Features
 

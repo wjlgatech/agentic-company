@@ -11,6 +11,7 @@ from typing import Optional, Any, Callable, Awaitable
 from datetime import datetime
 import uuid
 import asyncio
+import re
 
 from orchestration.agents.base import (
     Agent,
@@ -213,6 +214,26 @@ class AgentTeam:
         finally:
             self._running = False
 
+    def _preprocess_template(self, template: str) -> str:
+        """
+        Convert YAML-style template variables to Python .format() style.
+
+        YAML workflows use {{step_outputs.X}} syntax, but Python's .format()
+        treats {{ as an escaped literal {. This method converts:
+          - {{step_outputs.X}} → {X}  (for referencing previous step outputs)
+          - {{task}} → {task}          (for the main task)
+          - {{X}} → {X}                (for any other variables)
+
+        Example:
+            Input:  "Based on: {{step_outputs.plan}}"
+            Output: "Based on: {plan}"
+        """
+        # Convert {{step_outputs.X}} to {X}
+        template = re.sub(r'\{\{step_outputs\.([^}]+)\}\}', r'{\1}', template)
+        # Convert remaining {{X}} to {X}
+        template = re.sub(r'\{\{([^}]+)\}\}', r'{\1}', template)
+        return template
+
     async def _execute_step(
         self,
         step: WorkflowStep,
@@ -227,9 +248,11 @@ class AgentTeam:
 
         while retries <= step.max_retries:
             # Build input from template
+            # First, preprocess to convert {{step_outputs.X}} to {X}
+            processed_template = self._preprocess_template(step.input_template)
             # Merge all context, with explicit task taking precedence
             format_context = {**outputs, **context, "task": task}
-            input_data = step.input_template.format(**format_context)
+            input_data = processed_template.format(**format_context)
 
             # Create fresh context for this step
             agent_context = AgentContext(

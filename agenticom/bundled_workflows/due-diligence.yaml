@@ -1,0 +1,171 @@
+# Use Case 1: M&A Due Diligence
+# Pain Point: Acquiring companies spend weeks with lawyers, accountants, analysts
+# manually reviewing financials, legal docs, IP, team, market position.
+# Impact: $50K-500K+ in professional fees, 4-8 weeks timeline
+
+id: due-diligence
+name: M&A Due Diligence Analysis
+description: |
+  Comprehensive due diligence for merger/acquisition targets.
+  Analyzes financials, legal risks, IP portfolio, team assessment,
+  and market position to produce investment recommendation.
+
+agents:
+  - id: financial-analyst
+    role: Senior Financial Analyst specializing in M&A valuation
+    prompt: |
+      You are a senior financial analyst with 15+ years in M&A.
+      You analyze financial statements, revenue models, unit economics,
+      and create DCF/comparable valuations. Be rigorous and skeptical.
+      Flag any financial red flags or inconsistencies.
+    tools: [data_analysis, web_search]
+
+  - id: legal-reviewer
+    role: Legal Risk Analyst
+    prompt: |
+      You are a legal analyst specializing in corporate due diligence.
+      Review contracts, litigation history, regulatory compliance,
+      IP ownership, and employment agreements. Identify deal-breakers
+      and negotiation points. Be thorough and conservative.
+    tools: [web_search, document_analysis]
+
+  - id: market-analyst
+    role: Market & Competitive Intelligence Analyst
+    prompt: |
+      You are a market research analyst specializing in competitive landscapes.
+      Analyze market size, growth trends, competitive positioning,
+      customer segments, and strategic fit. Identify synergies and threats.
+    tools: [market_research, competitor_analysis, web_search]
+
+  - id: technical-assessor
+    role: Technical Due Diligence Lead
+    prompt: |
+      You are a technical assessor evaluating technology stacks,
+      technical debt, scalability, security posture, and team capabilities.
+      Identify technical risks and integration challenges.
+    tools: [web_search, code_analysis]
+
+  - id: deal-lead
+    role: Investment Committee Deal Lead
+    prompt: |
+      You are the deal lead synthesizing all due diligence findings.
+      Create executive summary with go/no-go recommendation,
+      key risks, valuation range, and deal structure suggestions.
+      Be decisive but balanced.
+
+steps:
+  - id: financial-analysis
+    agent: financial-analyst
+    input: |
+      Target Company: {{task}}
+
+      Conduct financial due diligence:
+      1. Revenue analysis (growth, concentration, quality)
+      2. Profitability metrics (margins, unit economics)
+      3. Cash flow assessment
+      4. Balance sheet review (assets, liabilities, working capital)
+      5. Financial projections assessment
+      6. Valuation (DCF, comparables, precedent transactions)
+
+      Provide specific numbers and flag any concerns.
+    expects: "Financial analysis with valuation range"
+
+  - id: legal-review
+    agent: legal-reviewer
+    input: |
+      Target Company: {{task}}
+
+      Financial Context:
+      {{step_outputs.financial-analysis}}
+
+      Conduct legal due diligence:
+      1. Corporate structure and ownership
+      2. Material contracts review
+      3. Litigation and regulatory history
+      4. IP portfolio and ownership
+      5. Employment and compensation issues
+      6. Compliance status (data privacy, industry regulations)
+
+      Identify deal-breakers and negotiation points.
+    expects: "Legal risk assessment with red flags"
+
+  - id: market-assessment
+    agent: market-analyst
+    input: |
+      Target Company: {{task}}
+
+      Financial Profile:
+      {{step_outputs.financial-analysis}}
+
+      Conduct market due diligence:
+      1. Total addressable market (TAM/SAM/SOM)
+      2. Market growth drivers and headwinds
+      3. Competitive landscape and positioning
+      4. Customer analysis (segments, concentration, NPS)
+      5. Strategic fit and synergy potential
+
+      Quantify market opportunity and competitive moat.
+    expects: "Market analysis with competitive positioning"
+
+  - id: technical-review
+    agent: technical-assessor
+    input: |
+      Target Company: {{task}}
+
+      Business Context:
+      {{step_outputs.financial-analysis}}
+      {{step_outputs.market-assessment}}
+
+      Conduct technical due diligence:
+      1. Technology stack assessment
+      2. Technical debt and scalability
+      3. Security and compliance posture
+      4. Team capabilities and key person risk
+      5. Integration complexity estimate
+
+      Rate technical risk: Low/Medium/High with justification.
+    expects: "Technical assessment with risk rating"
+
+  - id: investment-recommendation
+    agent: deal-lead
+    input: |
+      Target Company: {{task}}
+
+      == DUE DILIGENCE FINDINGS ==
+
+      FINANCIAL ANALYSIS:
+      {{step_outputs.financial-analysis}}
+
+      LEGAL REVIEW:
+      {{step_outputs.legal-review}}
+
+      MARKET ASSESSMENT:
+      {{step_outputs.market-assessment}}
+
+      TECHNICAL REVIEW:
+      {{step_outputs.technical-review}}
+
+      == YOUR TASK ==
+
+      Synthesize all findings into investment recommendation:
+      1. Executive Summary (1 paragraph)
+      2. Investment Thesis (bull case)
+      3. Key Risks (top 5 with mitigation)
+      4. Valuation Opinion (fair value range)
+      5. Deal Structure Suggestions
+      6. GO / NO-GO / CONDITIONAL recommendation
+
+      Be decisive. The board needs a clear recommendation.
+    expects: "Investment recommendation with GO/NO-GO decision"
+
+guardrails:
+  - content-filter
+  - pii-detection
+
+timeout_seconds: 1800
+
+metadata:
+  category: finance
+  difficulty: expert
+  typical_time_saved: "4-6 weeks"
+  typical_cost_saved: "$50,000-$200,000"

@@ -1,0 +1,189 @@
+# Use Case 3: Patent Landscape Analysis
+# Pain Point: Before R&D investment, companies need freedom-to-operate analysis.
+# Patent lawyers charge $500-1000/hour, analysis takes weeks.
+# Impact: Avoid $10M+ infringement suits, inform R&D strategy
+
+id: patent-landscape
+name: Patent Landscape Analysis
+description: |
+  Comprehensive patent landscape analysis for R&D planning.
+  Maps existing patents, identifies white spaces, assesses freedom
+  to operate, and provides IP strategy recommendations.
+
+agents:
+  - id: patent-searcher
+    role: Patent Search Specialist
+    prompt: |
+      You are a patent search specialist skilled in Boolean queries,
+      classification codes (CPC/IPC), and prior art discovery.
+      Search comprehensively across USPTO, EPO, WIPO, and national offices.
+      Focus on relevant claims, not just titles.
+    tools: [web_search, literature_search]
+
+  - id: claim-analyst
+    role: Patent Claims Analyst
+    prompt: |
+      You are a patent claims analyst who interprets claim scope,
+      identifies key claim elements, and assesses infringement risk.
+      Understand claim construction principles and prosecution history.
+      Be precise about what claims actually cover.
+    tools: [document_analysis]
+
+  - id: landscape-mapper
+    role: IP Landscape Strategist
+    prompt: |
+      You are an IP strategist who visualizes patent landscapes.
+      Identify technology clusters, key players, filing trends,
+      and white spaces. Map competitive IP positions.
+    tools: [data_analysis, competitor_analysis]
+
+  - id: fto-assessor
+    role: Freedom-to-Operate Analyst
+    prompt: |
+      You are an FTO analyst who assesses infringement risk.
+      Analyze claim coverage, identify design-around opportunities,
+      and assess litigation risk. Be conservative - flag potential issues.
+    tools: [web_search]
+
+  - id: ip-strategist
+    role: Chief IP Strategist
+    prompt: |
+      You are a chief IP strategist advising on patent portfolio strategy.
+      Recommend filing strategies, licensing opportunities, acquisition
+      targets, and defensive measures. Balance offensive and defensive IP.
+
+steps:
+  - id: patent-search
+    agent: patent-searcher
+    input: |
+      Technology Area: {{task}}
+
+      Conduct comprehensive patent search:
+      1. Define search scope (technology, geography, timeframe)
+      2. Identify relevant CPC/IPC classification codes
+      3. Build Boolean search queries
+      4. Search major patent databases
+      5. List top 20 most relevant patents with:
+         - Patent number, title, assignee
+         - Priority date and status (active/expired/pending)
+         - Key claims summary
+
+      Focus on ACTIVE patents with broad claims.
+    expects: "Patent search results with key patents identified"
+
+  - id: claim-analysis
+    agent: claim-analyst
+    input: |
+      Technology: {{task}}
+
+      Patents Found:
+      {{step_outputs.patent-search}}
+
+      Analyze patent claims:
+      1. For each key patent, identify independent claims
+      2. Parse claim elements and limitations
+      3. Assess claim breadth (broad/narrow/moderate)
+      4. Note any claim construction issues
+      5. Identify potential invalidity arguments
+
+      Focus on claims that could block the technology area.
+    expects: "Claim analysis with scope assessment"
+
+  - id: landscape-mapping
+    agent: landscape-mapper
+    input: |
+      Technology: {{task}}
+
+      Patents and Claims:
+      {{step_outputs.patent-search}}
+      {{step_outputs.claim-analysis}}
+
+      Create IP landscape map:
+      1. Technology clusters and sub-areas
+      2. Key players by patent count and claim quality
+      3. Filing trends (increasing/decreasing/stable)
+      4. Geographic coverage analysis
+      5. White spaces (unpatented areas)
+      6. Emerging technology areas
+
+      Identify strategic opportunities.
+    expects: "IP landscape with white spaces identified"
+
+  - id: fto-assessment
+    agent: fto-assessor
+    input: |
+      Technology: {{task}}
+
+      Claims Analysis:
+      {{step_outputs.claim-analysis}}
+
+      IP Landscape:
+      {{step_outputs.landscape-mapping}}
+
+      Freedom-to-Operate Assessment:
+      1. High-risk patents (likely infringement)
+      2. Medium-risk patents (possible infringement)
+      3. Low-risk patents (unlikely infringement)
+      4. Design-around opportunities for each risk
+      5. Licensing availability assessment
+      6. Litigation history of key patent holders
+
+      Rate overall FTO risk: HIGH / MEDIUM / LOW
+    expects: "FTO assessment with risk rating"
+
+  - id: ip-strategy
+    agent: ip-strategist
+    input: |
+      Technology: {{task}}
+
+      == IP INTELLIGENCE ==
+
+      Patent Search:
+      {{step_outputs.patent-search}}
+
+      Claims Analysis:
+      {{step_outputs.claim-analysis}}
+
+      Landscape:
+      {{step_outputs.landscape-mapping}}
+
+      FTO Assessment:
+      {{step_outputs.fto-assessment}}
+
+      == DEVELOP IP STRATEGY ==
+
+      Provide strategic recommendations:
+      1. Offensive Strategy
+         - Filing opportunities (white spaces)
+         - Patent thicket approach
+         - International filing strategy
+
+      2. Defensive Strategy
+         - Design-around recommendations
+         - Licensing targets
+         - Acquisition candidates
+         - Invalidity challenges
+
+      3. Risk Mitigation
+         - Insurance considerations
+         - Freedom-to-operate clearance path
+         - Monitoring recommendations
+
+      4. Budget Estimate
+         - Filing costs
+         - Licensing costs
+         - Risk reserve
+
+      Provide actionable 12-month IP roadmap.
+    expects: "IP strategy with actionable roadmap"
+
+guardrails:
+  - content-filter
+
+timeout_seconds: 1500
+
+metadata:
+  category: legal
+  difficulty: expert
+  typical_time_saved: "3-6 weeks"
+  typical_cost_saved: "$30,000-$100,000"

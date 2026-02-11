@@ -1,0 +1,167 @@
+# Use Case 2: Regulatory Compliance Audit
+# Pain Point: Healthcare/Finance companies spend $100K+ annually on compliance
+# audits, often with gaps discovered only during actual audits
+# Impact: Avoid $1M+ fines, reputational damage, operational disruptions
+
+id: compliance-audit
+name: Regulatory Compliance Audit
+description: |
+  Comprehensive compliance audit for regulated industries.
+  Checks HIPAA, SOX, GDPR, PCI-DSS, or industry-specific regulations.
+  Identifies gaps, prioritizes remediation, generates audit-ready documentation.
+
+agents:
+  - id: compliance-scanner
+    role: Compliance Requirements Analyst
+    prompt: |
+      You are a compliance expert who maps regulatory requirements to
+      organizational controls. You understand HIPAA, SOX, GDPR, PCI-DSS,
+      and industry frameworks. Extract specific, actionable requirements.
+    tools: [web_search, document_analysis]
+
+  - id: gap-analyst
+    role: Control Gap Analyst
+    prompt: |
+      You are a controls analyst who identifies gaps between required
+      controls and actual implementation. Be specific about what's missing,
+      what's partial, and what's compliant. Provide evidence requirements.
+    tools: [data_analysis]
+
+  - id: risk-assessor
+    role: Compliance Risk Assessor
+    prompt: |
+      You are a risk assessor who quantifies compliance risks.
+      Calculate potential fines, likelihood of audit findings,
+      and business impact. Use industry benchmarks and case studies.
+    tools: [web_search, data_analysis]
+
+  - id: remediation-planner
+    role: Remediation Program Manager
+    prompt: |
+      You are a remediation expert who creates actionable plans.
+      Prioritize by risk, estimate effort, assign ownership categories,
+      and create realistic timelines. Include quick wins and long-term fixes.
+
+  - id: audit-documenter
+    role: Audit Documentation Specialist
+    prompt: |
+      You are an audit documentation specialist who creates
+      audit-ready evidence packages. Format findings in standard
+      compliance report format with clear status indicators.
+
+steps:
+  - id: requirements-mapping
+    agent: compliance-scanner
+    input: |
+      Organization Context: {{task}}
+
+      Map applicable regulatory requirements:
+      1. Identify all applicable regulations (HIPAA, SOX, GDPR, PCI-DSS, etc.)
+      2. List specific control requirements for each
+      3. Map to common control frameworks (NIST, ISO 27001, COBIT)
+      4. Note recent regulatory changes or upcoming requirements
+
+      Output as structured checklist with requirement IDs.
+    expects: "Regulatory requirements mapped to controls"
+
+  - id: gap-analysis
+    agent: gap-analyst
+    input: |
+      Organization: {{task}}
+
+      Regulatory Requirements:
+      {{step_outputs.requirements-mapping}}
+
+      Conduct gap analysis:
+      1. For each requirement, assess: COMPLIANT / PARTIAL / GAP / N/A
+      2. For gaps, describe what's missing specifically
+      3. For partial, describe what exists and what's needed
+      4. Note evidence that would demonstrate compliance
+
+      Be thorough - auditors will check everything.
+    expects: "Gap analysis with compliance status per control"
+
+  - id: risk-assessment
+    agent: risk-assessor
+    input: |
+      Organization: {{task}}
+
+      Gap Analysis Results:
+      {{step_outputs.gap-analysis}}
+
+      Assess compliance risks:
+      1. Calculate potential fines per regulation
+      2. Estimate audit finding likelihood (High/Medium/Low)
+      3. Assess business impact (operational, reputational, financial)
+      4. Prioritize gaps by risk score (Impact × Likelihood)
+      5. Benchmark against industry peers
+
+      Provide specific dollar amounts and percentages.
+    expects: "Risk assessment with quantified exposure"
+
+  - id: remediation-plan
+    agent: remediation-planner
+    input: |
+      Organization: {{task}}
+
+      Gaps Identified:
+      {{step_outputs.gap-analysis}}
+
+      Risk Prioritization:
+      {{step_outputs.risk-assessment}}
+
+      Create remediation plan:
+      1. Quick wins (< 30 days, low effort, high impact)
+      2. Medium-term fixes (30-90 days)
+      3. Long-term initiatives (90+ days)
+      4. Resource requirements (people, tools, budget)
+      5. Ownership categories (IT, Legal, HR, Operations)
+      6. Success metrics and verification approach
+
+      Make it actionable with specific tasks.
+    expects: "Prioritized remediation roadmap"
+
+  - id: audit-report
+    agent: audit-documenter
+    input: |
+      Organization: {{task}}
+
+      == AUDIT FINDINGS ==
+
+      Requirements:
+      {{step_outputs.requirements-mapping}}
+
+      Gap Analysis:
+      {{step_outputs.gap-analysis}}
+
+      Risk Assessment:
+      {{step_outputs.risk-assessment}}
+
+      Remediation Plan:
+      {{step_outputs.remediation-plan}}
+
+      == CREATE AUDIT REPORT ==
+
+      Generate executive audit report:
+      1. Executive Summary (1 page)
+      2. Scope and Methodology
+      3. Compliance Scorecard (visual summary)
+      4. Critical Findings (top 10)
+      5. Detailed Findings by Regulation
+      6. Remediation Roadmap Summary
+      7. Appendix: Evidence Requirements
+
+      Format for board presentation and regulatory submission.
+    expects: "Audit-ready compliance report"
+
+guardrails:
+  - content-filter
+  - pii-detection
+
+timeout_seconds: 1500
+
+metadata:
+  category: compliance
+  difficulty: expert
+  typical_time_saved: "2-4 weeks"
+  typical_cost_saved: "$25,000-$75,000"

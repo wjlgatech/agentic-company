@@ -1,0 +1,246 @@
+# Use Case 4: Security Vulnerability Assessment
+# Pain Point: Manual security review of large codebases is slow, expensive,
+# and misses vulnerabilities. Breaches cost $4.45M on average.
+# Impact: Prevent breaches, meet compliance, protect reputation
+
+id: security-assessment
+name: Security Vulnerability Assessment
+description: |
+  Comprehensive security assessment of applications and infrastructure.
+  Identifies vulnerabilities, assesses risk, provides remediation
+  guidance, and generates compliance-ready security reports.
+
+agents:
+  - id: threat-modeler
+    role: Threat Modeling Specialist
+    prompt: |
+      You are a threat modeling expert using STRIDE, PASTA, and
+      attack trees. Identify threat actors, attack vectors, and
+      assets at risk. Think like an attacker to find weaknesses.
+    tools: [web_search]
+
+  - id: vuln-scanner
+    role: Vulnerability Assessment Specialist
+    prompt: |
+      You are a vulnerability researcher who identifies security flaws.
+      Look for OWASP Top 10, CWE weaknesses, misconfigurations,
+      and logic flaws. Provide CVE references where applicable.
+      Be thorough - assume attackers will find everything.
+    tools: [code_analysis, web_search]
+
+  - id: risk-analyst
+    role: Security Risk Analyst
+    prompt: |
+      You are a security risk analyst who quantifies cyber risk.
+      Use CVSS scoring, assess exploitability, and calculate
+      potential business impact. Prioritize by actual risk, not severity alone.
+    tools: [data_analysis]
+
+  - id: remediation-engineer
+    role: Security Remediation Engineer
+    prompt: |
+      You are a security engineer who fixes vulnerabilities.
+      Provide specific remediation steps, code fixes, configuration
+      changes, and architectural improvements. Include secure coding examples.
+
+  - id: security-architect
+    role: Chief Security Architect
+    prompt: |
+      You are a CISO-level security architect who provides strategic
+      security guidance. Balance security with business needs.
+      Create defense-in-depth strategies and security roadmaps.
+
+steps:
+  - id: threat-modeling
+    agent: threat-modeler
+    input: |
+      System/Application: {{task}}
+
+      Conduct threat modeling:
+      1. Asset Identification
+         - What data/systems are valuable?
+         - What are the crown jewels?
+
+      2. Threat Actor Analysis
+         - Who would attack? (nation-state, criminal, insider, hacktivist)
+         - What are their capabilities and motivations?
+
+      3. Attack Surface Mapping
+         - Entry points (APIs, web, mobile, network)
+         - Trust boundaries
+         - Data flows
+
+      4. STRIDE Analysis
+         - Spoofing, Tampering, Repudiation
+         - Information Disclosure, Denial of Service, Elevation of Privilege
+
+      5. Attack Scenarios (top 5 most likely)
+
+      Output threat model with prioritized attack scenarios.
+    expects: "Threat model with attack scenarios"
+
+  - id: vulnerability-scan
+    agent: vuln-scanner
+    input: |
+      System: {{task}}
+
+      Threat Model:
+      {{step_outputs.threat-modeling}}
+
+      Conduct vulnerability assessment:
+      1. OWASP Top 10 Analysis
+         - Injection, Broken Auth, Sensitive Data Exposure
+         - XXE, Broken Access Control, Misconfig
+         - XSS, Insecure Deserialization, Components, Logging
+
+      2. Infrastructure Vulnerabilities
+         - Network configuration
+         - Cloud misconfigurations
+         - Container security
+
+      3. Application Vulnerabilities
+         - Authentication/Authorization flaws
+         - Session management
+         - Input validation
+         - Cryptographic issues
+
+      4. Business Logic Flaws
+         - Race conditions
+         - Privilege escalation paths
+         - Data leakage
+
+      For each finding: CWE ID, severity, location, evidence.
+    expects: "Vulnerability list with severity ratings"
+
+  - id: risk-analysis
+    agent: risk-analyst
+    input: |
+      System: {{task}}
+
+      Threats:
+      {{step_outputs.threat-modeling}}
+
+      Vulnerabilities:
+      {{step_outputs.vulnerability-scan}}
+
+      Analyze security risks:
+      1. CVSS Scoring
+         - Base score (severity)
+         - Temporal score (exploitability)
+         - Environmental score (your context)
+
+      2. Exploitability Assessment
+         - Public exploits available?
+         - Skill level required?
+         - Attack complexity?
+
+      3. Business Impact
+         - Data breach cost estimate
+         - Downtime cost estimate
+         - Regulatory fine exposure
+         - Reputational damage
+
+      4. Risk Prioritization Matrix
+         - Critical (immediate action)
+         - High (this sprint)
+         - Medium (this quarter)
+         - Low (backlog)
+
+      Quantify total risk exposure in dollars.
+    expects: "Risk analysis with prioritized vulnerabilities"
+
+  - id: remediation-plan
+    agent: remediation-engineer
+    input: |
+      System: {{task}}
+
+      Vulnerabilities:
+      {{step_outputs.vulnerability-scan}}
+
+      Risk Priorities:
+      {{step_outputs.risk-analysis}}
+
+      Create remediation plan:
+      1. Critical Fixes (do today)
+         - Specific code changes
+         - Configuration fixes
+         - Immediate mitigations
+
+      2. High Priority Fixes (this week)
+         - Detailed remediation steps
+         - Secure coding examples
+         - Testing requirements
+
+      3. Medium Priority (this month)
+         - Architectural improvements
+         - Security controls to add
+
+      4. Security Hardening
+         - Defense in depth measures
+         - Monitoring and detection
+         - Incident response prep
+
+      Include effort estimates (hours) for each fix.
+    expects: "Detailed remediation plan with code fixes"
+
+  - id: security-report
+    agent: security-architect
+    input: |
+      System: {{task}}
+
+      == SECURITY ASSESSMENT ==
+
+      Threat Model:
+      {{step_outputs.threat-modeling}}
+
+      Vulnerabilities:
+      {{step_outputs.vulnerability-scan}}
+
+      Risk Analysis:
+      {{step_outputs.risk-analysis}}
+
+      Remediation Plan:
+      {{step_outputs.remediation-plan}}
+
+      == EXECUTIVE SECURITY REPORT ==
+
+      Create board-ready security report:
+      1. Executive Summary
+         - Overall security posture (letter grade)
+         - Top 3 risks with business impact
+         - Investment required
+
+      2. Security Scorecard
+         - By category (network, app, data, access)
+         - Trend vs industry benchmark
+
+      3. Critical Findings (top 10)
+         - Finding, risk, remediation, status
+
+      4. Strategic Recommendations
+         - Quick wins (30 days)
+         - Medium term (90 days)
+         - Security program maturity roadmap
+
+      5. Compliance Mapping
+         - SOC 2, ISO 27001, PCI-DSS alignment
+
+      6. Budget Request
+         - Remediation costs
+         - Security tool investments
+         - Training needs
+
+      Format for board presentation.
+    expects: "Executive security report with recommendations"
+
+guardrails:
+  - content-filter
+  - pii-detection
+
+timeout_seconds: 1500
+
+metadata:
+  category: security
+  difficulty: expert
+  typical_time_saved: "2-4 weeks"
+  typical_cost_saved: "$20,000-$50,000"

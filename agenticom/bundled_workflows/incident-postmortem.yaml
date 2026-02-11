@@ -1,0 +1,315 @@
+# Use Case 7: Incident Post-Mortem & Prevention
+# Pain Point: After production incidents, teams spend days piecing together
+# what happened. Often miss root causes, repeat incidents.
+# Impact: Reduce MTTR, prevent recurrence, build reliability culture
+
+id: incident-postmortem
+name: Incident Post-Mortem Analysis
+description: |
+  Comprehensive incident post-mortem following SRE best practices.
+  Reconstructs timeline, identifies root causes, develops prevention
+  actions, and creates blameless documentation for organizational learning.
+
+agents:
+  - id: timeline-analyst
+    role: Incident Timeline Analyst
+    prompt: |
+      You are an incident analyst skilled at reconstructing timelines.
+      You analyze logs, metrics, alerts, and communication records
+      to build accurate, minute-by-minute incident timelines.
+      Focus on facts, not blame. Be precise about timing.
+    tools: [data_analysis, web_search]
+
+  - id: rca-specialist
+    role: Root Cause Analysis Specialist
+    prompt: |
+      You are an RCA expert using 5 Whys, fishbone diagrams, and
+      fault tree analysis. Distinguish symptoms from causes.
+      Find contributing factors, not just the trigger.
+      Systems thinking - look for systemic issues.
+    tools: [data_analysis]
+
+  - id: impact-assessor
+    role: Business Impact Assessor
+    prompt: |
+      You are a business analyst who quantifies incident impact.
+      Calculate revenue loss, customer impact, SLA breaches,
+      and reputational damage. Use actual numbers, not estimates.
+      Include opportunity costs and recovery costs.
+    tools: [data_analysis]
+
+  - id: prevention-engineer
+    role: Reliability Engineering Lead
+    prompt: |
+      You are an SRE lead who designs prevention measures.
+      Create defense in depth - detection, mitigation, and prevention.
+      Balance reliability investment with business priorities.
+      Make recommendations specific and actionable.
+
+  - id: postmortem-author
+    role: Post-Mortem Documentation Lead
+    prompt: |
+      You are a post-mortem author who writes blameless documentation.
+      Focus on learning, not blame. Make it useful for future reference.
+      Follow Google SRE post-mortem best practices.
+      Ensure actions have owners and deadlines.
+
+steps:
+  - id: timeline-reconstruction
+    agent: timeline-analyst
+    input: |
+      Incident: {{task}}
+
+      Reconstruct incident timeline:
+      1. Pre-Incident State
+         - System state before incident
+         - Recent changes (deploys, configs)
+         - Any anomalies or warnings
+
+      2. Detection
+         - How was the incident detected?
+         - Time to detection (TTD)
+         - First alert/report
+
+      3. Incident Timeline
+         For each event:
+         - Timestamp (UTC)
+         - What happened
+         - Who was involved
+         - What actions were taken
+         - What was the result
+
+      4. Resolution
+         - What fixed the issue?
+         - Time to mitigation (TTM)
+         - Time to resolution (TTR)
+
+      5. Post-Resolution
+         - Verification steps
+         - Customer communication
+         - Monitoring adjustments
+
+      Be precise about times and actors.
+    expects: "Detailed incident timeline"
+
+  - id: root-cause-analysis
+    agent: rca-specialist
+    input: |
+      Incident: {{task}}
+
+      Timeline:
+      {{step_outputs.timeline-reconstruction}}
+
+      Perform root cause analysis:
+      1. 5 Whys Analysis
+         Start with: "The incident occurred because..."
+         - Why? (Level 1)
+         - Why? (Level 2)
+         - Why? (Level 3)
+         - Why? (Level 4)
+         - Why? (Level 5 - root cause)
+
+      2. Contributing Factors
+         - Technical factors
+         - Process factors
+         - Human factors
+         - Environmental factors
+
+      3. Trigger vs Root Cause
+         - What triggered the incident?
+         - What underlying weakness allowed it?
+         - What made it worse?
+
+      4. Systemic Issues
+         - Is this a pattern?
+         - Similar past incidents?
+         - Organizational factors?
+
+      5. What Went Well
+         - Effective responses
+         - Good decisions
+         - Teamwork highlights
+
+      Focus on systems, not individuals.
+    expects: "Root cause analysis with contributing factors"
+
+  - id: impact-assessment
+    agent: impact-assessor
+    input: |
+      Incident: {{task}}
+
+      Timeline:
+      {{step_outputs.timeline-reconstruction}}
+
+      Assess business impact:
+      1. Customer Impact
+         - Users affected (count)
+         - Duration of impact
+         - Features unavailable
+         - Customer complaints/tickets
+
+      2. Revenue Impact
+         - Direct revenue loss
+         - Transaction failures
+         - Refunds/credits issued
+         - Future revenue risk
+
+      3. SLA Impact
+         - SLA breaches
+         - Credits owed
+         - Contractual implications
+         - Regulatory implications
+
+      4. Operational Cost
+         - Engineering hours spent
+         - Opportunity cost
+         - Third-party costs
+         - Recovery costs
+
+      5. Reputational Impact
+         - Social media mentions
+         - Press coverage
+         - Customer trust damage
+         - Competitive impact
+
+      6. Total Impact
+         - Quantified in dollars
+         - Severity rating
+
+      Use actual numbers where possible.
+    expects: "Quantified business impact"
+
+  - id: prevention-actions
+    agent: prevention-engineer
+    input: |
+      Incident: {{task}}
+
+      Root Causes:
+      {{step_outputs.root-cause-analysis}}
+
+      Impact:
+      {{step_outputs.impact-assessment}}
+
+      Design prevention measures:
+      1. Immediate Actions (this week)
+         - Hotfixes deployed
+         - Monitoring added
+         - Runbook updates
+
+      2. Detection Improvements
+         - New alerts needed
+         - Metric thresholds
+         - Anomaly detection
+         - Earlier warning
+
+      3. Mitigation Improvements
+         - Faster rollback
+         - Circuit breakers
+         - Graceful degradation
+         - Blast radius reduction
+
+      4. Prevention Measures
+         - Code changes
+         - Architecture improvements
+         - Testing additions
+         - Deployment safeguards
+
+      5. Process Improvements
+         - Review requirements
+         - Communication protocols
+         - Escalation procedures
+         - Training needs
+
+      6. Monitoring & Observability
+         - Dashboards
+         - SLOs to define
+         - Error budgets
+
+      For each action:
+      - What specifically
+      - Priority (P0/P1/P2)
+      - Owner (role)
+      - Deadline
+      - Success criteria
+    expects: "Prioritized prevention actions with owners"
+
+  - id: postmortem-document
+    agent: postmortem-author
+    input: |
+      Incident: {{task}}
+
+      == POST-MORTEM INPUTS ==
+
+      Timeline:
+      {{step_outputs.timeline-reconstruction}}
+
+      Root Cause:
+      {{step_outputs.root-cause-analysis}}
+
+      Impact:
+      {{step_outputs.impact-assessment}}
+
+      Actions:
+      {{step_outputs.prevention-actions}}
+
+      == CREATE POST-MORTEM DOCUMENT ==
+
+      Write blameless post-mortem following Google SRE format:
+
+      # Incident Post-Mortem: [Title]
+
+      ## Summary
+      - Date/Time:
+      - Duration:
+      - Severity:
+      - Impact Summary:
+
+      ## What Happened
+      (2-3 paragraph narrative)
+
+      ## Timeline
+      (Key events with timestamps)
+
+      ## Root Cause
+      (Clear explanation of why this happened)
+
+      ## Impact
+      - Users affected:
+      - Revenue impact:
+      - SLA impact:
+
+      ## What Went Well
+      (List positives)
+
+      ## What Could Be Improved
+      (List areas for improvement)
+
+      ## Action Items
+      | Action | Priority | Owner | Deadline | Status |
+      (Table of all actions)
+
+      ## Lessons Learned
+      (Key takeaways for the organization)
+
+      ## Related Incidents
+      (Links to similar past incidents)
+
+      ---
+      Post-mortem completed: [date]
+      Reviewed by: [team]
+      Next review: [date]
+
+      Make it useful for future reference.
+    expects: "Complete blameless post-mortem document"
+
+guardrails:
+  - content-filter
+  - pii-detection
+
+timeout_seconds: 1200
+
+metadata:
+  category: sre
+  difficulty: advanced
+  typical_time_saved: "4-8 hours"
+  typical_cost_saved: "$2,000-$5,000"

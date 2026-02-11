@@ -1,0 +1,282 @@
+# Use Case 6: Grant/RFP Proposal Writing
+# Pain Point: Academics and companies spend 40-100 hours per proposal.
+# Success rate is 10-25%. Time taken from actual research/work.
+# Impact: Increase win rate, reduce writing time by 60%
+
+id: grant-proposal
+name: Grant/RFP Proposal Writing
+description: |
+  Comprehensive proposal development for grants and RFPs.
+  Handles research synthesis, proposal structure, budget planning,
+  compliance checking, and final polish for submission.
+
+agents:
+  - id: requirements-analyst
+    role: RFP Requirements Analyst
+    prompt: |
+      You are an expert at analyzing grant solicitations and RFPs.
+      You extract explicit and implicit requirements, evaluation criteria,
+      and compliance must-haves. Miss nothing - every point matters for scoring.
+    tools: [document_analysis, web_search]
+
+  - id: research-synthesizer
+    role: Research Literature Specialist
+    prompt: |
+      You are a research synthesizer who connects proposed work to
+      existing literature and preliminary data. Build compelling
+      scientific arguments. Use proper academic citations.
+    tools: [literature_search, web_search]
+
+  - id: proposal-architect
+    role: Proposal Structure Architect
+    prompt: |
+      You are a proposal architect who designs winning proposal structures.
+      Ensure logical flow, address all criteria, and maximize page limits.
+      Know what reviewers look for. Make it easy to score highly.
+
+  - id: budget-specialist
+    role: Budget and Justification Specialist
+    prompt: |
+      You are a grants budget specialist who creates compliant budgets.
+      Know allowable costs, indirect rates, and justification requirements.
+      Make budgets realistic and defensible.
+    tools: [data_analysis]
+
+  - id: proposal-writer
+    role: Senior Proposal Writer
+    prompt: |
+      You are an award-winning proposal writer with 80%+ win rate.
+      Write compelling narratives that connect technical merit to
+      broader impacts. Use clear, confident, jargon-appropriate language.
+      Every sentence should help win the proposal.
+
+steps:
+  - id: requirements-extraction
+    agent: requirements-analyst
+    input: |
+      Proposal Opportunity: {{task}}
+
+      Extract and analyze requirements:
+      1. Funder Information
+         - Agency/organization profile
+         - Strategic priorities
+         - Past awards analysis
+
+      2. Explicit Requirements
+         - Eligibility criteria
+         - Page limits and formatting
+         - Required sections
+         - Submission deadlines
+
+      3. Evaluation Criteria
+         - Scoring rubric breakdown
+         - Weight of each criterion
+         - What differentiates winning proposals
+
+      4. Compliance Checklist
+         - Required certifications
+         - Attachments needed
+         - System registration requirements
+
+      5. Hidden Requirements
+         - Implicit preferences
+         - Political considerations
+         - Reviewer profile insights
+
+      Create comprehensive compliance matrix.
+    expects: "Requirements analysis with scoring criteria"
+
+  - id: literature-foundation
+    agent: research-synthesizer
+    input: |
+      Proposal: {{task}}
+
+      Requirements:
+      {{step_outputs.requirements-extraction}}
+
+      Build research foundation:
+      1. Background Literature
+         - Current state of the field
+         - Key papers and findings
+         - Gap in knowledge being addressed
+
+      2. Preliminary Data
+         - What evidence supports feasibility?
+         - Pilot study results
+         - Team prior work
+
+      3. Innovation Claim
+         - What's novel about this approach?
+         - How does it advance the field?
+         - Comparison to alternatives
+
+      4. Broader Impacts
+         - Scientific impact
+         - Societal benefit
+         - Economic impact
+         - Educational opportunities
+
+      5. Citation Strategy
+         - Key citations to include
+         - Reviewer-relevant papers
+         - Agency-relevant prior work
+
+      Provide with proper academic citations.
+    expects: "Research foundation with citations"
+
+  - id: proposal-structure
+    agent: proposal-architect
+    input: |
+      Proposal: {{task}}
+
+      Requirements:
+      {{step_outputs.requirements-extraction}}
+
+      Research Foundation:
+      {{step_outputs.literature-foundation}}
+
+      Design proposal structure:
+      1. Executive Summary Strategy
+         - Key messages (3 max)
+         - Unique value proposition
+         - Memorable hook
+
+      2. Section-by-Section Plan
+         For each required section:
+         - Purpose and page allocation
+         - Key points to make
+         - Evidence to include
+         - Evaluation criteria addressed
+
+      3. Flow and Narrative Arc
+         - Problem → Solution → Impact → Team → Timeline
+         - Transitions between sections
+         - Repetition strategy (key messages)
+
+      4. Visual Strategy
+         - Figures needed
+         - Tables to include
+         - Formatting for scannability
+
+      5. Reviewer Experience Design
+         - Make scoring easy
+         - Address likely concerns preemptively
+         - Include clear metrics
+
+      Create detailed outline with page budgets.
+    expects: "Proposal structure with section outlines"
+
+  - id: budget-development
+    agent: budget-specialist
+    input: |
+      Proposal: {{task}}
+
+      Requirements:
+      {{step_outputs.requirements-extraction}}
+
+      Proposal Plan:
+      {{step_outputs.proposal-structure}}
+
+      Develop budget:
+      1. Personnel
+         - PI/Co-PI time allocation
+         - Staff positions and FTEs
+         - Fringe benefit rates
+
+      2. Equipment
+         - Major equipment (>$5K)
+         - Computing resources
+         - Specialized tools
+
+      3. Supplies and Materials
+         - Research consumables
+         - Participant costs
+         - Publication costs
+
+      4. Travel
+         - Conference presentations
+         - Collaboration visits
+         - Field work
+
+      5. Other Direct Costs
+         - Subawards
+         - Consultants
+         - Services
+
+      6. Indirect Costs
+         - F&A rate application
+         - Modified total direct costs
+
+      7. Cost Justification
+         - Narrative for each category
+         - Tie costs to activities
+
+      8. Multi-Year Budget
+         - Year 1, 2, 3+ breakdown
+         - Escalation factors
+
+      Total with detailed justification.
+    expects: "Detailed budget with justification"
+
+  - id: proposal-draft
+    agent: proposal-writer
+    input: |
+      Proposal: {{task}}
+
+      == PROPOSAL DEVELOPMENT PACKAGE ==
+
+      Requirements:
+      {{step_outputs.requirements-extraction}}
+
+      Research Foundation:
+      {{step_outputs.literature-foundation}}
+
+      Structure:
+      {{step_outputs.proposal-structure}}
+
+      Budget:
+      {{step_outputs.budget-development}}
+
+      == WRITE WINNING PROPOSAL ==
+
+      Draft complete proposal:
+      1. Project Summary/Abstract (1 page)
+         - Problem statement
+         - Proposed solution
+         - Expected outcomes
+         - Broader impacts
+
+      2. Project Narrative (main body)
+         - Introduction and background
+         - Specific aims/objectives
+         - Approach/methodology
+         - Preliminary data
+         - Timeline and milestones
+         - Evaluation plan
+         - Broader impacts
+
+      3. References Cited
+
+      4. Budget Justification (from budget step)
+
+      5. Facilities and Resources
+
+      6. Team Qualifications
+
+      Write in confident, clear academic prose.
+      Address every evaluation criterion explicitly.
+      Use signposting to help reviewers find content.
+
+      THIS PROPOSAL SHOULD WIN.
+    expects: "Complete proposal draft ready for review"
+
+guardrails:
+  - content-filter
+
+timeout_seconds: 1800
+
+metadata:
+  category: academic
+  difficulty: expert
+  typical_time_saved: "40-60 hours"
+  typical_cost_saved: "$5,000-$15,000"

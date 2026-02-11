@@ -109,13 +109,112 @@ class WorkflowParser:
         "writer": AgentRole.WRITER,
         "analyst": AgentRole.ANALYST,
         "custom": AgentRole.CUSTOM,
-        # Marketing workflow role mappings
+
+        # Marketing workflow roles
         "social-intel": AgentRole.RESEARCHER,
         "competitor-analyst": AgentRole.ANALYST,
         "content-creator": AgentRole.WRITER,
         "community-manager": AgentRole.WRITER,
         "campaign-lead": AgentRole.PLANNER,
+
+        # M&A Due Diligence roles
+        "financial-analyst": AgentRole.ANALYST,
+        "legal-reviewer": AgentRole.REVIEWER,
+        "market-analyst": AgentRole.ANALYST,
+        "technical-assessor": AgentRole.VERIFIER,
+        "deal-lead": AgentRole.PLANNER,
+
+        # Compliance Audit roles
+        "compliance-scanner": AgentRole.ANALYST,
+        "gap-analyst": AgentRole.ANALYST,
+        "risk-assessor": AgentRole.ANALYST,
+        "remediation-planner": AgentRole.PLANNER,
+        "audit-documenter": AgentRole.WRITER,
+
+        # Patent Landscape roles
+        "patent-searcher": AgentRole.RESEARCHER,
+        "claim-analyst": AgentRole.ANALYST,
+        "landscape-mapper": AgentRole.ANALYST,
+        "fto-assessor": AgentRole.ANALYST,
+        "ip-strategist": AgentRole.PLANNER,
+
+        # Security Assessment roles
+        "threat-modeler": AgentRole.ANALYST,
+        "vuln-scanner": AgentRole.ANALYST,
+        "risk-analyst": AgentRole.ANALYST,
+        "remediation-engineer": AgentRole.DEVELOPER,
+        "security-architect": AgentRole.PLANNER,
+
+        # Churn Analysis roles
+        "data-analyst": AgentRole.ANALYST,
+        "customer-researcher": AgentRole.RESEARCHER,
+        "segment-strategist": AgentRole.PLANNER,
+        "retention-strategist": AgentRole.PLANNER,
+        "executive-advisor": AgentRole.PLANNER,
+
+        # Grant Proposal roles
+        "requirements-analyst": AgentRole.ANALYST,
+        "research-synthesizer": AgentRole.RESEARCHER,
+        "proposal-architect": AgentRole.PLANNER,
+        "budget-specialist": AgentRole.ANALYST,
+        "proposal-writer": AgentRole.WRITER,
+
+        # Incident Post-Mortem roles
+        "timeline-analyst": AgentRole.ANALYST,
+        "rca-specialist": AgentRole.ANALYST,
+        "impact-assessor": AgentRole.ANALYST,
+        "prevention-engineer": AgentRole.DEVELOPER,
+        "postmortem-author": AgentRole.WRITER,
     }
+
+    # Fallback patterns for auto-mapping unknown roles
+    ROLE_PATTERNS = {
+        "analyst": AgentRole.ANALYST,
+        "researcher": AgentRole.RESEARCHER,
+        "writer": AgentRole.WRITER,
+        "planner": AgentRole.PLANNER,
+        "developer": AgentRole.DEVELOPER,
+        "engineer": AgentRole.DEVELOPER,
+        "reviewer": AgentRole.REVIEWER,
+        "verifier": AgentRole.VERIFIER,
+        "tester": AgentRole.TESTER,
+        "lead": AgentRole.PLANNER,
+        "strategist": AgentRole.PLANNER,
+        "specialist": AgentRole.ANALYST,
+        "assessor": AgentRole.ANALYST,
+        "advisor": AgentRole.PLANNER,
+        "architect": AgentRole.PLANNER,
+        "scanner": AgentRole.ANALYST,
+        "modeler": AgentRole.ANALYST,
+    }
+
+    @classmethod
+    def resolve_role(cls, role_id: str) -> AgentRole:
+        """
+        Resolve a role ID to an AgentRole.
+
+        First checks explicit mappings, then uses pattern matching,
+        finally falls back to CUSTOM.
+
+        Args:
+            role_id: The role identifier from YAML
+
+        Returns:
+            Appropriate AgentRole
+        """
+        role_lower = role_id.lower()
+
+        # Check explicit mapping
+        if role_lower in cls.ROLE_MAP:
+            return cls.ROLE_MAP[role_lower]
+
+        # Try pattern matching (look for keywords in role name)
+        for pattern, role in cls.ROLE_PATTERNS.items():
+            if pattern in role_lower:
+                return role
+
+        # Fallback to CUSTOM
+        return AgentRole.CUSTOM
 
     def parse(self, yaml_content: str) -> WorkflowDefinition:
         """Parse YAML string into WorkflowDefinition"""
@@ -193,9 +292,8 @@ class WorkflowParser:
         # Create and add agents
         agent_map = {}
         for agent_def in definition.agents:
-            role = self.ROLE_MAP.get(agent_def.role.lower())
-            if role is None:
-                raise ValueError(f"Unknown agent role: {agent_def.role}")
+            # Use dynamic role resolution with fallback to CUSTOM
+            role = self.resolve_role(agent_def.role)
 
             agent = create_agent(
                 role,

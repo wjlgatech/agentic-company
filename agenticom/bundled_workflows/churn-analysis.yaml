@@ -1,0 +1,276 @@
+# Use Case 5: Customer Churn Analysis & Prevention
+# Pain Point: B2B SaaS loses 5-7% customers/year. Each enterprise customer
+# worth $50K-500K ARR. Manual analysis misses at-risk signals.
+# Impact: 10% churn reduction = millions in retained revenue
+
+id: churn-analysis
+name: Customer Churn Analysis & Prevention
+description: |
+  Comprehensive churn analysis with predictive modeling and
+  retention strategy development. Identifies at-risk customers,
+  root causes, and creates personalized retention playbooks.
+
+agents:
+  - id: data-analyst
+    role: Customer Analytics Specialist
+    prompt: |
+      You are a customer analytics expert specializing in churn prediction.
+      You analyze usage patterns, engagement metrics, support tickets,
+      and billing data to identify churn signals. Use cohort analysis
+      and statistical methods. Be data-driven and specific.
+    tools: [data_analysis]
+
+  - id: customer-researcher
+    role: Voice of Customer Researcher
+    prompt: |
+      You are a customer researcher who understands why customers leave.
+      Analyze feedback, reviews, exit interviews, and support conversations.
+      Identify emotional triggers and unmet needs. Empathize with customers.
+    tools: [web_search, social_api]
+
+  - id: segment-strategist
+    role: Customer Segmentation Strategist
+    prompt: |
+      You are a segmentation expert who groups customers by behavior,
+      value, and risk. Create actionable segments that drive different
+      retention strategies. Use RFM and behavioral clustering.
+    tools: [data_analysis]
+
+  - id: retention-strategist
+    role: Retention Strategy Director
+    prompt: |
+      You are a retention expert who designs intervention programs.
+      Create personalized retention plays based on churn drivers.
+      Focus on high-value, saveable customers. Be creative but practical.
+
+  - id: executive-advisor
+    role: Chief Customer Officer
+    prompt: |
+      You are a CCO who balances retention costs with customer lifetime value.
+      Make ROI-driven recommendations. Consider organizational capabilities.
+      Present insights that drive executive action.
+
+steps:
+  - id: churn-patterns
+    agent: data-analyst
+    input: |
+      Business Context: {{task}}
+
+      Analyze churn patterns:
+      1. Churn Rate Analysis
+         - Monthly/quarterly/annual churn rates
+         - Logo churn vs revenue churn
+         - Voluntary vs involuntary churn
+
+      2. Leading Indicators
+         - Usage decline patterns (DAU, feature adoption)
+         - Support ticket escalation
+         - NPS/CSAT score changes
+         - Payment issues
+         - Contract/renewal signals
+
+      3. Cohort Analysis
+         - Churn by acquisition cohort
+         - Churn by customer segment
+         - Time-to-churn distribution
+
+      4. Predictive Signals
+         - Features correlated with retention
+         - Features correlated with churn
+         - Statistical significance of each
+
+      Provide specific metrics and benchmarks.
+    expects: "Churn analysis with leading indicators"
+
+  - id: churn-reasons
+    agent: customer-researcher
+    input: |
+      Business: {{task}}
+
+      Quantitative Analysis:
+      {{step_outputs.churn-patterns}}
+
+      Research churn reasons:
+      1. Exit Interview Themes
+         - Top 5 stated reasons for leaving
+         - What they switched to
+         - What would have kept them
+
+      2. Feedback Analysis
+         - Common complaints
+         - Feature requests unfulfilled
+         - Support frustrations
+
+      3. Competitive Factors
+         - Why competitors are winning
+         - Feature gaps
+         - Pricing concerns
+
+      4. Emotional Triggers
+         - Trust/relationship issues
+         - Feeling unvalued
+         - Poor experiences
+
+      5. External Factors
+         - Budget cuts
+         - Company changes
+         - Industry shifts
+
+      Prioritize by frequency and impact.
+    expects: "Churn reasons with customer quotes"
+
+  - id: customer-segments
+    agent: segment-strategist
+    input: |
+      Business: {{task}}
+
+      Churn Data:
+      {{step_outputs.churn-patterns}}
+
+      Churn Reasons:
+      {{step_outputs.churn-reasons}}
+
+      Create customer segments:
+      1. Risk Segments
+         - High risk / High value (save at all costs)
+         - High risk / Low value (selective intervention)
+         - Low risk / High value (protect and grow)
+         - Low risk / Low value (standard care)
+
+      2. Behavioral Segments
+         - Power users (high engagement)
+         - Passive users (low engagement)
+         - Declining users (dropping engagement)
+         - At-risk users (churn signals present)
+
+      3. Churn Reason Segments
+         - Price sensitive
+         - Feature gaps
+         - Service issues
+         - Strategic misfit
+
+      4. Segment Sizing
+         - Count and revenue per segment
+         - Save potential per segment
+         - Intervention cost per segment
+
+      Include specific criteria for each segment.
+    expects: "Customer segmentation with criteria"
+
+  - id: retention-playbooks
+    agent: retention-strategist
+    input: |
+      Business: {{task}}
+
+      Churn Analysis:
+      {{step_outputs.churn-patterns}}
+
+      Root Causes:
+      {{step_outputs.churn-reasons}}
+
+      Segments:
+      {{step_outputs.customer-segments}}
+
+      Design retention playbooks:
+      1. Early Warning System
+         - Triggers to identify at-risk customers
+         - Alert escalation rules
+         - SLA for response
+
+      2. Segment-Specific Plays
+         For each segment:
+         - Intervention type
+         - Timing
+         - Owner (CSM, support, exec)
+         - Talk track
+         - Offers/incentives
+         - Success metrics
+
+      3. Proactive Programs
+         - QBR enhancement
+         - Executive sponsorship
+         - Customer advisory board
+         - Success planning
+
+      4. Save Desk Protocol
+         - Escalation criteria
+         - Authority levels
+         - Maximum discounts
+         - Win-back timeline
+
+      5. Product Improvements
+         - Features to build
+         - UX improvements
+         - Onboarding changes
+
+      Include specific scripts and templates.
+    expects: "Retention playbooks per segment"
+
+  - id: executive-summary
+    agent: executive-advisor
+    input: |
+      Business: {{task}}
+
+      == CHURN ANALYSIS ==
+
+      Patterns:
+      {{step_outputs.churn-patterns}}
+
+      Reasons:
+      {{step_outputs.churn-reasons}}
+
+      Segments:
+      {{step_outputs.customer-segments}}
+
+      Playbooks:
+      {{step_outputs.retention-playbooks}}
+
+      == EXECUTIVE PRESENTATION ==
+
+      Create board-ready churn presentation:
+      1. The Churn Problem
+         - Current state (rate, revenue impact)
+         - Trend (getting better/worse)
+         - Industry benchmark comparison
+
+      2. Root Cause Summary
+         - Top 3 controllable reasons
+         - Top 3 uncontrollable reasons
+         - What customers actually say
+
+      3. Retention Investment Case
+         - Cost of churn (LTV × churn rate)
+         - Cost of retention program
+         - Expected ROI
+         - Payback period
+
+      4. Recommended Actions
+         - Quick wins (next 30 days)
+         - Program launch (90 days)
+         - Product roadmap items
+
+      5. Success Metrics
+         - Churn rate target
+         - NPS target
+         - Expansion revenue target
+         - Leading indicators to track
+
+      6. Resource Request
+         - Headcount
+         - Tools
+         - Budget
+
+      Make the case for investment in retention.
+    expects: "Executive presentation with ROI case"
+
+guardrails:
+  - content-filter
+  - pii-detection
+
+timeout_seconds: 1500
+
+metadata:
+  category: customer-success
+  difficulty: advanced
+  typical_time_saved: "1-2 weeks"
+  typical_cost_saved: "$10,000-$30,000"

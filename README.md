@@ -6,14 +6,14 @@
 
 <p align="center">
   <strong>One agent makes mistakes. Five agents ship features.</strong><br>
-  <em>Multi-agent orchestration for OpenClaw, Nanobot, and Ollama.</em>
+  <em>Multi-agent orchestration for OpenClaw and Nanobot.</em>
 </p>
 
 <p align="center">
   <a href="#-use-with-openclaw">OpenClaw</a> •
-  <a href="#-use-with-nanobot">Nanobot</a> •
   <a href="#-use-standalone">Standalone</a> •
-  <a href="#-natural-language-builder">Natural Language</a>
+  <a href="#-natural-language-builder">Natural Language</a> •
+  <a href="#-vs-antfarm">vs Antfarm</a>
 </p>
 
 ---
@@ -30,164 +30,150 @@ Agenticom:     User → Planner → Developer → Verifier → Tester → Review
                               (cross-verification)
 ```
 
-Works with **OpenClaw** (Claude), **Nanobot** (GPT), or **Ollama** (FREE local).
-
-*Inspired by [antfarm](https://github.com/jlowin/antfarm)'s elegant YAML + SQLite pattern.*
+*Inspired by [antfarm](https://github.com/snarktank/antfarm)'s elegant YAML + SQLite pattern.*
 
 ---
 
-## 🔷 Use with OpenClaw
+## 🦞 Use with OpenClaw
 
-OpenClaw (Claude Code) users can add Agenticom as an MCP tool.
+[OpenClaw](https://github.com/openclaw/openclaw) is a personal AI assistant for WhatsApp, Telegram, Slack, Discord, and more. Agenticom adds multi-agent workflows to OpenClaw.
 
-### Setup (30 seconds)
+### Install Agenticom as OpenClaw Skill
 
 ```bash
-pip install agentic-company
+# Clone to OpenClaw workspace
+git clone https://github.com/wjlgatech/agentic-company.git ~/.openclaw/workspace/agenticom
+cd ~/.openclaw/workspace/agenticom
+
+# Install Python package
+pip install -e .
+
+# Install bundled workflows
+agenticom install
+
+# Copy skill to OpenClaw skills directory
+cp -r skills/agenticom-workflows ~/.openclaw/skills/
 ```
 
-Add to `~/.claude/claude_desktop_config.json`:
+### Use in OpenClaw
 
-```json
-{
-  "mcpServers": {
-    "agenticom": {
-      "command": "python",
-      "args": ["-m", "orchestration.mcp_server"]
-    }
-  }
-}
-```
-
-### Use in Claude Code
-
-Once configured, you can ask Claude:
+Once installed, tell your OpenClaw agent:
 
 ```
 "Use agenticom to build user authentication with JWT"
 ```
 
-Claude will have access to these tools:
+Or run directly:
 
-| Tool | Description |
-|------|-------------|
-| `agenticom_list_teams` | List available agent teams |
-| `agenticom_run_team` | Run a team on a task |
-| `agenticom_execute_step` | Execute a single step |
-| `agenticom_create_team` | Create custom team |
+```bash
+agenticom workflow run feature-dev "Add JWT authentication to the REST API"
+```
 
 <details>
-<summary><strong>Example: Run marketing campaign in Claude Code</strong></summary>
+<summary><strong>Example: Full workflow in OpenClaw</strong></summary>
 
 ```
-You: Use agenticom to create a viral launch campaign for my new CLI tool
+You: Use agenticom to add dark mode to my app
 
-Claude: I'll use the marketing team from Agenticom.
+OpenClaw: I'll run the feature-dev workflow with Agenticom.
 
-[Calls agenticom_run_team with team="marketing", task="Create viral launch..."]
+$ agenticom workflow run feature-dev "Add dark mode toggle with system preference detection"
 
-The team executed 5 steps:
-1. SocialIntelAgent: Found 23 pain points on Reddit/HN about CLI tools
-2. CompetitorAnalyst: Analyzed fig, warp, starship - identified gaps
-3. ContentCreator: Generated 7-day content calendar with threads
-4. CommunityManager: Created outreach plan for 15 communities
-5. CampaignLead: Compiled 30-day execution plan
+🚀 Running workflow: feature-dev
+📝 Task: Add dark mode toggle with system preference detection
 
-[Full output with actionable items]
+✅ Run ID: a7b3c9d2
+📊 Status: completed
+📈 Progress: 5/5 steps
+
+📋 Step Results:
+   ✅ plan (Planner): completed
+      - Created 4 stories: theme context, toggle component, CSS variables, persistence
+   ✅ implement (Developer): completed
+      - Implemented ThemeProvider, DarkModeToggle, CSS custom properties
+   ✅ verify (Verifier): completed
+      - Verified all acceptance criteria met
+   ✅ test (Tester): completed
+      - Added unit tests for theme switching
+   ✅ review (Reviewer): completed
+      - Code review passed, ready to merge
+
+The dark mode feature has been implemented with:
+- System preference detection
+- Manual toggle override
+- Persistent preference storage
+- Smooth transition animations
 ```
 </details>
 
-### Python API with OpenClaw
+### Available Workflows
 
-```python
-from orchestration.integrations import OpenClawExecutor
-from orchestration.agents import AgentTeam, PlannerAgent, DeveloperAgent, VerifierAgent
-
-# Uses ANTHROPIC_API_KEY from environment
-executor = OpenClawExecutor()
-
-# Create team with Claude as the brain
-team = AgentTeam(
-    agents=[PlannerAgent(), DeveloperAgent(), VerifierAgent()],
-    executor=executor
-)
-
-# Run task
-result = await team.run("Add rate limiting to the API")
-```
+| Workflow | Agents | Steps | Use Case |
+|----------|--------|-------|----------|
+| `feature-dev` | 5 | 5 | Planner → Developer → Verifier → Tester → Reviewer |
+| `marketing-campaign` | 5 | 5 | SocialIntel → Competitor → Content → Community → Lead |
 
 ---
 
-## 🟢 Use with Nanobot
+## 🟢 Use Standalone
 
-Nanobot (OpenAI) users can use Agenticom with GPT models.
+No OpenClaw? Run Agenticom directly with any LLM backend.
 
-### Setup
+### Install
 
 ```bash
 pip install agentic-company
-export OPENAI_API_KEY=sk-...
-```
-
-### Python API with Nanobot
-
-```python
-from orchestration.integrations import NanobotExecutor
-from orchestration.agents import AgentTeam, PlannerAgent, DeveloperAgent, VerifierAgent
-
-# Uses OPENAI_API_KEY from environment
-executor = NanobotExecutor(model="gpt-4-turbo")
-
-# Create team with GPT as the brain
-team = AgentTeam(
-    agents=[PlannerAgent(), DeveloperAgent(), VerifierAgent()],
-    executor=executor
-)
-
-# Run task
-result = await team.run("Refactor the authentication module")
-```
-
-### CLI with Nanobot
-
-```bash
-export OPENAI_API_KEY=sk-...
 agenticom install
-agenticom workflow run feature-dev "Add caching layer"
 ```
 
-Agenticom auto-detects your API key and uses Nanobot.
-
----
-
-## 🦙 Use Standalone (FREE with Ollama)
-
-No API key? Run 100% local with Ollama.
-
-### Setup
+### With Ollama (FREE)
 
 ```bash
-# Install Ollama (one time)
+# Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve &
 ollama pull llama3.2
 
-# Install Agenticom
-pip install agentic-company
-agenticom install
-```
-
-### CLI (Recommended)
-
-```bash
+# Run workflow
 agenticom workflow run feature-dev "Build REST API for user management"
 ```
 
-```
-🚀 Running workflow: feature-dev
-📝 Task: Build REST API for user management
+### With Claude (Anthropic)
 
-✅ Run ID: 27c491eb
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+agenticom workflow run feature-dev "Add caching layer to API"
+```
+
+### With GPT (OpenAI / Nanobot)
+
+```bash
+export OPENAI_API_KEY=sk-...
+agenticom workflow run marketing-campaign "Launch campaign for AI coding tool"
+```
+
+### CLI Commands
+
+```bash
+agenticom install                    # Install bundled workflows
+agenticom workflow list              # List all workflows
+agenticom workflow run <id> <task>   # Execute workflow
+agenticom workflow status <run-id>   # Check status
+agenticom workflow resume <run-id>   # Resume failed run
+agenticom stats                      # Show statistics
+agenticom uninstall --force          # Remove all data
+```
+
+<details>
+<summary><strong>Example: CLI output</strong></summary>
+
+```bash
+$ agenticom workflow run feature-dev "Add error handling to API endpoints"
+
+🚀 Running workflow: feature-dev
+📝 Task: Add error handling to API endpoints
+
+✅ Run ID: 12f3e885
 📊 Status: completed
 📈 Progress: 5/5 steps
 
@@ -197,77 +183,29 @@ agenticom workflow run feature-dev "Build REST API for user management"
    ✅ verify (Verifier): completed
    ✅ test (Tester): completed
    ✅ review (Reviewer): completed
+
+💡 Check status: agenticom workflow status 12f3e885
+
+$ agenticom stats
+
+📊 Agenticom Statistics
+========================================
+📁 Workflows installed: 2
+🔹 Workflow names: Feature Development Team, Viral Marketing Campaign
+📈 Total runs: 3
+📂 Database: ~/.agenticom/state.db
+
+📊 Runs by status:
+   • completed: 3
+   • failed: 0
 ```
-
-### Python API with Ollama
-
-```python
-from orchestration.integrations import OllamaExecutor
-from orchestration.agents import AgentTeam, PlannerAgent, DeveloperAgent, VerifierAgent
-
-# FREE - no API key needed
-executor = OllamaExecutor(model="llama3.2")
-
-team = AgentTeam(
-    agents=[PlannerAgent(), DeveloperAgent(), VerifierAgent()],
-    executor=executor
-)
-
-result = await team.run("Write unit tests for the payment module")
-```
-
-### Auto-Detection
-
-Don't know which backend? Let Agenticom figure it out:
-
-```python
-from orchestration.integrations import auto_setup_executor
-
-# Tries: Ollama → OpenClaw → Nanobot
-executor = auto_setup_executor()
-```
+</details>
 
 ---
 
 ## 💬 Natural Language Builder
 
 Build workflows by answering questions. No code required.
-
-### Interactive CLI
-
-```bash
-agentic create
-```
-
-```
-👋 Hi! What would you like your AI team to help you with?
-
-   a) Build a new feature ⭐ Most Popular
-   b) Fix a bug
-   c) Write content
-   d) Review & improve code
-   e) Something else
-
-> a
-
-🏷️ What should we call this workflow?
-> jwt-auth
-
-🤖 Which AI agents should be on your team?
-   a) Full team (5 agents) ⭐ Recommended
-   b) Quick team (3 agents)
-   c) Custom
-
-> a
-
-📝 Describe the task:
-> Add JWT authentication with refresh tokens to the FastAPI backend
-
-✅ Generated workflow!
-
-Saved to: ~/.agenticom/workflows/jwt-auth.yaml
-Run with: agenticom workflow run jwt-auth
-```
 
 ### Python API
 
@@ -276,11 +214,11 @@ from orchestration.conversation import ConversationBuilder
 
 builder = ConversationBuilder()
 
-# Answer questions programmatically
+# Answer questions to build workflow
 builder.answer("a")  # Build a feature
-builder.answer("auth-flow")  # Workflow name
-builder.answer("a")  # Full team
-builder.answer("Add OAuth2 login with Google and GitHub")
+builder.answer("auth-flow")  # Name it
+builder.answer("a")  # Full team (5 agents)
+builder.answer("Add OAuth2 login with Google")
 
 # Generate outputs
 yaml_config = builder.generate_yaml()
@@ -288,17 +226,16 @@ python_code = builder.generate_python()
 ```
 
 <details>
-<summary><strong>Generated YAML Example</strong></summary>
+<summary><strong>Generated YAML</strong></summary>
 
 ```yaml
 id: auth-flow
 name: Auth Flow
-description: Add OAuth2 login with Google and GitHub
+description: Add OAuth2 login with Google
 
 agents:
   - role: planner
-    guardrails:
-      - content-filter
+    guardrails: [content-filter]
   - role: developer
   - role: verifier
   - role: tester
@@ -327,34 +264,32 @@ steps:
 ```
 </details>
 
-<details>
-<summary><strong>Generated Python Example</strong></summary>
+---
 
-```python
-from orchestration import TeamBuilder, AgentRole
+## ⚔️ vs Antfarm
 
-team = (TeamBuilder("auth-flow")
-    .with_planner()
-    .with_developer()
-    .with_verifier()
-    .with_tester()
-    .with_reviewer()
-    .step("plan", AgentRole.PLANNER, "Create plan: {task}")
-    .step("impl", AgentRole.DEVELOPER, "Implement: {plan}",
-          verified_by=AgentRole.VERIFIER)
-    .step("test", AgentRole.TESTER, "Test: {impl}")
-    .step("review", AgentRole.REVIEWER, "Review: {test}")
-    .build())
+Both [Antfarm](https://github.com/snarktank/antfarm) and Agenticom provide multi-agent workflows for OpenClaw. Here's how they differ:
 
-result = await team.run("Add OAuth2 login with Google and GitHub")
-```
-</details>
+| Feature | Antfarm | Agenticom |
+|---------|---------|-----------|
+| Language | TypeScript | Python |
+| Execution | Cron polling (15 min) | Direct execution |
+| **Guardrails** | ❌ | ✅ Content filter, rate limiter |
+| **Memory** | ❌ | ✅ Persistent remember/recall |
+| **Approval Gates** | ❌ | ✅ Auto/Human/Hybrid |
+| **Multi-Backend** | ❌ | ✅ Ollama (FREE), Claude, GPT |
+| **REST API** | ❌ | ✅ 27 endpoints |
+| **Caching** | ❌ | ✅ LLM response cache |
+| Dashboard | ✅ Web UI | CLI-based |
+| OpenClaw Skill | ✅ | ✅ |
+
+**Use Antfarm if:** You want a web dashboard and cron-based execution.
+
+**Use Agenticom if:** You need guardrails, memory, approval gates, or want to use Python.
 
 ---
 
 ## 🛡️ Built-in Features
-
-Agenticom includes production features out of the box:
 
 <details>
 <summary><strong>Guardrails</strong> — Block sensitive data</summary>
@@ -365,24 +300,19 @@ from orchestration.guardrails import ContentFilter, GuardrailPipeline
 pipeline = GuardrailPipeline([
     ContentFilter(blocked_patterns=["password", r"sk-[a-zA-Z0-9]{20,}"])
 ])
-
 # Blocks: "My password: secret123" ❌
-# Allows: "Write a login function" ✅
 ```
 </details>
 
 <details>
-<summary><strong>Memory</strong> — Remember context across sessions</summary>
+<summary><strong>Memory</strong> — Remember context</summary>
 
 ```python
 from orchestration.memory import LocalMemoryStore
 
 memory = LocalMemoryStore()
 memory.remember("User prefers Python", tags=["preference"])
-memory.remember("Project uses FastAPI", tags=["tech"])
-
-results = memory.recall("what framework", limit=3)
-# Returns: "Project uses FastAPI"
+results = memory.recall("what language", limit=3)
 ```
 </details>
 
@@ -392,24 +322,8 @@ results = memory.recall("what framework", limit=3)
 ```python
 from orchestration.approval import AutoApprovalGate, HumanApprovalGate
 
-# Auto-approve safe operations
-auto = AutoApprovalGate()
-
-# Require human approval for destructive actions
-human = HumanApprovalGate(timeout_seconds=300)
-```
-</details>
-
-<details>
-<summary><strong>Observability</strong> — Metrics & tracing</summary>
-
-```python
-from orchestration.observability import MetricsCollector
-
-metrics = MetricsCollector()
-metrics.increment("workflow_runs", labels={"team": "feature-dev"})
-
-# Export to Prometheus: GET /metrics
+auto = AutoApprovalGate()  # For safe operations
+human = HumanApprovalGate(timeout_seconds=300)  # For risky ones
 ```
 </details>
 
@@ -424,53 +338,30 @@ cache = LocalCache()
 @cached(cache, ttl=3600)
 def llm_call(prompt):
     return executor.execute_sync(prompt)
-
-# Second call is FREE (cache hit)
-```
-</details>
-
-<details>
-<summary><strong>Security</strong> — JWT, audit, sanitization</summary>
-
-```python
-from orchestration.security import create_jwt_token, AuditLogger
-
-token = create_jwt_token({"user_id": "alice"})
-audit = AuditLogger()
-audit.log("workflow_started", user_id="alice", resource="feature-dev")
 ```
 </details>
 
 ---
 
-## 📦 Installation
-
-```bash
-# Basic
-pip install agentic-company
-agenticom install
-
-# With FREE local LLM
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama pull llama3.2
-```
-
----
-
-## 🗂️ Project Structure
+## 📦 Project Structure
 
 ```
-├── agenticom/              # CLI (run workflows)
-│   └── bundled_workflows/  # Ready-to-use teams
+├── agenticom/              # CLI (antfarm-style)
+│   ├── cli.py              # Commands
+│   ├── core.py             # Orchestration
+│   ├── state.py            # SQLite persistence
+│   └── bundled_workflows/  # Ready-to-use workflows
 │
 ├── orchestration/          # Full platform
-│   ├── integrations/       # OpenClaw, Nanobot, Ollama
-│   ├── agents/             # Agent definitions
 │   ├── guardrails.py       # Content filtering
 │   ├── memory.py           # Persistent memory
-│   ├── approval.py         # Human-in-the-loop
-│   ├── mcp_server.py       # Claude Code integration
-│   └── conversation.py     # Natural language builder
+│   ├── approval.py         # Approval gates
+│   ├── cache.py            # Response caching
+│   └── integrations/       # Ollama, Claude, GPT
+│
+├── skills/                 # OpenClaw skill
+│   └── agenticom-workflows/
+│       └── SKILL.md
 ```
 
 ---

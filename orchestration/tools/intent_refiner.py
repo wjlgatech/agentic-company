@@ -44,11 +44,22 @@ class Complexity(Enum):
 
 class Domain(Enum):
     """Knowledge domains."""
+    # Core domains
     TECHNICAL = "technical"         # Code, systems, data
-    BUSINESS = "business"           # Strategy, operations, finance
+    BUSINESS = "business"           # Strategy, operations, marketing, sales
     CREATIVE = "creative"           # Writing, design, content
     RESEARCH = "research"           # Academic, scientific
     PERSONAL = "personal"           # Life, productivity
+
+    # Specialized domains
+    SCIENCE = "science"             # Biology, chemistry, physics, quantum
+    FINANCE = "finance"             # Stocks, crypto, real estate, investing
+    HEALTH = "health"               # Medical, wellness, mental health
+    LEGAL = "legal"                 # Law, contracts, IP, compliance
+    EDUCATION = "education"         # Teaching, learning, curriculum
+    ENTERTAINMENT = "entertainment" # Music, film, gaming, content creation
+    FASHION = "fashion"             # Style, clothing, design
+    ENTREPRENEURSHIP = "entrepreneurship"  # Startups, founding, scaling
 
 
 @dataclass
@@ -242,25 +253,126 @@ class IntentRefiner:
 
     # Domain signal words
     DOMAIN_SIGNALS = {
+        # Core domains
         Domain.TECHNICAL: [
             "code", "api", "database", "server", "bug", "deploy",
-            "function", "class", "error", "debug", "test"
+            "function", "class", "error", "debug", "test", "software",
+            "programming", "algorithm", "framework", "library", "git",
+            "frontend", "backend", "devops", "cloud", "aws", "docker"
         ],
         Domain.BUSINESS: [
             "revenue", "customer", "market", "strategy", "sales",
-            "growth", "profit", "competitor", "stakeholder"
+            "growth", "profit", "competitor", "stakeholder", "marketing",
+            "brand", "campaign", "kpi", "roi", "pipeline", "b2b", "b2c",
+            "team", "management", "leadership", "hr", "hiring", "operations"
         ],
         Domain.CREATIVE: [
-            "story", "design", "content", "brand", "visual",
-            "creative", "artistic", "style", "tone"
+            "story", "design", "content", "visual", "creative", "artistic",
+            "style", "tone", "writing", "novel", "screenplay", "script",
+            "graphics", "illustration", "ux", "ui"
         ],
         Domain.RESEARCH: [
-            "study", "paper", "literature", "hypothesis", "data",
-            "experiment", "methodology", "findings", "citation"
+            "study", "paper", "papers", "literature", "hypothesis", "experiment",
+            "methodology", "findings", "citation", "academic", "thesis",
+            "dissertation", "peer review", "journal", "research", "publication"
         ],
         Domain.PERSONAL: [
-            "my life", "personal", "habit", "goal", "productivity",
-            "schedule", "organize", "planning"
+            "my life", "personal", "habit", "goal setting", "productivity",
+            "schedule", "organize", "planning", "self-improvement",
+            "work-life", "balance", "routine"
+        ],
+
+        # Science & Research (specialized)
+        Domain.SCIENCE: [
+            "biology", "chemistry", "physics", "quantum", "gene", "genes",
+            "dna", "rna", "protein", "cell", "cells", "crispr", "genomic",
+            "sequencing", "pcr", "microscopy", "spectroscopy", "nmr",
+            "mass spec", "chromatography", "synthesis", "reaction", "catalyst",
+            "molecular", "compound", "qubit", "entanglement", "superposition",
+            "hamiltonian", "qiskit", "synthetic biology", "metabolic",
+            "pathway", "bioreactor", "fermentation", "enzyme", "biomarker",
+            "clinical trial", "irb", "particle", "hadron", "quantum field",
+            "condensed matter", "lab", "pipette", "assay", "western blot",
+            "elisa", "experiment", "scientific", "hypothesis"
+        ],
+
+        # Finance
+        Domain.FINANCE: [
+            "stock", "invest", "portfolio", "dividend", "etf", "mutual fund",
+            "trading", "options", "puts", "calls", "hedge", "forex",
+            "crypto", "bitcoin", "ethereum", "blockchain", "defi", "yield",
+            "nft", "token", "wallet", "exchange", "binance", "coinbase",
+            "real estate", "property", "rental", "mortgage", "reit", "flip",
+            "retirement", "401k", "ira", "compound interest", "passive income",
+            "market cap", "pe ratio", "fundamental", "technical analysis"
+        ],
+
+        # Health & Wellness
+        Domain.HEALTH: [
+            "health", "healthy", "healthier", "medical", "doctor", "symptom",
+            "diagnosis", "treatment", "medication", "therapy", "hospital",
+            "clinic", "patient", "nutrition", "diet", "calories", "macros",
+            "vitamins", "supplements", "fitness", "workout", "exercise",
+            "cardio", "strength", "muscle", "weight", "lose weight", "bmi",
+            "metabolism", "sleep", "insomnia", "mental health", "anxiety",
+            "anxious", "depression", "depressed", "stress", "stressed",
+            "therapist", "meditation", "mindfulness", "wellness", "self-care",
+            "burnout", "longevity", "aging", "regenerative", "stem cell",
+            "biological age"
+        ],
+
+        # Legal
+        Domain.LEGAL: [
+            "legal", "law", "lawyer", "attorney", "court", "litigation",
+            "contract", "agreement", "clause", "terms", "conditions",
+            "intellectual property", "ip", "patent", "trademark", "copyright",
+            "compliance", "regulation", "gdpr", "hipaa", "sec", "fda",
+            "liability", "negligence", "tort", "dispute", "arbitration",
+            "corporate", "llc", "incorporation", "bylaws", "governance",
+            "employment law", "non-compete", "nda", "licensing", "protect"
+        ],
+
+        # Education
+        Domain.EDUCATION: [
+            "teach", "teaching", "learn", "learning", "student", "students",
+            "teacher", "professor", "course", "curriculum", "lesson",
+            "lecture", "assignment", "exam", "quiz", "grade", "grading",
+            "assessment", "rubric", "syllabus", "textbook", "classroom",
+            "online learning", "mooc", "tutoring", "mentorship", "k-12",
+            "higher ed", "university", "college", "school", "pedagogy",
+            "edtech", "lms", "engaged", "engagement", "retention", "class"
+        ],
+
+        # Entertainment & Media
+        Domain.ENTERTAINMENT: [
+            "music", "song", "lyrics", "melody", "beat", "album", "track",
+            "film", "movie", "screenplay", "director", "cinema", "scene",
+            "game", "gaming", "level design", "mechanics", "unity", "unreal",
+            "streaming", "twitch", "youtube", "content creator", "influencer",
+            "podcast", "episode", "audio", "production", "mixing", "mastering",
+            "comedy", "standup", "joke", "humor", "sketch",
+            "animation", "vfx", "3d", "render", "storyboard"
+        ],
+
+        # Fashion
+        Domain.FASHION: [
+            "fashion", "clothing", "clothes", "outfit", "outfits", "wardrobe",
+            "wear", "wearing", "dress", "dressing", "trend", "trends",
+            "designer", "collection", "runway", "look", "looks",
+            "sustainable fashion", "eco-friendly", "vintage", "thrift",
+            "accessory", "accessories", "jewelry", "shoes", "handbag", "watch",
+            "dress code", "formal", "casual", "business casual", "streetwear",
+            "capsule wardrobe", "color palette", "fabric", "textile", "attire"
+        ],
+
+        # Entrepreneurship
+        Domain.ENTREPRENEURSHIP: [
+            "startup", "founder", "cofounder", "entrepreneur", "venture",
+            "funding", "investor", "vc", "angel", "seed", "series a",
+            "pitch", "deck", "valuation", "equity", "cap table",
+            "mvp", "product market fit", "pivot", "scale", "growth hacking",
+            "bootstrapping", "accelerator", "incubator", "yc", "techstars",
+            "exit", "acquisition", "ipo", "unicorn", "burn rate", "runway"
         ],
     }
 
@@ -363,6 +475,19 @@ class IntentRefiner:
     # STAGE 1: PARSE
     # =========================================================================
 
+    def _match_signal(self, signal: str, text: str) -> bool:
+        """
+        Check if signal matches in text using word boundaries.
+        Multi-word signals use substring matching, single-word use word boundaries.
+        """
+        if " " in signal:
+            # Multi-word signal - use substring matching
+            return signal in text
+        else:
+            # Single-word signal - use word boundary matching
+            pattern = r'\b' + re.escape(signal) + r'\b'
+            return bool(re.search(pattern, text))
+
     def parse(self, user_input: str) -> IntentClassification:
         """
         Classify user intent along multiple dimensions.
@@ -381,7 +506,7 @@ class IntentRefiner:
         task_signals = []
 
         for ttype, signals in self.TASK_SIGNALS.items():
-            matches = [s for s in signals if s in input_lower]
+            matches = [s for s in signals if self._match_signal(s, input_lower)]
             if len(matches) > len(task_signals):
                 task_type = ttype
                 task_signals = matches
@@ -393,7 +518,7 @@ class IntentRefiner:
         domain_signals = []
 
         for dom, signals in self.DOMAIN_SIGNALS.items():
-            matches = [s for s in signals if s in input_lower]
+            matches = [s for s in signals if self._match_signal(s, input_lower)]
             if len(matches) > len(domain_signals):
                 domain = dom
                 domain_signals = matches
@@ -673,11 +798,21 @@ class IntentRefiner:
 
         # Build role based on domain
         role_map = {
+            # Core domains
             Domain.TECHNICAL: "expert software engineer and technical architect",
             Domain.BUSINESS: "senior business strategist and analyst",
             Domain.CREATIVE: "experienced creative professional and writer",
             Domain.RESEARCH: "thorough researcher and academic analyst",
             Domain.PERSONAL: "helpful personal assistant and productivity coach",
+            # Specialized domains
+            Domain.SCIENCE: "expert scientist with deep domain knowledge",
+            Domain.FINANCE: "experienced financial analyst and investment strategist",
+            Domain.HEALTH: "knowledgeable health and wellness advisor",
+            Domain.LEGAL: "experienced legal analyst (not providing legal advice)",
+            Domain.EDUCATION: "expert educator and curriculum designer",
+            Domain.ENTERTAINMENT: "creative entertainment industry professional",
+            Domain.FASHION: "experienced fashion consultant and stylist",
+            Domain.ENTREPRENEURSHIP: "seasoned startup advisor and founder coach",
         }
         role = role_map.get(classification.domain, "helpful assistant")
 
@@ -743,12 +878,37 @@ class IntentRefiner:
         prompt_parts.append("- Acknowledge uncertainty when appropriate")
         prompt_parts.append("- Ask for clarification if the request is ambiguous")
 
+        # Domain-specific guardrails
         if classification.domain == Domain.TECHNICAL:
             prompt_parts.append("- Provide working, tested solutions")
         if classification.domain == Domain.BUSINESS:
             prompt_parts.append("- Support claims with reasoning or data")
         if classification.domain == Domain.RESEARCH:
             prompt_parts.append("- Cite sources when possible")
+        if classification.domain == Domain.SCIENCE:
+            prompt_parts.append("- Use precise scientific terminology")
+            prompt_parts.append("- Reference established methodologies")
+        if classification.domain == Domain.FINANCE:
+            prompt_parts.append("- This is not financial advice - for informational purposes only")
+            prompt_parts.append("- Consider risk factors and diversification")
+        if classification.domain == Domain.HEALTH:
+            prompt_parts.append("- This is not medical advice - consult healthcare professionals")
+            prompt_parts.append("- Prioritize evidence-based information")
+        if classification.domain == Domain.LEGAL:
+            prompt_parts.append("- This is not legal advice - consult a licensed attorney")
+            prompt_parts.append("- Note jurisdiction-specific variations")
+        if classification.domain == Domain.EDUCATION:
+            prompt_parts.append("- Adapt to learner's level and context")
+            prompt_parts.append("- Include practical examples and exercises")
+        if classification.domain == Domain.ENTERTAINMENT:
+            prompt_parts.append("- Balance creativity with feasibility")
+            prompt_parts.append("- Consider audience and platform requirements")
+        if classification.domain == Domain.FASHION:
+            prompt_parts.append("- Consider personal style, body type, and occasion")
+            prompt_parts.append("- Balance trends with timeless principles")
+        if classification.domain == Domain.ENTREPRENEURSHIP:
+            prompt_parts.append("- Focus on actionable, practical advice")
+            prompt_parts.append("- Consider resource constraints and timing")
 
         return "\n".join(prompt_parts)
 

@@ -4,7 +4,7 @@
   <p>
     <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-    <img src="https://img.shields.io/badge/tests-172%20passed-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-189%20passed-brightgreen" alt="Tests">
     <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
   </p>
 </div>
@@ -15,6 +15,7 @@
 
 ## 📢 News
 
+- **2026-02-11** 🐛 **CRITICAL FIX**: Multi-step workflow variable substitution now works! Agents properly receive previous step outputs.
 - **2026-02-11** 🧠 **NEW: PromptEngineer** - Automatic prompt improvement using Anthropic's best practices
 - **2026-02-11** 🔌 **NEW: MCP Integration** - Connect workflow tools to real MCP servers (PubMed, Ahrefs, etc.)
 - **2026-02-11** 🔧 **Critical fixes**: YAML parser + CLI execution now work properly!

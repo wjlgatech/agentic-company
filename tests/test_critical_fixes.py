@@ -277,6 +277,78 @@ class TestWorkflowExecutorWiring:
         print("✅ load_ready_workflow correctly exported")
 
 
+class TestExecutorActuallyWorks:
+    """Integration tests that verify actual executor wiring (not just API contracts)."""
+
+    def test_executor_property_exists(self):
+        """Test that agents have public executor property."""
+        from orchestration.agents.specialized import PlannerAgent
+
+        agent = PlannerAgent()
+        assert hasattr(agent, 'executor'), "Agent should have executor property"
+        assert hasattr(agent, 'has_executor'), "Agent should have has_executor property"
+        assert agent.executor is None, "New agent should have None executor"
+        assert agent.has_executor is False, "New agent should not have executor"
+
+        print("✅ Agent has executor property")
+
+    def test_set_executor_actually_sets(self):
+        """Test that set_executor() actually sets the executor."""
+        from orchestration.agents.specialized import PlannerAgent
+
+        agent = PlannerAgent()
+
+        # Define a mock executor
+        async def mock_executor(prompt, context):
+            return "mock response"
+
+        # Set it
+        agent.set_executor(mock_executor)
+
+        # Verify it's actually set
+        assert agent.executor is not None, "Executor should be set after set_executor()"
+        assert agent.has_executor is True, "has_executor should be True"
+        assert agent.executor is mock_executor, "Executor should be the one we set"
+        assert agent._executor is mock_executor, "_executor should match"
+
+        print("✅ set_executor() actually sets the executor")
+
+    def test_auto_setup_executor_eager_init(self):
+        """Test that auto_setup_executor with eager_init=True initializes backend."""
+        from orchestration.integrations import auto_setup_executor
+        from orchestration.integrations.unified import get_ready_backends
+        import os
+
+        ready = get_ready_backends()
+        if not ready:
+            print("⚠️ No backend available - skipping eager_init test")
+            return
+
+        executor = auto_setup_executor(eager_init=True)
+        assert executor.active_backend is not None, "active_backend should be set with eager_init"
+        print(f"✅ auto_setup_executor eager_init works: {executor.active_backend}")
+
+    def test_load_ready_workflow_sets_executors(self):
+        """Test that load_ready_workflow actually sets executors on agents."""
+        from orchestration.integrations.unified import get_ready_backends
+
+        ready = get_ready_backends()
+        if not ready:
+            print("⚠️ No backend available - skipping executor wiring test")
+            return
+
+        from orchestration.workflows import load_ready_workflow
+
+        team = load_ready_workflow('agenticom/bundled_workflows/feature-dev.yaml')
+
+        # Check every agent has executor set
+        for role, agent in team.agents.items():
+            assert agent.has_executor, f"Agent {role} should have executor"
+            assert agent.executor is not None, f"Agent {role} executor should not be None"
+
+        print(f"✅ load_ready_workflow sets executors on all {len(team.agents)} agents")
+
+
 def run_all_tests():
     """Run all tests and report results."""
     import traceback
@@ -287,6 +359,7 @@ def run_all_tests():
         TestWorkflowListDiscovery,
         TestAgentTeamExecution,
         TestWorkflowExecutorWiring,
+        TestExecutorActuallyWorks,
     ]
 
     total = 0

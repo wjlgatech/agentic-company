@@ -97,6 +97,16 @@ class Agent(ABC):
         """Set the LLM executor function (e.g., OpenClaw, Anthropic API)"""
         self._executor = executor
 
+    @property
+    def executor(self) -> Optional[Callable[[str, AgentContext], Awaitable[str]]]:
+        """Get the current executor (None if not set)"""
+        return self._executor
+
+    @property
+    def has_executor(self) -> bool:
+        """Check if executor is configured"""
+        return self._executor is not None
+
     def set_guardrails(self, guardrail_pipeline):
         """Set guardrail pipeline for input/output filtering"""
         self._guardrail_pipeline = guardrail_pipeline

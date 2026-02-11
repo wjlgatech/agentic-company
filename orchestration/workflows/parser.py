@@ -316,7 +316,8 @@ def _setup_team_executor(team: AgentTeam) -> None:
             "  3. Start Ollama locally: ollama serve"
         )
 
-    executor = auto_setup_executor()
+    # eager_init=True ensures executor is ready immediately
+    executor = auto_setup_executor(eager_init=True)
 
     async def agent_executor(prompt: str, context) -> str:
         return await executor.execute(prompt, context)

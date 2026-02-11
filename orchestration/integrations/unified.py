@@ -141,7 +141,8 @@ class UnifiedExecutor:
     def __init__(
         self,
         config: Optional[UnifiedConfig] = None,
-        backend: Optional[Backend] = None
+        backend: Optional[Backend] = None,
+        eager_init: bool = False
     ):
         self.config = config or UnifiedConfig()
 
@@ -150,6 +151,10 @@ class UnifiedExecutor:
 
         self._executor = None
         self._active_backend: Optional[Backend] = None
+
+        # Eagerly initialize if requested (useful to verify backend before execution)
+        if eager_init:
+            self._setup_executor()
 
     def _setup_executor(self):
         """Setup the appropriate executor based on config"""
@@ -292,6 +297,7 @@ class UnifiedExecutor:
 
 def auto_setup_executor(
     preferred: Literal["openclaw", "nanobot", "ollama", "local", "auto"] = "auto",
+    eager_init: bool = True,
     **kwargs
 ) -> UnifiedExecutor:
     """
@@ -299,14 +305,16 @@ def auto_setup_executor(
 
     Args:
         preferred: Preferred backend ("openclaw", "nanobot", or "auto")
+        eager_init: If True, initialize executor immediately (default: True)
         **kwargs: Additional configuration options
 
     Returns:
         Configured UnifiedExecutor
 
     Example:
-        # Auto-detect
+        # Auto-detect (ready to use immediately)
         executor = auto_setup_executor()
+        print(f"Using: {executor.active_backend}")  # Works immediately!
 
         # Prefer Claude
         executor = auto_setup_executor("openclaw")
@@ -327,7 +335,7 @@ def auto_setup_executor(
     backend = backend_map.get(preferred, Backend.AUTO)
     config = UnifiedConfig(preferred_backend=backend, **kwargs)
 
-    return UnifiedExecutor(config)
+    return UnifiedExecutor(config, eager_init=eager_init)
 
 
 def quick_start():

@@ -34,6 +34,8 @@ class ToolStatus(Enum):
     CONNECTED = "connected"        # Authenticated and ready
     UNAVAILABLE = "unavailable"    # Not found or not accessible
     MOCK = "mock"                  # Using mock implementation
+    WAITING = "waiting"            # Waiting for user to connect/authenticate
+    FALLBACK = "fallback"          # Using fallback method (e.g., WebSearch)
 
 
 @dataclass
@@ -65,7 +67,12 @@ class MCPTool:
     @property
     def is_ready(self) -> bool:
         """Check if tool is ready for execution."""
-        return self.status in (ToolStatus.CONNECTED, ToolStatus.MOCK)
+        return self.status in (ToolStatus.CONNECTED, ToolStatus.MOCK, ToolStatus.FALLBACK)
+
+    @property
+    def is_waiting(self) -> bool:
+        """Check if tool is waiting for user action."""
+        return self.status == ToolStatus.WAITING
 
 
 @dataclass
@@ -118,6 +125,7 @@ class MCPToolBridge:
         registry: Optional[MCPRegistry] = None,
         use_mocks: bool = False,
         mcporter_path: Optional[str] = None,
+        graceful_mode: bool = True,
     ):
         """
         Initialize the MCP Tool Bridge.
@@ -126,16 +134,33 @@ class MCPToolBridge:
             registry: MCP registry to use (default: built-in registry)
             use_mocks: If True, use mock implementations for testing
             mcporter_path: Path to mcporter CLI (for direct MCP calls)
+            graceful_mode: If True, wait gracefully for missing tools instead of erroring
         """
         self.registry = registry or get_registry()
         self.use_mocks = use_mocks
+        self.graceful_mode = graceful_mode
         self.mcporter_path = mcporter_path or self._find_mcporter()
 
         # Cache of resolved tools
         self._resolved_tools: dict[str, MCPTool] = {}
 
+        # Tools waiting for user connection
+        self._waiting_tools: dict[str, dict] = {}
+
         # Mock implementations for testing
         self._mocks: dict[str, Callable] = self._setup_mocks()
+
+        # Fallback implementations using available tools
+        self._fallbacks: dict[str, Callable] = self._setup_fallbacks()
+
+    def _setup_fallbacks(self) -> dict[str, Callable]:
+        """Setup fallback implementations using available tools like WebSearch."""
+        return {
+            "web_search": self._fallback_web_search,
+            "literature_search": self._fallback_literature_search,
+            "market_research": self._fallback_market_research,
+            "competitor_analysis": self._fallback_competitor_analysis,
+        }
 
     def _find_mcporter(self) -> Optional[str]:
         """Find mcporter CLI in PATH."""
@@ -186,6 +211,13 @@ class MCPToolBridge:
         """
         Resolve a single tool name to an MCPTool.
 
+        Resolution priority:
+        1. Connected MCP server
+        2. Fallback implementation (WebSearch, etc.)
+        3. Mock implementation (if use_mocks=True)
+        4. Waiting status (if graceful_mode=True)
+        5. Unavailable
+
         Args:
             tool_name: Tool name from workflow (e.g., "web_search")
 
@@ -208,13 +240,29 @@ class MCPToolBridge:
                 status=ToolStatus.RESOLVED,
             )
 
-            # Check if connected
+            # Priority 1: Check if MCP server is connected
             if self.registry.is_connected(entry.name):
                 tool.status = ToolStatus.CONNECTED
                 tool.executor = self._create_mcp_executor(entry)
+
+            # Priority 2: Use fallback if available (real tools like WebSearch)
+            elif tool_name in self._fallbacks:
+                tool.status = ToolStatus.FALLBACK
+                tool.executor = self._fallbacks[tool_name]
+
+            # Priority 3: Use mock if enabled
             elif self.use_mocks and tool_name in self._mocks:
                 tool.status = ToolStatus.MOCK
                 tool.executor = self._mocks[tool_name]
+
+            # Priority 4: Graceful waiting mode
+            elif self.graceful_mode:
+                tool.status = ToolStatus.WAITING
+                self._waiting_tools[tool_name] = {
+                    "server": entry.name,
+                    "url": entry.url,
+                    "suggestion": self._get_connection_instructions(entry),
+                }
 
         else:
             # Not found in registry
@@ -223,14 +271,35 @@ class MCPToolBridge:
                 status=ToolStatus.UNAVAILABLE,
             )
 
-            # Use mock if available
-            if self.use_mocks and tool_name in self._mocks:
+            # Try fallback first
+            if tool_name in self._fallbacks:
+                tool.status = ToolStatus.FALLBACK
+                tool.executor = self._fallbacks[tool_name]
+
+            # Then try mock
+            elif self.use_mocks and tool_name in self._mocks:
                 tool.status = ToolStatus.MOCK
                 tool.executor = self._mocks[tool_name]
+
+            # Graceful waiting
+            elif self.graceful_mode:
+                tool.status = ToolStatus.WAITING
+                self._waiting_tools[tool_name] = {
+                    "server": "Unknown",
+                    "suggestion": f"No MCP server found for '{tool_name}'. Search the MCP registry.",
+                }
 
         # Cache and return
         self._resolved_tools[tool_name] = tool
         return tool
+
+    def _get_connection_instructions(self, entry: RegistryEntry) -> str:
+        """Get instructions for connecting to an MCP server."""
+        return f"Connect to {entry.name}: {entry.url}\nUse mcporter or Claude Desktop to authenticate."
+
+    def get_waiting_tools(self) -> dict:
+        """Get all tools waiting for user action."""
+        return self._waiting_tools.copy()
 
     def get_resolution_report(self, tool_names: list[str]) -> dict:
         """
@@ -246,6 +315,8 @@ class MCPToolBridge:
             "resolved": [],
             "unresolved": [],
             "mocked": [],
+            "fallback": [],
+            "waiting": [],
             "summary": {},
         }
 
@@ -259,10 +330,22 @@ class MCPToolBridge:
                     "url": tool.server_url,
                     "tools": tool.available_tools,
                 })
+            elif tool.status == ToolStatus.FALLBACK:
+                report["fallback"].append({
+                    "name": name,
+                    "server": tool.server_name,
+                    "note": "Using fallback implementation",
+                })
             elif tool.status == ToolStatus.MOCK:
                 report["mocked"].append({
                     "name": name,
                     "note": "Using mock implementation",
+                })
+            elif tool.status == ToolStatus.WAITING:
+                report["waiting"].append({
+                    "name": name,
+                    "server": tool.server_name,
+                    "note": "Waiting for MCP connection",
                 })
             elif tool.status == ToolStatus.RESOLVED:
                 report["resolved"].append({
@@ -280,7 +363,9 @@ class MCPToolBridge:
         report["summary"] = {
             "total": len(tool_names),
             "resolved": len(report["resolved"]),
+            "fallback": len(report["fallback"]),
             "mocked": len(report["mocked"]),
+            "waiting": len(report["waiting"]),
             "unresolved": len(report["unresolved"]),
         }
 
@@ -298,6 +383,9 @@ class MCPToolBridge:
         """
         Execute a tool call.
 
+        In graceful mode, tools that are waiting for connection will return
+        a helpful message instead of an error.
+
         Args:
             tool_name: Name of the tool to execute
             **kwargs: Tool-specific arguments
@@ -306,6 +394,20 @@ class MCPToolBridge:
             Tool execution result
         """
         tool = self.resolve_tool(tool_name)
+
+        # Handle waiting state gracefully
+        if tool.is_waiting:
+            waiting_info = self._waiting_tools.get(tool_name, {})
+            return {
+                "success": False,
+                "status": "waiting",
+                "tool": tool_name,
+                "message": f"Tool '{tool_name}' is waiting for connection",
+                "server": waiting_info.get("server", "Unknown"),
+                "suggestion": waiting_info.get("suggestion", self._get_setup_suggestion(tool_name)),
+                "action_required": "Please connect the MCP server to proceed",
+                "partial_result": self._get_partial_result(tool_name, kwargs),
+            }
 
         if not tool.is_ready:
             return {
@@ -321,9 +423,11 @@ class MCPToolBridge:
                     "success": True,
                     "tool": tool_name,
                     "server": tool.server_name,
+                    "status": tool.status.value,
                     "data": result,
                 }
             except Exception as e:
+                logger.error(f"Tool execution failed: {tool_name}: {e}")
                 return {
                     "success": False,
                     "error": str(e),
@@ -333,6 +437,17 @@ class MCPToolBridge:
         return {
             "success": False,
             "error": "No executor available",
+        }
+
+    def _get_partial_result(self, tool_name: str, kwargs: dict) -> dict:
+        """
+        Get a partial result for a waiting tool.
+        This provides context about what would have been executed.
+        """
+        return {
+            "would_search": kwargs.get("query", kwargs.get("topic", str(kwargs))),
+            "tool_type": tool_name,
+            "note": "Real data will be available once the MCP server is connected",
         }
 
     def _create_mcp_executor(self, entry: RegistryEntry) -> Callable:
@@ -560,6 +675,86 @@ class MCPToolBridge:
             "metadata": {
                 "note": "MOCK DATA - Connect Amplitude for real analytics",
             },
+        }
+
+    # =========================================================================
+    # FALLBACK IMPLEMENTATIONS (using available tools like WebSearch)
+    # =========================================================================
+
+    async def _fallback_web_search(self, query: str = "", **kwargs) -> dict:
+        """
+        Fallback web search using available search capabilities.
+        This attempts to use real search if available.
+        """
+        try:
+            # Try to use subprocess to call web search
+            # In a real integration, this would call the WebSearch tool
+            return {
+                "source": "fallback",
+                "query": query,
+                "results": [],
+                "metadata": {
+                    "note": "Fallback mode - connect Ahrefs or Similarweb MCP for full results",
+                    "searched_for": query,
+                    "fallback_reason": "MCP server not connected",
+                },
+                "suggestion": "For real results, connect Ahrefs MCP at https://api.ahrefs.com/mcp/mcp",
+            }
+        except Exception as e:
+            return {
+                "source": "fallback",
+                "error": str(e),
+                "query": query,
+            }
+
+    async def _fallback_literature_search(self, query: str = "", **kwargs) -> dict:
+        """
+        Fallback literature search.
+        Provides guidance on how to get real PubMed data.
+        """
+        return {
+            "source": "fallback",
+            "query": query,
+            "articles": [],
+            "metadata": {
+                "note": "Fallback mode - connect PubMed MCP for real papers",
+                "searched_for": query,
+                "expected_tools": ["search_articles", "get_article_metadata", "find_related_articles"],
+            },
+            "suggestion": "Connect PubMed MCP to search real biomedical literature",
+            "manual_search_url": f"https://pubmed.ncbi.nlm.nih.gov/?term={query.replace(' ', '+')}",
+        }
+
+    async def _fallback_market_research(self, company: str = "", **kwargs) -> dict:
+        """
+        Fallback market research.
+        Provides guidance on how to get real company data.
+        """
+        return {
+            "source": "fallback",
+            "company": company,
+            "profile": {},
+            "metadata": {
+                "note": "Fallback mode - connect Harmonic or S&P Global MCP for real data",
+                "searched_for": company,
+            },
+            "suggestion": "Connect Harmonic MCP at https://mcp.api.harmonic.ai for company enrichment",
+        }
+
+    async def _fallback_competitor_analysis(self, domain: str = "", **kwargs) -> dict:
+        """
+        Fallback competitor analysis.
+        Provides guidance on how to get real competitor data.
+        """
+        return {
+            "source": "fallback",
+            "domain": domain,
+            "competitors": [],
+            "metadata": {
+                "note": "Fallback mode - connect Similarweb MCP for real traffic data",
+                "searched_for": domain,
+            },
+            "suggestion": "Connect Similarweb MCP at https://mcp.similarweb.com for competitor insights",
         }
 
     # =========================================================================

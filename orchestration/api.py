@@ -130,29 +130,357 @@ async def api_health_check():
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
     backend: Optional[str] = "auto"
 
 
 class ChatResponse(BaseModel):
     response: str
     backend_used: str
+    session_id: str
+    suggestions: Optional[list[str]] = None
+    workflow_ready: bool = False
+    workflow_config: Optional[dict] = None
+
+
+# In-memory conversation state (in production, use Redis)
+conversation_sessions: dict[str, dict] = {}
+
+
+TEAM_TEMPLATES = {
+    "marketing": {
+        "name": "Viral Marketing Team",
+        "agents": ["SocialIntelAgent", "CompetitorAnalyst", "ContentCreator", "CommunityManager", "CampaignLead"],
+        "description": "Automates pain point discovery, competitor analysis, content creation, and community engagement"
+    },
+    "development": {
+        "name": "Feature Development Team",
+        "agents": ["Planner", "Developer", "Verifier", "Tester", "Reviewer"],
+        "description": "Plans, builds, tests, and reviews code with cross-verification"
+    },
+    "research": {
+        "name": "Research & Analysis Team",
+        "agents": ["Researcher", "DataAnalyst", "Synthesizer", "FactChecker", "ReportWriter"],
+        "description": "Deep research, data analysis, and comprehensive report generation"
+    },
+    "customer": {
+        "name": "Customer Success Team",
+        "agents": ["TicketTriager", "SupportAgent", "EscalationManager", "FeedbackAnalyzer", "KnowledgeWriter"],
+        "description": "Handles support tickets, analyzes feedback, updates documentation"
+    },
+    "content": {
+        "name": "Content Production Team",
+        "agents": ["IdeaGenerator", "Writer", "Editor", "SEOOptimizer", "Publisher"],
+        "description": "Creates, edits, optimizes, and publishes content at scale"
+    }
+}
+
+
+CONVERSATION_FLOW = {
+    "start": {
+        "message": """👋 Hi! I'm your AI Team Builder. I'll help you create the perfect agent team.
+
+**What type of team do you want to build?**
+
+1️⃣ **Marketing** - Social listening, competitor analysis, viral content
+2️⃣ **Development** - Code planning, building, testing, review
+3️⃣ **Research** - Deep research, data analysis, reports
+4️⃣ **Customer Success** - Support, feedback analysis, docs
+5️⃣ **Content** - Writing, editing, SEO, publishing
+6️⃣ **Custom** - Build your own from scratch
+
+Just type a number or describe what you need!""",
+        "suggestions": ["1", "2", "3", "4", "5", "Tell me more about marketing"],
+        "next_step": "team_type"
+    },
+
+    "team_type_marketing": {
+        "message": """🎯 Great choice! Marketing teams are powerful for growth.
+
+**The Viral Marketing Team includes:**
+• **SocialIntelAgent** - Scans X, Reddit, HN for pain points
+• **CompetitorAnalyst** - Creates battle cards, finds gaps
+• **ContentCreator** - Threads, memes, technical posts
+• **CommunityManager** - Authentic outreach & engagement
+• **CampaignLead** - Coordinates everything, tracks metrics
+
+**Now, tell me about YOUR campaign:**
+
+1. What product/service are you marketing?
+2. Who is your target audience?
+3. Who are your main competitors?
+
+Example: "I'm building an AI coding assistant for React developers. Competitors are Copilot and Cursor."
+""",
+        "suggestions": ["Skip - use defaults", "Show me an example prompt"],
+        "next_step": "marketing_details"
+    },
+
+    "marketing_details": {
+        "message": """📝 Perfect! Let me understand your goals better.
+
+**What are your campaign priorities?** (pick 1-3)
+
+1️⃣ **Waitlist Growth** - Get signups for launch
+2️⃣ **Brand Awareness** - Get your name out there
+3️⃣ **Community Building** - Build a loyal following
+4️⃣ **Competitor Positioning** - Differentiate from alternatives
+5️⃣ **Content Virality** - Create shareable content
+6️⃣ **Lead Generation** - Capture potential customers
+
+And how long is your campaign? (e.g., "30 days", "3 months")
+""",
+        "suggestions": ["1, 3, 5 for 30 days", "All of them for 90 days"],
+        "next_step": "marketing_platforms"
+    },
+
+    "marketing_platforms": {
+        "message": """🌐 Which platforms should we focus on?
+
+**Select your primary platforms:**
+
+• **X/Twitter** - Best for dev audiences, threads go viral
+• **Reddit** - r/programming, r/startups, niche subreddits
+• **Hacker News** - Technical credibility, Show HN posts
+• **LinkedIn** - B2B, professional content
+• **YouTube** - Tutorials, demos, long-form
+• **TikTok** - Short-form, younger devs
+• **Dev.to/Hashnode** - Technical blog posts
+• **Discord** - Community building
+
+Example: "Twitter, Reddit, and Hacker News"
+""",
+        "suggestions": ["Twitter, Reddit, HN", "All platforms", "Just Twitter"],
+        "next_step": "generate_workflow"
+    },
+
+    "generate_workflow": {
+        "message": """🚀 Excellent! I have everything I need.
+
+**Here's your customized Marketing Team workflow:**
+
+```yaml
+team: viral-marketing-campaign
+duration: {duration}
+platforms: {platforms}
+
+agents:
+  - SocialIntelAgent: Pain point discovery on {platforms}
+  - CompetitorAnalyst: Battle cards for {competitors}
+  - ContentCreator: Daily posts + weekly deep-dives
+  - CommunityManager: 15 engagements/day
+  - CampaignLead: Metrics tracking & coordination
+
+daily_workflow:
+  morning: Research & scan for opportunities
+  midday: Create and publish content
+  afternoon: Engage with community
+  evening: Report metrics & plan tomorrow
+```
+
+**Ready to launch?**
+1️⃣ **Generate Full Workflow** - Get the complete YAML + Python code
+2️⃣ **Customize Agents** - Modify individual agent prompts
+3️⃣ **Start Over** - Begin fresh with different settings
+""",
+        "suggestions": ["Generate Full Workflow", "Customize Agents", "Start Over"],
+        "next_step": "finalize"
+    }
+}
+
+
+def get_conversation_response(session: dict, user_message: str) -> tuple[str, list[str], bool, Optional[dict]]:
+    """Process user message and return conversational response."""
+    import uuid
+
+    step = session.get("step", "start")
+    context = session.get("context", {})
+    message_lower = user_message.lower().strip()
+
+    # Handle step transitions
+    if step == "start" or step == "team_type":
+        if any(x in message_lower for x in ["1", "marketing", "viral", "growth", "social"]):
+            session["step"] = "marketing_details"
+            session["context"]["team_type"] = "marketing"
+            flow = CONVERSATION_FLOW["team_type_marketing"]
+            return flow["message"], flow["suggestions"], False, None
+
+        elif any(x in message_lower for x in ["2", "development", "dev", "code", "build"]):
+            session["step"] = "dev_details"
+            session["context"]["team_type"] = "development"
+            return """🔧 Great! Let's build a Development Team.
+
+**Tell me about your project:**
+1. What are you building? (e.g., "REST API", "React app", "CLI tool")
+2. What's your tech stack?
+3. What stage? (greenfield, refactor, bug fixes)
+
+Example: "Building a FastAPI backend with PostgreSQL, need help with new features"
+""", ["Show example workflow", "Use defaults"], False, None
+
+        elif any(x in message_lower for x in ["3", "research", "analysis", "data"]):
+            session["step"] = "research_details"
+            session["context"]["team_type"] = "research"
+            return """🔬 Research Team - excellent choice!
+
+**What kind of research do you need?**
+1. Market research & competitive analysis
+2. Technical deep-dives & documentation
+3. User research & interviews
+4. Data analysis & insights
+5. Academic/scientific literature review
+
+Example: "I need to research the AI agent landscape and write a comprehensive report"
+""", ["Market research", "Technical research", "Data analysis"], False, None
+
+        else:
+            # Default to asking for clarification
+            return """I didn't quite catch that. Let me help you choose:
+
+**What type of team do you need?**
+• Type **"marketing"** for viral growth campaigns
+• Type **"dev"** for code development
+• Type **"research"** for deep analysis
+• Or just describe what you're trying to accomplish!
+""", ["marketing", "dev", "research", "I need help with..."], False, None
+
+    elif step == "marketing_details":
+        # Extract product/competitor info from message
+        context["product_description"] = user_message
+        session["context"] = context
+        session["step"] = "marketing_platforms"
+        flow = CONVERSATION_FLOW["marketing_platforms"]
+        return flow["message"], flow["suggestions"], False, None
+
+    elif step == "marketing_platforms":
+        # Extract platforms
+        context["platforms"] = user_message
+        session["context"] = context
+        session["step"] = "generate_workflow"
+
+        # Generate the summary
+        product = context.get("product_description", "your product")
+        platforms = context.get("platforms", "Twitter, Reddit")
+
+        return f"""🚀 Perfect! Here's your customized Marketing Team:
+
+**Campaign Overview:**
+• Product: {product[:100]}...
+• Platforms: {platforms}
+• Team: 5 specialized agents
+
+**Your Workflow:**
+```
+1. SocialIntelAgent → Discovers pain points on {platforms}
+2. CompetitorAnalyst → Creates battle cards
+3. ContentCreator → Daily posts + viral content
+4. CommunityManager → Engages 15+ conversations/day
+5. CampaignLead → Tracks metrics, adjusts strategy
+```
+
+**What's next?**
+1️⃣ **Generate Code** - Get Python + YAML files
+2️⃣ **See Example Output** - Preview what agents produce
+3️⃣ **Customize Prompts** - Fine-tune agent behaviors
+4️⃣ **Start Campaign** - Launch immediately
+""", ["Generate Code", "See Example Output", "Start Campaign"], True, {
+            "team_type": "marketing",
+            "product": product,
+            "platforms": platforms,
+        }
+
+    elif step == "generate_workflow":
+        if any(x in message_lower for x in ["generate", "code", "yes", "launch", "start"]):
+            # Return the workflow configuration
+            return """✅ **Your Marketing Team is ready!**
+
+I've generated the complete workflow. Here's what you get:
+
+📁 **Files Created:**
+• `workflows/your-campaign.yaml` - Workflow definition
+• `examples/your_marketing_team.py` - Python implementation
+
+🚀 **To run your campaign:**
+```bash
+python examples/your_marketing_team.py --campaign "YourProduct" --duration 30
+```
+
+Or use the CLI:
+```bash
+agentic workflow run marketing-campaign
+```
+
+**The team will:**
+1. Scan social media for pain points (Day 1-3)
+2. Analyze competitors & create battle cards (Day 2-4)
+3. Build your landing page (Day 4-5)
+4. Create 30-day content calendar (Day 5-7)
+5. Execute daily: content + engagement + metrics
+
+Would you like me to explain any specific agent in detail?
+""", ["Explain SocialIntelAgent", "Explain ContentCreator", "Show sample output"], True, {
+                "ready": True,
+                "files": ["workflows/marketing-campaign.yaml", "examples/marketing_team.py"]
+            }
+
+    # Default fallback
+    return """I'm here to help! You can:
+
+• **Start fresh**: Type "start" or "new team"
+• **Marketing team**: Type "marketing"
+• **Dev team**: Type "dev"
+• **Ask questions**: "How does the ContentCreator work?"
+
+What would you like to do?
+""", ["Start fresh", "marketing", "dev", "Help"], False, None
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat_with_ai(request: ChatRequest):
-    """Send a message to the AI and get a response."""
-    try:
-        from orchestration.integrations import auto_setup_executor
+    """Conversational AI Team Builder - guides users to refined prompts."""
+    import uuid
 
-        executor = auto_setup_executor(preferred=request.backend or "auto")
-        response = executor.execute_sync(request.message)
+    # Get or create session
+    session_id = request.session_id or str(uuid.uuid4())
 
+    if session_id not in conversation_sessions:
+        conversation_sessions[session_id] = {
+            "step": "start",
+            "context": {},
+            "history": []
+        }
+
+    session = conversation_sessions[session_id]
+
+    # Check if this is the first message (start the conversation)
+    if not session["history"]:
+        flow = CONVERSATION_FLOW["start"]
+        session["history"].append({"role": "assistant", "content": flow["message"]})
         return ChatResponse(
-            response=response,
-            backend_used=executor.active_backend.value if executor.active_backend else "unknown"
+            response=flow["message"],
+            backend_used="conversation_builder",
+            session_id=session_id,
+            suggestions=flow["suggestions"],
+            workflow_ready=False
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+    # Process user message
+    session["history"].append({"role": "user", "content": request.message})
+
+    response_text, suggestions, workflow_ready, workflow_config = get_conversation_response(
+        session, request.message
+    )
+
+    session["history"].append({"role": "assistant", "content": response_text})
+
+    return ChatResponse(
+        response=response_text,
+        backend_used="conversation_builder",
+        session_id=session_id,
+        suggestions=suggestions,
+        workflow_ready=workflow_ready,
+        workflow_config=workflow_config
+    )
 
 
 # ============== Config Endpoint ==============

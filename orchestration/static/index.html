@@ -178,25 +178,27 @@
 
         <!-- Chat Modal -->
         <div id="chat-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-                <div class="p-4 border-b flex justify-between items-center">
-                    <h3 class="font-bold text-lg">💬 Chat with AI Team</h3>
-                    <button onclick="closeChat()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-                </div>
-                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                    <div class="bg-purple-100 rounded-lg p-3 max-w-[80%]">
-                        <p class="text-sm text-purple-800">👋 Hi! I'm your AI team. What would you like to build today?</p>
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-purple-500 to-indigo-500 rounded-t-2xl">
+                    <div>
+                        <h3 class="font-bold text-lg text-white">🤖 AI Team Builder</h3>
+                        <p class="text-purple-200 text-xs">Guided workflow to create your perfect agent team</p>
                     </div>
+                    <button onclick="closeChat()" class="text-white/80 hover:text-white text-2xl">&times;</button>
                 </div>
-                <div class="p-4 border-t">
+                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                    <!-- Messages will be populated dynamically -->
+                </div>
+                <div class="p-4 border-t bg-white rounded-b-2xl">
                     <div class="flex space-x-2">
-                        <input type="text" id="chat-input" placeholder="Type your message..."
-                               class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        <input type="text" id="chat-input" placeholder="Type your message or click a suggestion..."
+                               class="flex-1 px-4 py-3 border-2 border-purple-200 rounded-xl focus:outline-none focus:border-purple-500 transition"
                                onkeypress="if(event.key==='Enter')sendMessage()">
-                        <button onclick="sendMessage()" class="bg-purple-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-purple-600 transition">
+                        <button onclick="sendMessage()" class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-6 py-3 rounded-xl font-semibold hover:opacity-90 transition shadow-lg">
                             Send
                         </button>
                     </div>
+                    <p class="text-xs text-gray-400 mt-2 text-center">💡 Tip: Click the suggestion buttons for quick responses</p>
                 </div>
             </div>
         </div>
@@ -353,14 +355,97 @@
         }
 
         // Chat functions
+        let chatSessionId = null;
+        let chatInitialized = false;
+
         function openChat() {
             document.getElementById('chat-modal').classList.remove('hidden');
             document.getElementById('chat-modal').classList.add('flex');
+
+            // Initialize conversation on first open
+            if (!chatInitialized) {
+                initializeChat();
+            }
         }
 
         function closeChat() {
             document.getElementById('chat-modal').classList.add('hidden');
             document.getElementById('chat-modal').classList.remove('flex');
+        }
+
+        async function initializeChat() {
+            const messagesDiv = document.getElementById('chat-messages');
+            messagesDiv.innerHTML = `
+                <div id="typing" class="bg-purple-100 rounded-lg p-3 max-w-[85%]">
+                    <p class="text-sm text-purple-800">Starting conversation...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: '', session_id: chatSessionId })
+                });
+                const data = await response.json();
+                chatSessionId = data.session_id;
+                chatInitialized = true;
+
+                document.getElementById('typing').remove();
+                displayAssistantMessage(data.response, data.suggestions);
+            } catch (e) {
+                document.getElementById('typing').remove();
+                displayAssistantMessage(`👋 Hi! I'm your AI Team Builder. I'll help you create the perfect agent team.
+
+**What type of team do you want to build?**
+
+1️⃣ **Marketing** - Social listening, competitor analysis, viral content
+2️⃣ **Development** - Code planning, building, testing, review
+3️⃣ **Research** - Deep research, data analysis, reports
+4️⃣ **Custom** - Build your own from scratch
+
+Just type a number or describe what you need!`, ['marketing', 'dev', 'research']);
+            }
+        }
+
+        function displayAssistantMessage(text, suggestions) {
+            const messagesDiv = document.getElementById('chat-messages');
+
+            // Convert markdown-style formatting to HTML
+            let formattedText = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 text-green-400 p-2 rounded mt-2 mb-2 text-xs overflow-x-auto">$1</pre>')
+                .replace(/`(.*?)`/g, '<code class="bg-gray-200 px-1 rounded text-purple-700">$1</code>')
+                .replace(/\n/g, '<br>');
+
+            messagesDiv.innerHTML += `
+                <div class="bg-purple-100 rounded-lg p-4 max-w-[85%]">
+                    <div class="text-sm text-purple-900 leading-relaxed">${formattedText}</div>
+                </div>
+            `;
+
+            // Add suggestion buttons if available
+            if (suggestions && suggestions.length > 0) {
+                const suggestionsHtml = suggestions.map(s =>
+                    `<button onclick="sendSuggestion('${s.replace(/'/g, "\\'")}')"
+                            class="bg-white border border-purple-300 text-purple-700 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-purple-50 hover:border-purple-400 transition">
+                        ${s}
+                    </button>`
+                ).join('');
+
+                messagesDiv.innerHTML += `
+                    <div class="flex flex-wrap gap-2 mt-2 mb-2">
+                        ${suggestionsHtml}
+                    </div>
+                `;
+            }
+
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendSuggestion(suggestion) {
+            document.getElementById('chat-input').value = suggestion;
+            sendMessage();
         }
 
         async function sendMessage() {
@@ -380,7 +465,7 @@
             // Add typing indicator
             messagesDiv.innerHTML += `
                 <div id="typing" class="bg-purple-100 rounded-lg p-3 max-w-[80%]">
-                    <p class="text-sm text-purple-800">Thinking...</p>
+                    <p class="text-sm text-purple-800 animate-pulse">🤔 Thinking...</p>
                 </div>
             `;
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -389,23 +474,33 @@
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, backend: activeBackend })
+                    body: JSON.stringify({ message, session_id: chatSessionId, backend: activeBackend })
                 });
                 const data = await response.json();
+                chatSessionId = data.session_id;
 
                 document.getElementById('typing').remove();
-                messagesDiv.innerHTML += `
-                    <div class="bg-purple-100 rounded-lg p-3 max-w-[80%]">
-                        <p class="text-sm text-purple-800">${data.response || 'I processed your request!'}</p>
-                    </div>
-                `;
+                displayAssistantMessage(data.response, data.suggestions);
+
+                // Show workflow ready indicator if applicable
+                if (data.workflow_ready) {
+                    messagesDiv.innerHTML += `
+                        <div class="bg-green-100 border border-green-300 rounded-lg p-3 max-w-[85%] mt-2">
+                            <p class="text-sm text-green-800 font-medium">✅ Your workflow is ready! Click "Generate Code" to get the files.</p>
+                        </div>
+                    `;
+                }
             } catch (e) {
                 document.getElementById('typing').remove();
-                messagesDiv.innerHTML += `
-                    <div class="bg-purple-100 rounded-lg p-3 max-w-[80%]">
-                        <p class="text-sm text-purple-800">🤖 I would process: "${message}" using ${activeBackend || 'your selected backend'}. (Demo mode - API not connected)</p>
-                    </div>
-                `;
+                // Fallback demo response
+                displayAssistantMessage(`Great choice! Let me help you build that.
+
+**Tell me more about your project:**
+- What's your product/service?
+- Who's your target audience?
+- What are your main goals?
+
+This helps me customize the agent team for your needs.`, ['I\'m building a SaaS', 'Marketing campaign', 'Show me examples']);
             }
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }

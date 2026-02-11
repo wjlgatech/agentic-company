@@ -124,7 +124,7 @@ def run_evaluation():
                 "Description": case.description,
 
                 # Input Analysis
-                "Input_X": case.input_text[:200] + ("..." if len(case.input_text) > 200 else ""),
+                "Input_X": case.input_text,  # Full input, no truncation
                 "Input_Words": input_words,
                 "Input_Vague_Words": input_issues["vague_words"],
                 "Input_Missing_Specifics": input_issues["missing_specifics"],
@@ -136,7 +136,7 @@ def run_evaluation():
                 "Questions_Generated": eval_result["num_questions"],
 
                 # Output Analysis
-                "Output_Y_Prompt": result.get("prompt", "")[:500] + "...",
+                "Output_Y_Prompt": result.get("prompt", ""),  # Full prompt, no truncation
                 "Prompt_Words": prompt_words,
                 "Prompt_Sections": eval_result["prompt_sections"],
                 "Has_Visual_Model": "Yes" if result.get("model", {}).get("ascii") else "No",
@@ -162,7 +162,7 @@ def run_evaluation():
                 "Domain": case.domain,
                 "Subdomain": case.subdomain,
                 "Description": case.description,
-                "Input_X": case.input_text[:200],
+                "Input_X": case.input_text,
                 "Input_Words": len(case.input_text.split()) if case.input_text else 0,
                 "Input_Vague_Words": 0,
                 "Input_Missing_Specifics": 0,

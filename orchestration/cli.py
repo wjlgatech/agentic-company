@@ -333,5 +333,124 @@ def approval_reject(request_id: str, reason: str) -> None:
     console.print(f"  Reason: {reason}")
 
 
+@main.command()
+@click.option("--output", "-o", type=click.Path(), help="Output file path for generated workflow")
+@click.option("--voice", "-v", is_flag=True, help="Enable voice input (speak your answers)")
+def create(output: Optional[str], voice: bool) -> None:
+    """Create a workflow using the Easy Mode conversational builder.
+
+    Walks you through creating an AI agent workflow step by step
+    with simple multiple-choice questions.
+
+    Use --voice to speak your answers instead of typing!
+    """
+    mode_text = "🎤 Voice mode enabled - speak your answers!" if voice else "Type your answers below"
+    console.print()
+    console.print(Panel(
+        f"🆕 [bold]Easy Workflow Builder[/bold]\n\n"
+        f"I'll help you create an AI agent workflow step by step.\n"
+        f"{mode_text}",
+        title="Agenticom Create",
+        border_style="cyan"
+    ))
+    console.print()
+
+    try:
+        from orchestration.conversation import ConversationBuilder, get_voice_input, VOICE_AVAILABLE
+
+        # Check voice availability
+        if voice and not VOICE_AVAILABLE:
+            console.print("[yellow]⚠️ Voice not available. Install with:[/yellow]")
+            console.print("   pip install SpeechRecognition pyaudio")
+            voice = False
+
+        builder = ConversationBuilder()
+
+        while not builder.is_complete():
+            question = builder.get_current_question()
+            if not question:
+                break
+
+            # Display question
+            console.print(f"[bold cyan]Question {builder.current_step + 1}:[/bold cyan] {question.text}")
+            console.print()
+
+            # Display options
+            for i, option in enumerate(question.options, 1):
+                console.print(f"   {i}) {option}")
+            console.print()
+
+            # Get user input (voice or text)
+            while True:
+                response = None
+
+                # Try voice input first if enabled
+                if voice:
+                    console.print("[cyan]🎤 Listening... (say A, B, C, etc. or speak your choice)[/cyan]")
+                    voice_text = get_voice_input("Listening...")
+                    if voice_text:
+                        # Parse voice for letter choices
+                        voice_lower = voice_text.lower()
+                        for i, opt in enumerate(question.options):
+                            letter = chr(ord('a') + i)
+                            if letter in voice_lower or opt.lower() in voice_lower:
+                                response = letter
+                                console.print(f"   Heard: [green]{voice_text}[/green] → {letter}")
+                                break
+
+                # Fall back to text input
+                if response is None:
+                    response = click.prompt("Your choice (enter letter or text)", type=str)
+
+                # Convert number to letter if applicable
+                try:
+                    num = int(response)
+                    if 1 <= num <= len(question.options):
+                        response = chr(ord('a') + num - 1)  # 1→a, 2→b, etc.
+                except ValueError:
+                    pass  # User typed letter or text
+
+                if builder.answer(response):
+                    break
+                else:
+                    console.print("[red]Invalid response. Please try again.[/red]")
+
+            console.print()
+
+        # Generate outputs
+        console.print()
+        console.print("[bold green]✓ Workflow Created![/bold green]")
+        console.print()
+
+        # Show YAML
+        yaml_content = builder.generate_yaml()
+        console.print(Panel(yaml_content, title="Generated YAML", border_style="green"))
+
+        # Show Python
+        python_content = builder.generate_python()
+        console.print(Panel(python_content, title="Generated Python", border_style="blue"))
+
+        # Save to file if requested
+        if output:
+            with open(output, "w") as f:
+                f.write(yaml_content)
+            console.print(f"[green]✓[/green] Saved YAML to: {output}")
+        else:
+            # Offer to save
+            save = click.confirm("Would you like to save the YAML file?", default=True)
+            if save:
+                default_name = f"workflow-{builder.answers.get('purpose', 'custom').lower().replace(' ', '-')}.yaml"
+                filename = click.prompt("Filename", default=default_name)
+                with open(filename, "w") as f:
+                    f.write(yaml_content)
+                console.print(f"[green]✓[/green] Saved to: {filename}")
+
+    except ImportError as e:
+        console.print(f"[red]Error loading conversation builder: {e}[/red]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise
+
+
 if __name__ == "__main__":
     main()

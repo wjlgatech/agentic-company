@@ -34,19 +34,19 @@ class TestCLIConfig:
 
     def test_config_show_table(self, runner):
         """config show should display table."""
-        result = runner.invoke(main, ["config-cmd", "show"])
+        result = runner.invoke(main, ["config", "show"])
         assert result.exit_code == 0
 
     def test_config_show_json(self, runner):
         """config show --format json should output JSON."""
-        result = runner.invoke(main, ["config-cmd", "show", "--format", "json"])
+        result = runner.invoke(main, ["config", "show", "--format", "json"])
         assert result.exit_code == 0
         # Should contain JSON-like content
         assert "{" in result.output
 
     def test_config_validate(self, runner):
         """config validate should check configuration."""
-        result = runner.invoke(main, ["config-cmd", "validate"])
+        result = runner.invoke(main, ["config", "validate"])
         # May pass or fail depending on env, but should run
         assert result.exit_code in [0, 1]
 

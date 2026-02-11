@@ -127,7 +127,8 @@ class LocalMemoryStore(MemoryStore):
         query_lower = query.lower()
         results = []
 
-        for entry in self.entries.values():
+        # Copy values to avoid "dictionary changed size during iteration" in concurrent access
+        for entry in list(self.entries.values()):
             # Check if expired
             if entry.expires_at and entry.expires_at < datetime.now():
                 continue

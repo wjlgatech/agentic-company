@@ -2,14 +2,19 @@
 FastAPI REST API for Agentic Company orchestration system.
 
 Provides HTTP endpoints for workflow management, health checks, and metrics.
+Includes a user-friendly web dashboard at the root URL.
 """
 
 import asyncio
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from orchestration._version import __version__
@@ -26,6 +31,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Static files directory
+STATIC_DIR = Path(__file__).parent / "static"
 
 # CORS middleware
 app.add_middleware(
@@ -82,7 +90,90 @@ class ApprovalDecision(BaseModel):
     decided_by: str = "api"
 
 
+# ============== Dashboard & Static Files ==============
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def serve_dashboard():
+    """Serve the user-friendly web dashboard."""
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    else:
+        # Fallback: redirect to API docs
+        return HTMLResponse("""
+        <html>
+        <head><meta http-equiv="refresh" content="0;url=/docs"></head>
+        <body>Redirecting to API docs...</body>
+        </html>
+        """)
+
+
 # ============== Health Endpoints ==============
+
+@app.get("/api/health", tags=["Health"])
+async def api_health_check():
+    """Check backend status for dashboard."""
+    from orchestration.integrations import get_available_backends, get_ready_backends
+
+    available = get_available_backends()
+    ready = get_ready_backends()
+
+    return {
+        "status": "ok" if ready else "needs_setup",
+        "available_backends": [b.value for b in available],
+        "ready_backends": [b.value for b in ready],
+        "version": __version__,
+    }
+
+
+# ============== Chat Endpoint ==============
+
+class ChatRequest(BaseModel):
+    message: str
+    backend: Optional[str] = "auto"
+
+
+class ChatResponse(BaseModel):
+    response: str
+    backend_used: str
+
+
+@app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
+async def chat_with_ai(request: ChatRequest):
+    """Send a message to the AI and get a response."""
+    try:
+        from orchestration.integrations import auto_setup_executor
+
+        executor = auto_setup_executor(preferred=request.backend or "auto")
+        response = executor.execute_sync(request.message)
+
+        return ChatResponse(
+            response=response,
+            backend_used=executor.active_backend.value if executor.active_backend else "unknown"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== Config Endpoint ==============
+
+class ApiKeyRequest(BaseModel):
+    provider: str  # "anthropic" or "openai"
+    key: str
+
+
+@app.post("/api/config/key", tags=["Config"])
+async def save_api_key(request: ApiKeyRequest):
+    """Save an API key (session only - not persisted)."""
+    if request.provider == "anthropic":
+        os.environ["ANTHROPIC_API_KEY"] = request.key
+    elif request.provider == "openai":
+        os.environ["OPENAI_API_KEY"] = request.key
+    else:
+        raise HTTPException(status_code=400, detail="Unknown provider")
+
+    return {"status": "ok", "provider": request.provider}
+
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check() -> HealthResponse:
@@ -313,7 +404,7 @@ async def get_metrics() -> dict[str, Any]:
     return obs.metrics.get_all_metrics()
 
 
-@app.get("/metrics/prometheus", tags=["Metrics"])
+@app.get("/metrics/prometheus", tags=["Metrics"], response_class=PlainTextResponse)
 async def get_prometheus_metrics() -> str:
     """Get metrics in Prometheus format."""
     metrics = obs.metrics.get_all_metrics()

@@ -81,6 +81,14 @@ from orchestration.integrations import (
     get_available_backends,
 )
 
+# Conversational Workflow Builder (Easy Mode)
+from orchestration.conversation import (
+    ConversationBuilder,
+    Question,
+    QuestionType,
+    run_conversation,
+)
+
 __all__ = [
     # Version
     "__version__",
@@ -144,4 +152,9 @@ __all__ = [
     "UnifiedExecutor",
     "auto_setup_executor",
     "get_available_backends",
+    # Conversational Builder (Easy Mode)
+    "ConversationBuilder",
+    "Question",
+    "QuestionType",
+    "run_conversation",
 ]

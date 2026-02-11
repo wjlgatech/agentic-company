@@ -3,6 +3,11 @@ Unified LLM Executor
 
 Provides a unified interface for multiple LLM backends.
 Automatically detects, installs, and configures the best available option.
+
+Supports:
+- OpenClaw (Anthropic Claude) - Cloud API
+- Nanobot (OpenAI GPT) - Cloud API
+- Ollama (Local LLMs) - 100% FREE, runs on your machine!
 """
 
 import os
@@ -22,12 +27,21 @@ from orchestration.integrations.nanobot import (
     is_nanobot_installed,
     install_nanobot,
 )
+from orchestration.integrations.ollama import (
+    OllamaExecutor,
+    OllamaConfig,
+    is_ollama_running,
+    is_ollama_installed,
+    get_available_models,
+)
 
 
 class Backend(Enum):
     """Available LLM backends"""
-    OPENCLAW = "openclaw"  # Anthropic Claude
-    NANOBOT = "nanobot"    # OpenAI GPT
+    OPENCLAW = "openclaw"  # Anthropic Claude (cloud)
+    NANOBOT = "nanobot"    # OpenAI GPT (cloud)
+    OLLAMA = "ollama"      # Local LLMs (free!)
+    LOCAL = "local"        # Alias for Ollama
     AUTO = "auto"          # Auto-detect best available
 
 
@@ -37,6 +51,8 @@ class UnifiedConfig:
     preferred_backend: Backend = Backend.AUTO
     openclaw_model: str = "claude-3-5-sonnet-20241022"
     nanobot_model: str = "gpt-4-turbo-preview"
+    ollama_model: str = "llama3.2"  # Default local model
+    ollama_url: str = "http://localhost:11434"
     max_tokens: int = 4096
     temperature: float = 0.7
     auto_install: bool = True  # Auto-install missing backends
@@ -44,28 +60,58 @@ class UnifiedConfig:
 
 def get_available_backends() -> list[Backend]:
     """
-    Get list of available (installed) backends.
+    Get list of available (installed/running) backends.
 
     Returns:
         List of available Backend enums
     """
     available = []
 
+    # Check cloud backends (SDK installed + API key)
     if is_openclaw_installed():
         available.append(Backend.OPENCLAW)
 
     if is_nanobot_installed():
         available.append(Backend.NANOBOT)
 
+    # Check local backend (Ollama running)
+    if is_ollama_running():
+        available.append(Backend.OLLAMA)
+
     return available
 
 
+def get_ready_backends() -> list[Backend]:
+    """
+    Get backends that are fully ready to use (with API keys or running).
+
+    Returns:
+        List of ready Backend enums
+    """
+    ready = []
+
+    # Cloud backends need API keys
+    if is_openclaw_installed() and os.environ.get("ANTHROPIC_API_KEY"):
+        ready.append(Backend.OPENCLAW)
+
+    if is_nanobot_installed() and os.environ.get("OPENAI_API_KEY"):
+        ready.append(Backend.NANOBOT)
+
+    # Local backend just needs to be running
+    if is_ollama_running():
+        ready.append(Backend.OLLAMA)
+
+    return ready
+
+
 def _has_api_key(backend: Backend) -> bool:
-    """Check if API key is available for backend"""
+    """Check if API key is available for backend (or no key needed)"""
     if backend == Backend.OPENCLAW:
         return bool(os.environ.get("ANTHROPIC_API_KEY"))
     elif backend == Backend.NANOBOT:
         return bool(os.environ.get("OPENAI_API_KEY"))
+    elif backend in (Backend.OLLAMA, Backend.LOCAL):
+        return True  # No API key needed for local!
     return False
 
 
@@ -125,6 +171,13 @@ class UnifiedExecutor:
                 max_tokens=self.config.max_tokens,
                 temperature=self.config.temperature,
             ))
+        elif backend in (Backend.OLLAMA, Backend.LOCAL):
+            self._executor = OllamaExecutor(OllamaConfig(
+                model=self.config.ollama_model,
+                base_url=self.config.ollama_url,
+                max_tokens=self.config.max_tokens,
+                temperature=self.config.temperature,
+            ))
         else:
             raise RuntimeError("No LLM backend available")
 
@@ -156,20 +209,29 @@ class UnifiedExecutor:
                     )
                 return Backend.NANOBOT
 
-        # Auto-detect: prefer OpenClaw (Claude) if available
-        available = get_available_backends()
+            elif preferred in (Backend.OLLAMA, Backend.LOCAL):
+                if not is_ollama_running():
+                    raise ValueError(
+                        "Ollama not running!\n"
+                        "Start it with: ollama serve\n"
+                        "Or install from: https://ollama.ai"
+                    )
+                return Backend.OLLAMA
 
-        # Check which ones have API keys
-        ready_backends = [b for b in available if _has_api_key(b)]
+        # Auto-detect: check what's ready to use
+        ready = get_ready_backends()
 
-        if Backend.OPENCLAW in ready_backends:
+        # Priority: Local (free!) > OpenClaw > Nanobot
+        if Backend.OLLAMA in ready:
+            print("🦙 Using Ollama (local, free!)")
+            return Backend.OLLAMA
+        elif Backend.OPENCLAW in ready:
             return Backend.OPENCLAW
-        elif Backend.NANOBOT in ready_backends:
+        elif Backend.NANOBOT in ready:
             return Backend.NANOBOT
 
-        # Try to install one
+        # Try to install cloud backend if API key available
         if self.config.auto_install:
-            # Prefer OpenClaw
             if os.environ.get("ANTHROPIC_API_KEY"):
                 print("🔧 Auto-installing OpenClaw (Anthropic API key detected)...")
                 install_openclaw()
@@ -180,13 +242,15 @@ class UnifiedExecutor:
                 return Backend.NANOBOT
 
         raise RuntimeError(
-            "No LLM backend available. Please either:\n"
-            "1. Set ANTHROPIC_API_KEY for OpenClaw (Claude)\n"
-            "2. Set OPENAI_API_KEY for Nanobot (GPT)\n"
-            "\nExample:\n"
-            "  export ANTHROPIC_API_KEY=sk-ant-...\n"
-            "  # or\n"
-            "  export OPENAI_API_KEY=sk-..."
+            "No LLM backend available. Choose one:\n\n"
+            "🦙 OPTION 1: FREE LOCAL (Ollama)\n"
+            "   curl -fsSL https://ollama.ai/install.sh | sh\n"
+            "   ollama serve\n"
+            "   ollama pull llama3.2\n\n"
+            "☁️  OPTION 2: Cloud API\n"
+            "   export ANTHROPIC_API_KEY=sk-ant-...  # Claude\n"
+            "   # or\n"
+            "   export OPENAI_API_KEY=sk-...         # GPT\n"
         )
 
     @property
@@ -227,7 +291,7 @@ class UnifiedExecutor:
 
 
 def auto_setup_executor(
-    preferred: Literal["openclaw", "nanobot", "auto"] = "auto",
+    preferred: Literal["openclaw", "nanobot", "ollama", "local", "auto"] = "auto",
     **kwargs
 ) -> UnifiedExecutor:
     """
@@ -255,6 +319,8 @@ def auto_setup_executor(
     backend_map = {
         "openclaw": Backend.OPENCLAW,
         "nanobot": Backend.NANOBOT,
+        "ollama": Backend.OLLAMA,
+        "local": Backend.LOCAL,
         "auto": Backend.AUTO,
     }
 
@@ -273,26 +339,29 @@ def quick_start():
 ║                    🚀 AGENTICOM QUICK START                      ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
-║  Step 1: Set your API key                                        ║
+║  🦙 OPTION 1: FREE LOCAL (No API key needed!)                    ║
 ║  ─────────────────────────────────────────────────────────────   ║
+║  1. Install Ollama:                                              ║
+║     curl -fsSL https://ollama.ai/install.sh | sh                 ║
+║  2. Start server:                                                ║
+║     ollama serve                                                 ║
+║  3. Pull a model:                                                ║
+║     ollama pull llama3.2                                         ║
+║  4. Run Agenticom - it auto-detects Ollama!                      ║
 ║                                                                  ║
+║  ☁️  OPTION 2: Cloud APIs (Higher quality, requires key)         ║
+║  ─────────────────────────────────────────────────────────────   ║
 ║  For Claude (OpenClaw):                                          ║
 ║    export ANTHROPIC_API_KEY=sk-ant-your-key-here                 ║
 ║                                                                  ║
 ║  For GPT (Nanobot):                                              ║
 ║    export OPENAI_API_KEY=sk-your-key-here                        ║
 ║                                                                  ║
-║  Step 2: Run Agenticom                                           ║
+║  🎯 RUN AGENTICOM                                                ║
 ║  ─────────────────────────────────────────────────────────────   ║
-║                                                                  ║
-║  Quick test:                                                     ║
-║    python -c "from orchestration import auto_setup_executor;     ║
-║    e = auto_setup_executor(); print(e.execute_sync('Hello!'))"   ║
-║                                                                  ║
-║  Start web interface:                                            ║
-║    agenticom-launch                                              ║
-║                                                                  ║
-║  Or use the desktop icon!                                        ║
+║  GUI:      agenticom-launch                                      ║
+║  CLI:      agentic create   (Easy workflow builder)              ║
+║  Test:     agentic health   (Check your setup)                   ║
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
 """)

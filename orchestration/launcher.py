@@ -113,23 +113,53 @@ def run_quick_demo():
         return False
 
 
+def run_conversation_builder():
+    """Run the conversational workflow builder"""
+    print()
+    print("🆕 Easy Workflow Builder")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print()
+    print("I'll help you create an AI agent workflow step by step.")
+    print()
+    print("How would you like to interact?")
+    print("   1) ⌨️  Text input (type your answers)")
+    print("   2) 🎤 Voice input (speak your answers)")
+    print()
+
+    choice = input("Choose (1 or 2) [1]: ").strip()
+    voice_mode = choice == "2"
+
+    try:
+        from orchestration.conversation import run_conversation
+        run_conversation(voice_mode=voice_mode)
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        print()
+
+    input("Press Enter to continue...")
+
+
 def interactive_menu():
     """Show interactive menu"""
     while True:
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("📋 What would you like to do?")
         print()
-        print("   1) 🚀 Start Web Server (recommended)")
-        print("   2) 🧪 Run Quick Demo")
-        print("   3) 💻 Open CLI Help")
-        print("   4) 🔑 Configure API Keys")
-        print("   5) 📚 Open Documentation")
-        print("   6) ❌ Exit")
+        print("   1) 🆕 Create Workflow (Easy Mode) ⭐ NEW!")
+        print("   2) 🚀 Start Web Server")
+        print("   3) 🧪 Run Quick Demo")
+        print("   4) 💻 Open CLI Help")
+        print("   5) 🔑 Configure API Keys")
+        print("   6) 📚 Open Documentation")
+        print("   7) ❌ Exit")
         print()
 
-        choice = input("Enter choice (1-6): ").strip()
+        choice = input("Enter choice (1-7): ").strip()
 
         if choice == "1":
+            run_conversation_builder()
+
+        elif choice == "2":
             port = 8000
             # Open browser in background
             browser_thread = threading.Thread(target=open_browser, args=(port,))
@@ -139,25 +169,25 @@ def interactive_menu():
             start_server(port)
             break
 
-        elif choice == "2":
+        elif choice == "3":
             run_quick_demo()
             input("Press Enter to continue...")
 
-        elif choice == "3":
+        elif choice == "4":
             print()
             os.system(f"{sys.executable} -m orchestration.cli --help")
             print()
             input("Press Enter to continue...")
 
-        elif choice == "4":
+        elif choice == "5":
             configure_api_keys()
 
-        elif choice == "5":
+        elif choice == "6":
             webbrowser.open("https://github.com/wjlgatech/agentic-company")
             print("📚 Documentation opened in browser")
             input("Press Enter to continue...")
 
-        elif choice == "6":
+        elif choice == "7":
             print("👋 Goodbye!")
             break
 

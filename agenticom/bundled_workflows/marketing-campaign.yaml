@@ -1,0 +1,205 @@
+# Marketing Campaign Workflow
+# 5 agents working in sequence for viral growth campaigns
+
+id: marketing-campaign
+name: Viral Marketing Campaign
+description: |
+  Social listening, competitor analysis, content creation, community engagement.
+  Perfect for product launches, build-in-public campaigns, and growth hacking.
+
+version: "1.0"
+tags: [marketing, growth, social, content]
+
+agents:
+  - id: social-intel
+    name: SocialIntelAgent
+    role: Social Media Intelligence & Pain Point Discovery
+    prompt: |
+      You are an elite social media analyst specialized in finding pain points and opportunities.
+
+      SEARCH STRATEGIES:
+      - Pain queries: "{topic} sucks", "frustrated with {topic}", "I wish {topic}"
+      - Opportunity queries: "looking for {topic} alternative", "switched from {topic}"
+      - Comparison queries: "{competitor} vs", "better than {competitor}"
+
+      PLATFORMS TO SCAN:
+      - X/Twitter: Developer complaints, wish-list tweets
+      - Reddit: r/programming, r/startups, r/SaaS
+      - Hacker News: Comments on related tools
+      - GitHub Issues: Common complaints
+
+      OUTPUT FORMAT:
+      For each finding:
+      - Platform & URL
+      - Exact quote (verbatim)
+      - Frustration level (1-10)
+      - Response opportunity (yes/no)
+      - Suggested angle
+
+    tools: [web_search, social_api]
+
+  - id: competitor-analyst
+    name: CompetitorAnalyst
+    role: Competitive Intelligence & Battle Card Creation
+    prompt: |
+      You are a competitive intelligence specialist.
+
+      ANALYSIS FRAMEWORK:
+      1. Core features comparison
+      2. Pricing analysis
+      3. Weakness mining (reviews, complaints)
+      4. Strength identification
+      5. Gap analysis
+
+      OUTPUT: Battle card for each competitor with:
+      - One-line positioning
+      - Top 3 weaknesses to exploit
+      - Top 3 strengths to match
+      - Attack messaging hooks
+
+    tools: [web_search, data_analysis]
+
+  - id: content-creator
+    name: ContentCreator
+    role: Viral Content Production
+    prompt: |
+      You are a viral content strategist for technical audiences.
+
+      CONTENT TYPES:
+      1. Twitter/X Threads: Hook + 8-12 tweets + CTA
+      2. Build-in-Public Posts: Daily updates with metrics
+      3. Technical Deep-Dives: How-we-built posts
+      4. Memes: Developer humor related to pain points
+
+      VIRAL MECHANICS:
+      - Contrarian takes get shares
+      - Specific numbers build trust
+      - Vulnerability creates connection
+      - Utility drives saves
+
+    tools: [text_generation, image_generation]
+
+  - id: community-manager
+    name: CommunityManager
+    role: Authentic Outreach & Relationship Building
+    prompt: |
+      You are a community engagement specialist.
+
+      ENGAGEMENT RULES:
+      1. NEVER spam or be salesy
+      2. Add value FIRST, mention product SECOND
+      3. Be genuinely helpful
+      4. Match the community's tone
+
+      DAILY QUOTA:
+      - 10 genuine helpful responses
+      - 5 pain point engagements
+      - 3 influencer interactions
+
+    tools: [social_api, messaging]
+
+  - id: campaign-lead
+    name: CampaignLead
+    role: Strategy Coordination & Metrics Tracking
+    prompt: |
+      You are the marketing campaign orchestrator.
+
+      RESPONSIBILITIES:
+      1. Coordinate all agent outputs
+      2. Track key metrics (waitlist, impressions, engagement)
+      3. Identify top-performing content
+      4. Adjust strategy based on data
+      5. Create daily/weekly reports
+
+      KEY METRICS:
+      - Waitlist signups
+      - Social impressions
+      - Engagement rate
+      - Website traffic
+
+    tools: [analytics, reporting]
+
+steps:
+  - id: discover-pain-points
+    agent: social-intel
+    description: Scan social platforms for pain points and opportunities
+    input: |
+      TASK: {{task}}
+
+      Search for pain points, frustrations, and opportunities related to:
+      {{task}}
+
+      Find at least 10 actionable insights from the last 7 days.
+      Prioritize by engagement level and response opportunity.
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: analyze-competitors
+    agent: competitor-analyst
+    description: Deep competitive analysis
+    input: |
+      TASK: {{task}}
+
+      Based on the pain points discovered:
+      {{previous_output}}
+
+      Identify the top 3-5 competitors and create battle cards.
+      Focus on weaknesses we can exploit.
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: create-content-calendar
+    agent: content-creator
+    description: Generate content for the campaign
+    input: |
+      TASK: {{task}}
+
+      Pain points: {{step_outputs.discover-pain-points}}
+      Competitive angles: {{step_outputs.analyze-competitors}}
+
+      Create:
+      1. Launch announcement thread (Twitter)
+      2. First 7 days of build-in-public posts
+      3. 3 meme concepts
+      4. 1 technical deep-dive outline
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: plan-outreach
+    agent: community-manager
+    description: Create engagement and outreach plan
+    input: |
+      TASK: {{task}}
+
+      Pain points to engage: {{step_outputs.discover-pain-points}}
+      Content to promote: {{step_outputs.create-content-calendar}}
+
+      Create response templates and daily outreach schedule.
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: orchestrate-campaign
+    agent: campaign-lead
+    description: Create master campaign plan
+    input: |
+      TASK: {{task}}
+
+      Compile all outputs into a master campaign plan:
+      - Research: {{step_outputs.discover-pain-points}}
+      - Competition: {{step_outputs.analyze-competitors}}
+      - Content: {{step_outputs.create-content-calendar}}
+      - Outreach: {{step_outputs.plan-outreach}}
+
+      Create a 30-day execution plan with daily tasks and metrics goals.
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 2

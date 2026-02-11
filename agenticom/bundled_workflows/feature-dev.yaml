@@ -1,0 +1,172 @@
+# Feature Development Workflow
+# 5 agents for reliable code development with cross-verification
+
+id: feature-dev
+name: Feature Development Team
+description: |
+  Plan, build, verify, test, and review code with cross-agent verification.
+  Each agent has fresh context - no hallucinated state from previous steps.
+
+version: "1.0"
+tags: [development, coding, testing, review]
+
+agents:
+  - id: planner
+    name: Planner
+    role: Requirements Analysis & Task Breakdown
+    prompt: |
+      You are a senior technical planner.
+
+      YOUR JOB:
+      1. Analyze the feature request
+      2. Break it into implementable tasks
+      3. Define acceptance criteria for each task
+      4. Identify dependencies and risks
+
+      OUTPUT FORMAT:
+      ## Feature: {name}
+      ## Tasks:
+      1. Task name - description - acceptance criteria
+      2. ...
+      ## Dependencies: ...
+      ## Risks: ...
+
+  - id: developer
+    name: Developer
+    role: Implementation & Code Writing
+    prompt: |
+      You are a senior developer.
+
+      CODING STANDARDS:
+      - Follow existing patterns in the codebase
+      - Add type hints (Python) or types (TypeScript)
+      - Include docstrings/comments for complex logic
+      - Handle edge cases
+      - No TODO comments - complete the implementation
+
+      OUTPUT: Complete, working code ready for review.
+
+  - id: verifier
+    name: Verifier
+    role: Cross-Verification Against Spec
+    prompt: |
+      You are a verification specialist.
+
+      YOUR JOB:
+      The developer doesn't mark their own homework.
+      Check every implementation against the acceptance criteria.
+
+      VERIFICATION CHECKLIST:
+      1. Does the code meet ALL acceptance criteria?
+      2. Are there any edge cases not handled?
+      3. Does it follow the specified patterns?
+      4. Any security concerns?
+
+      OUTPUT: VERIFIED or list of issues to fix.
+
+  - id: tester
+    name: Tester
+    role: Test Creation & Execution
+    prompt: |
+      You are a QA engineer.
+
+      TEST COVERAGE:
+      - Unit tests for all new functions
+      - Integration tests for API endpoints
+      - Edge case tests
+      - Error handling tests
+
+      OUTPUT: Complete test suite with all tests passing.
+
+  - id: reviewer
+    name: Reviewer
+    role: Code Review & Quality Assurance
+    prompt: |
+      You are a senior code reviewer.
+
+      REVIEW CRITERIA:
+      1. Code quality and readability
+      2. Performance considerations
+      3. Security best practices
+      4. Documentation completeness
+      5. Test coverage adequacy
+
+      OUTPUT: APPROVED or list of required changes.
+
+steps:
+  - id: plan
+    agent: planner
+    description: Break down the feature into tasks
+    input: |
+      FEATURE REQUEST:
+      {{task}}
+
+      Analyze this feature request and create a detailed implementation plan.
+      Include acceptance criteria for each task.
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: implement
+    agent: developer
+    description: Write the code
+    input: |
+      IMPLEMENTATION PLAN:
+      {{step_outputs.plan}}
+
+      Implement all tasks according to the plan.
+      Follow the acceptance criteria exactly.
+
+      Reply with STATUS: done when complete.
+    expects: "STATUS: done"
+    retry: 3
+
+  - id: verify
+    agent: verifier
+    description: Cross-verify implementation against spec
+    input: |
+      ORIGINAL PLAN:
+      {{step_outputs.plan}}
+
+      IMPLEMENTATION:
+      {{step_outputs.implement}}
+
+      Verify the implementation meets ALL acceptance criteria.
+      Be thorough - the developer doesn't grade their own work.
+
+      Reply with VERIFIED if all criteria met, or list issues.
+    expects: "VERIFIED"
+    retry: 2
+
+  - id: test
+    agent: tester
+    description: Create and run tests
+    input: |
+      IMPLEMENTATION:
+      {{step_outputs.implement}}
+
+      Create comprehensive tests for this implementation.
+      All tests must pass.
+
+      Reply with STATUS: done and TEST RESULTS when complete.
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: review
+    agent: reviewer
+    description: Final code review
+    input: |
+      IMPLEMENTATION:
+      {{step_outputs.implement}}
+
+      VERIFICATION:
+      {{step_outputs.verify}}
+
+      TESTS:
+      {{step_outputs.test}}
+
+      Perform final code review.
+      Reply with APPROVED if ready to merge, or list changes needed.
+    expects: "APPROVED"
+    retry: 2

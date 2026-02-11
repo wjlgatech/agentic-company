@@ -81,6 +81,7 @@ all = [
 
 [project.scripts]
 agentic = "orchestration.cli:main"
+agenticom = "agenticom.cli:main"
 agenticom-launch = "orchestration.launcher:main"
 
 [project.urls]
@@ -94,7 +95,10 @@ version = {attr = "orchestration._version.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["orchestration*"]
+include = ["orchestration*", "agenticom*"]
+
+[tool.setuptools.package-data]
+agenticom = ["bundled_workflows/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

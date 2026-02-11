@@ -17,8 +17,8 @@
 
 - **2026-02-11** 🔧 **Critical fixes**: YAML parser + CLI execution now work properly!
 - **2026-02-11** 🎉 Added Web Dashboard + Golden Retriever mascot
-- **2026-02-10** ✨ Core features verified with stress tests
-- **2026-02-09** 🔧 Added OpenClaw + Nanobot skill integrations
+- **2026-02-11** ✨ Core features verified with stress tests
+- **2026-02-11** 🚀 Initial release with OpenClaw + Nanobot skill integrations
 
 ## ⚠️ Current Status: Alpha Framework
 

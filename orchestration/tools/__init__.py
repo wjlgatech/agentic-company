@@ -4,6 +4,7 @@ Tool integration module for Agenticom.
 Provides:
 - MCP (Model Context Protocol) integration for connecting workflow tools to real services
 - Prompt engineering for automatically improving agent prompts
+- Intent refinement for transforming vague user input into well-defined prompts
 """
 
 from .mcp_bridge import MCPToolBridge, MCPTool, ToolMapping
@@ -16,6 +17,18 @@ from .prompt_engineer import (
     get_prompt_engineer,
     improve_prompt,
     improve_prompt_sync,
+)
+from .intent_refiner import (
+    IntentRefiner,
+    IntentClassification,
+    IntentModel,
+    ClarificationQuestion,
+    TaskType,
+    Complexity,
+    Domain,
+    refine_intent,
+    get_clarification_questions,
+    generate_system_prompt,
 )
 
 __all__ = [
@@ -33,4 +46,15 @@ __all__ = [
     "get_prompt_engineer",
     "improve_prompt",
     "improve_prompt_sync",
+    # Intent Refinement
+    "IntentRefiner",
+    "IntentClassification",
+    "IntentModel",
+    "ClarificationQuestion",
+    "TaskType",
+    "Complexity",
+    "Domain",
+    "refine_intent",
+    "get_clarification_questions",
+    "generate_system_prompt",
 ]

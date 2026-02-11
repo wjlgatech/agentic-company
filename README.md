@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/mascot.svg" alt="Agenticom" width="120">
+  <img src="assets/mascot.png" alt="Agenticom Golden Retriever" width="200">
   <h1>Agenticom: Multi-Agent Team Orchestration</h1>
   <p>
     <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">

@@ -62,41 +62,50 @@ The task string is the contract between you and the agents. A vague task produce
 
 Get the user to confirm the plan and acceptance criteria before running.
 
+## Example Prompts
+
+### 🏠 Real Estate Marketing Team
+```
+Use agenticom marketing-campaign to create a complete digital marketing
+strategy for a luxury real estate agency in Miami targeting international
+buyers. Include: buyer personas, competitor audit, 30-day content calendar,
+influencer outreach list, and 90-day launch plan with KPIs.
+```
+
+### 🧬 Biomedical Research Deep Dive
+```
+Use agenticom feature-dev to research CAR-T cell therapy resistance in
+solid tumors. Scout literature (2020-2024), categorize resistance mechanisms,
+verify claims against primary data, generate 5 novel hypotheses, and write
+a 15-page review article with citations.
+```
+
+### 🚀 Idea to Product with PMF
+```
+Use agenticom feature-dev to validate my startup idea: "An AI copilot for
+freelance consultants that turns client calls into SOWs and invoices."
+Research market size, analyze competitors, design MVP spec, build financial
+model, and create go-to-market plan for first 100 customers.
+```
+
 ## Example Session
 
 ```bash
-$ agenticom workflow list
-📋 2 workflows available:
+$ agenticom workflow run marketing-campaign "Go-to-market for B2B SaaS targeting HR teams"
 
-🔹 feature-dev
-   Name: Feature Development Team
-   Agents: 5 | Steps: 5
-
-🔹 marketing-campaign
-   Name: Viral Marketing Campaign
-   Agents: 5 | Steps: 5
-
-$ agenticom workflow run feature-dev "Add JWT authentication to the REST API"
-🚀 Running workflow: feature-dev
-📝 Task: Add JWT authentication to the REST API
+🚀 Running workflow: marketing-campaign
+📝 Task: Go-to-market for B2B SaaS targeting HR teams
 
 ✅ Run ID: 27c491eb
 📊 Status: completed
 📈 Progress: 5/5 steps
 
 📋 Step Results:
-   ✅ plan (Planner): completed
-   ✅ implement (Developer): completed
-   ✅ verify (Verifier): completed
-   ✅ test (Tester): completed
-   ✅ review (Reviewer): completed
-
-$ agenticom workflow status 27c491eb
-🔹 Run ID: 27c491eb
-📋 Workflow: feature-dev
-📝 Task: Add JWT authentication to the REST API
-📊 Status: completed
-📈 Progress: 5/5 steps
+   ✅ discover (Trend Scout): Identified 3 buyer personas, pain points
+   ✅ analyze (Competitor Analyst): Audited 8 competitors, found gaps
+   ✅ create (Content Creator): 30-day calendar, email sequences
+   ✅ outreach (Partnership Builder): 25 targets, pitch templates
+   ✅ orchestrate (Launch Planner): 90-day plan with KPIs
 ```
 
 ## How It Works

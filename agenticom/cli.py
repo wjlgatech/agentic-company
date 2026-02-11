@@ -244,19 +244,16 @@ def stats(ctx, as_json):
 # ============== Dashboard ==============
 
 @cli.command()
-@click.option("--port", default=3333, help="Port number")
+@click.option("--port", "-p", default=8080, help="Port number (default: 8080)")
+@click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
 @click.pass_context
-def dashboard(ctx, port):
+def dashboard(ctx, port, no_browser):
     """Start the web dashboard"""
-    click.echo(f"🌐 Starting Agenticom dashboard on http://localhost:{port}")
-    click.echo("   Press Ctrl+C to stop")
-
     try:
-        from .dashboard import run_dashboard
-        run_dashboard(port=port)
-    except ImportError:
-        click.echo("❌ Dashboard dependencies not installed.")
-        click.echo("   Run: pip install agenticom[dashboard]")
+        from .dashboard import start_dashboard
+        start_dashboard(port=port, open_browser=not no_browser)
+    except ImportError as e:
+        click.echo(f"❌ Dashboard import error: {e}")
     except Exception as e:
         click.echo(f"❌ Error starting dashboard: {e}")
 

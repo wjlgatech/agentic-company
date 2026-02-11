@@ -99,6 +99,7 @@ class WorkflowParser:
     """
 
     ROLE_MAP = {
+        # Standard roles
         "planner": AgentRole.PLANNER,
         "developer": AgentRole.DEVELOPER,
         "verifier": AgentRole.VERIFIER,
@@ -107,6 +108,13 @@ class WorkflowParser:
         "researcher": AgentRole.RESEARCHER,
         "writer": AgentRole.WRITER,
         "analyst": AgentRole.ANALYST,
+        "custom": AgentRole.CUSTOM,
+        # Marketing workflow role mappings
+        "social-intel": AgentRole.RESEARCHER,
+        "competitor-analyst": AgentRole.ANALYST,
+        "content-creator": AgentRole.WRITER,
+        "community-manager": AgentRole.WRITER,
+        "campaign-lead": AgentRole.PLANNER,
     }
 
     def parse(self, yaml_content: str) -> WorkflowDefinition:
@@ -124,10 +132,21 @@ class WorkflowParser:
         # Parse agents
         agents = []
         for agent_data in data.get('agents', []):
+            # Use 'id' for role mapping (e.g., "planner", "developer")
+            # Fall back to 'role' for backward compatibility with simple formats
+            role_key = agent_data.get('id') or agent_data.get('role')
+
+            # Use 'prompt' for persona, fall back to 'persona' field
+            # The 'role' field in bundled YAMLs is a description, append it to persona
+            persona = agent_data.get('prompt') or agent_data.get('persona') or ''
+            role_desc = agent_data.get('role', '')
+            if role_desc and role_desc != role_key:
+                persona = f"Role: {role_desc}\n\n{persona}".strip()
+
             agents.append(AgentDefinition(
-                role=agent_data.get('role'),
+                role=role_key,
                 name=agent_data.get('name'),
-                persona=agent_data.get('persona'),
+                persona=persona,
                 guardrails=agent_data.get('guardrails', []),
                 workspace_files=agent_data.get('workspace_files', []),
                 tools=agent_data.get('tools', []),

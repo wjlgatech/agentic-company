@@ -129,21 +129,58 @@ def workflow() -> None:
 @workflow.command("list")
 def workflow_list() -> None:
     """List available workflows."""
-    # Built-in workflows
-    workflows = [
-        {"name": "content-research", "description": "Research and analyze content", "status": "active"},
-        {"name": "content-creation", "description": "Create new content", "status": "active"},
-        {"name": "review-optimize", "description": "Review and optimize content", "status": "active"},
-        {"name": "data-processing", "description": "Process and transform data", "status": "active"},
+    from pathlib import Path
+    from orchestration.workflows.parser import WorkflowParser
+
+    parser = WorkflowParser()
+    workflows = []
+
+    # Search locations for workflow files
+    search_paths = [
+        Path("workflows"),
+        Path("agenticom/bundled_workflows"),
+        Path(__file__).parent.parent / "agenticom/bundled_workflows",
     ]
+
+    for search_path in search_paths:
+        if search_path.exists():
+            for yaml_file in list(search_path.glob("*.yaml")) + list(search_path.glob("*.yml")):
+                try:
+                    definition = parser.parse_file(yaml_file)
+                    workflows.append({
+                        "name": definition.id,
+                        "description": definition.description.split('\n')[0][:60] if definition.description else "No description",
+                        "path": str(yaml_file),
+                        "agents": len(definition.agents),
+                        "steps": len(definition.steps),
+                    })
+                except Exception as e:
+                    workflows.append({
+                        "name": yaml_file.stem,
+                        "description": f"[red]Error loading: {e}[/red]",
+                        "path": str(yaml_file),
+                        "agents": 0,
+                        "steps": 0,
+                    })
+
+    if not workflows:
+        console.print("[yellow]No workflows found.[/yellow]")
+        console.print("Create one with: [cyan]agentic create[/cyan]")
+        return
 
     table = Table(title="Available Workflows")
     table.add_column("Name", style="cyan")
     table.add_column("Description")
-    table.add_column("Status", style="green")
+    table.add_column("Agents", justify="center")
+    table.add_column("Steps", justify="center")
 
     for wf in workflows:
-        table.add_row(wf["name"], wf["description"], wf["status"])
+        table.add_row(
+            wf["name"],
+            wf["description"],
+            str(wf["agents"]),
+            str(wf["steps"]),
+        )
 
     console.print(table)
 
@@ -153,34 +190,135 @@ def workflow_list() -> None:
 @click.option("--input", "-i", "input_data", required=True, help="Input data or file path")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--async", "run_async", is_flag=True, help="Run asynchronously")
+@click.option("--dry-run", is_flag=True, help="Show workflow plan without executing")
 def workflow_run(
     workflow_name: str,
     input_data: str,
     output: Optional[str],
     run_async: bool,
+    dry_run: bool,
 ) -> None:
     """Run a workflow."""
+    from pathlib import Path
+
     console.print(f"[cyan]Running workflow:[/cyan] {workflow_name}")
-    console.print(f"[cyan]Input:[/cyan] {input_data[:100]}...")
+    console.print(f"[cyan]Input:[/cyan] {input_data[:100]}{'...' if len(input_data) > 100 else ''}")
 
-    # Simulate workflow execution
-    with console.status("Executing workflow..."):
-        import time
-        time.sleep(1)  # Simulate processing
+    # Find and load the workflow
+    workflow_paths = [
+        Path(f"{workflow_name}.yaml"),
+        Path(f"{workflow_name}.yml"),
+        Path(f"workflows/{workflow_name}.yaml"),
+        Path(f"agenticom/bundled_workflows/{workflow_name}.yaml"),
+        Path(__file__).parent.parent / f"agenticom/bundled_workflows/{workflow_name}.yaml",
+    ]
 
-    result = {
-        "workflow": workflow_name,
-        "status": "completed",
-        "input": input_data,
-        "output": f"Processed result for: {input_data}",
-    }
+    workflow_path = None
+    for path in workflow_paths:
+        if path.exists():
+            workflow_path = path
+            break
 
-    if output:
-        with open(output, "w") as f:
-            json.dump(result, f, indent=2)
-        console.print(f"[green]✓[/green] Output saved to: {output}")
-    else:
-        console.print(Panel(result["output"], title="Result", border_style="green"))
+    if workflow_path is None:
+        console.print(f"[red]✗[/red] Workflow not found: {workflow_name}")
+        console.print("[dim]Searched in:[/dim]")
+        for p in workflow_paths:
+            console.print(f"  - {p}")
+        sys.exit(1)
+
+    try:
+        from orchestration.workflows.parser import load_workflow
+        team = load_workflow(workflow_path)
+        console.print(f"[green]✓[/green] Loaded workflow from: {workflow_path}")
+        console.print(f"  Agents: {[r.value for r in team.agents.keys()]}")
+        console.print(f"  Steps: {len(team.steps)}")
+
+        # Show workflow plan
+        if dry_run:
+            console.print("\n[bold cyan]Workflow Plan:[/bold cyan]")
+            for i, step in enumerate(team.steps, 1):
+                console.print(f"  {i}. [bold]{step.name}[/bold] ({step.agent_role.value})")
+                if step.expects:
+                    console.print(f"     Expects: {step.expects}")
+            return
+
+        # Setup LLM executor
+        from orchestration.integrations import auto_setup_executor
+        from orchestration.integrations.unified import get_ready_backends
+
+        ready = get_ready_backends()
+        if not ready:
+            console.print("[red]✗[/red] No LLM backend ready!")
+            console.print("\n[yellow]To run workflows, configure one of:[/yellow]")
+            console.print("  1. Set ANTHROPIC_API_KEY for Claude")
+            console.print("  2. Set OPENAI_API_KEY for GPT-4")
+            console.print("  3. Start Ollama locally: [cyan]ollama serve[/cyan]")
+            console.print("\nOr use [cyan]--dry-run[/cyan] to preview the workflow")
+            sys.exit(1)
+
+        executor = auto_setup_executor()
+        backend_name = executor.active_backend.value if executor.active_backend else "None"
+        console.print(f"[green]✓[/green] LLM backend: {backend_name}")
+
+        # Configure agents with executor
+        async def agent_executor(prompt: str, context) -> str:
+            return await executor.execute(prompt, context)
+
+        for agent in team.agents.values():
+            agent.set_executor(agent_executor)
+
+        # Execute workflow
+        async def run_workflow():
+            with console.status("[bold green]Executing workflow...") as status:
+                result = await team.run(input_data)
+
+                # Display step results as they complete
+                for step_result in result.steps:
+                    step = step_result.step
+                    if step_result.status.value == "completed":
+                        console.print(f"  [green]✓[/green] {step.name}: completed")
+                    else:
+                        console.print(f"  [red]✗[/red] {step.name}: {step_result.status.value}")
+
+                return result
+
+        team_result = asyncio.run(run_workflow())
+
+        # Build result
+        result = {
+            "workflow": workflow_name,
+            "workflow_id": team_result.workflow_id,
+            "status": "completed" if team_result.success else "failed",
+            "input": input_data,
+            "output": team_result.final_output,
+            "steps": len(team_result.steps),
+            "error": team_result.error,
+        }
+
+        if output:
+            with open(output, "w") as f:
+                json.dump(result, f, indent=2)
+            console.print(f"[green]✓[/green] Output saved to: {output}")
+        else:
+            if team_result.success:
+                console.print(Panel(
+                    str(team_result.final_output)[:2000] if team_result.final_output else "No output",
+                    title="[green]Result[/green]",
+                    border_style="green"
+                ))
+            else:
+                console.print(Panel(
+                    team_result.error or "Unknown error",
+                    title="[red]Error[/red]",
+                    border_style="red"
+                ))
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
+        import traceback
+        if console.is_terminal:
+            traceback.print_exc()
+        sys.exit(1)
 
 
 @workflow.command("status")

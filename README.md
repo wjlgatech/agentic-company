@@ -4,58 +4,83 @@
   <p>
     <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-    <img src="https://img.shields.io/badge/tests-11%2F11%20passed-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-10%2F10%20passed-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
   </p>
 </div>
 
-🐕 **Agenticom** is a multi-agent workflow orchestration tool inspired by [Antfarm](https://github.com/snarktank/antfarm).
+🐕 **Agenticom** is a multi-agent workflow orchestration framework inspired by [Antfarm](https://github.com/snarktank/antfarm).
 
-⚡️ **One agent makes mistakes. Five agents ship features.**
-
-📏 Real-time line count: **14,097 lines** (run `find . -name "*.py" -exec cat {} \; | wc -l`)
+⚡️ **One agent makes mistakes. Five agents cross-verify.**
 
 ## 📢 News
 
-- **2026-02-11** 🎉 Added Web Dashboard + Golden Retriever mascot!
-- **2026-02-10** ✨ All 11 features verified with stress tests
+- **2026-02-11** 🔧 **Critical fixes**: YAML parser + CLI execution now work properly!
+- **2026-02-11** 🎉 Added Web Dashboard + Golden Retriever mascot
+- **2026-02-10** ✨ Core features verified with stress tests
 - **2026-02-09** 🔧 Added OpenClaw + Nanobot skill integrations
-- **2026-02-08** 🚀 Initial release with guardrails, memory, approval gates
 
-## ✨ Key Features (All Verified ✅)
+## ⚠️ Current Status: Alpha Framework
 
-| Feature | Status | What it does |
-|---------|--------|--------------|
-| 🛡️ **Guardrails** | ✅ Tested | Content filter, rate limiter |
-| 🧠 **Memory** | ✅ Tested | Persistent remember/recall |
-| ✅ **Approval Gates** | ✅ Tested | Auto/Human/Hybrid approval |
-| 💾 **Caching** | ✅ Tested | LLM response cache |
-| 📊 **Observability** | ✅ Tested | Prometheus metrics |
-| 🖥️ **CLI** | ✅ Tested | Full workflow management |
-| 💾 **State Manager** | ✅ Tested | SQLite persistence |
-| 🌐 **Dashboard** | ✅ Tested | Beautiful web UI |
-| ⚡ **Multi-Backend** | ✅ Tested | Ollama (FREE), Claude, GPT |
+**Agenticom is a FRAMEWORK, not a turnkey product.** It provides:
+
+### ✅ What Works
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| 🛡️ **Guardrails** | ✅ Working | Content filter, rate limiter |
+| 🧠 **Memory** | ✅ Working | Persistent remember/recall |
+| ✅ **Approval Gates** | ✅ Working | Auto/Human/Hybrid patterns |
+| 💾 **Caching** | ✅ Working | LLM response cache |
+| 📊 **Observability** | ✅ Working | Prometheus-style metrics |
+| 📋 **YAML Workflows** | ✅ Working | Parser loads bundled workflows |
+| 🖥️ **CLI** | ✅ Working | `workflow list`, `run --dry-run` |
+| 🌐 **Dashboard** | ✅ Working | Visual workflow management |
+| ⚡ **Multi-Backend** | ✅ Working | Ollama/Claude/GPT abstraction |
+
+### ⚠️ What Requires Your Implementation
+
+| Feature | Status | What You Need to Build |
+|---------|--------|------------------------|
+| 🌐 **Web Scraping** | ❌ Not Implemented | Integrate Brave/Google Search API |
+| 📱 **Social Media** | ❌ Not Implemented | Connect Twitter/Reddit/LinkedIn APIs |
+| 📊 **Analytics** | ❌ Not Implemented | Add Google Analytics, Mixpanel |
+| 🔧 **Tool Execution** | ❌ Not Implemented | Build actual tool runners |
+
+**The bundled workflows (`marketing-campaign`, `feature-dev`) define WHAT agents should do via prompts, but the tools they reference (like `web_search`, `social_api`) are declarative placeholders that you must implement.**
 
 <details>
-<summary><b>View Test Results</b></summary>
+<summary><b>View Test Results (Critical Fixes Verified)</b></summary>
 
 ```
-🧪 AGENTICOM STRESS TEST SUITE
+🧪 AGENTICOM CRITICAL FIX TEST SUITE
 ============================================================
-✅ 🛡️ Guardrails: ContentFilter + RateLimiter working
-✅ 🧠 Memory: Stored 2 memories, found 1 matches
-✅ ✅ Approval Gates: ApprovalRequest created
-✅ 💾 Caching: Cache get/set + decorator OK
-✅ 📊 Observability: Recorded 3 metric types
-✅ 🖥️ CLI Commands: workflow list + stats working
-✅ 💾 State Manager: SQLite persistence working
-✅ 📋 Workflow Parser: YAML parsing working
-✅ 🌐 Dashboard: 16,076 chars HTML ready
-✅ 💬 Conversation Builder: Progress tracking
-✅ ⚡ Ollama Backend: OllamaExecutor ready
+TestYAMLParserFix:
+  ✅ feature-dev.yaml loads correctly
+  ✅ marketing-campaign.yaml loads correctly
+  ✅ Parser preserves persona from prompt field
+  ✅ Parser correctly uses 'id' for role mapping
 
-🎯 Total: 11/11 tests passed
-🎉 ALL FEATURES VERIFIED!
+TestCLIWorkflowExecution:
+  ✅ CLI dry-run mode works
+  ✅ CLI workflow run is not mocked
+  ✅ CLI shows helpful error when no LLM backend
+
+TestWorkflowListDiscovery:
+  ✅ Workflow list discovers actual YAML files
+
+TestAgentTeamExecution:
+  ✅ Agent correctly requires executor
+  ✅ AgentTeam has async run method
+
+============================================================
+RESULTS: 10/10 tests passed
 ```
+
+**Critical Fixes Applied (2026-02-11):**
+1. **YAML Parser**: Now correctly uses `id` field for role mapping (was using `role` which contained descriptions)
+2. **CLI Execution**: Replaced mock `time.sleep()` with real workflow execution
+3. **Error Handling**: Clear messages when LLM backend not configured
 
 </details>
 
@@ -76,7 +101,7 @@ cd agentic-company && pip install -e . && agenticom install
 
 ## 🚀 Quick Start
 
-**1. Configure LLM backend**
+**1. Configure LLM backend (required)**
 
 ```bash
 # Option A: Ollama (FREE - local)
@@ -89,17 +114,27 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-**2. Run a workflow**
+**2. Preview a workflow (dry-run)**
 
 ```bash
-agenticom workflow run marketing-campaign "Launch strategy for B2B SaaS targeting HR teams"
+# See what a workflow will do without executing
+agenticom workflow run feature-dev -i "Add login button" --dry-run
 ```
 
-**3. Open dashboard**
+**3. Run a workflow**
+
+```bash
+# Actually execute the workflow (requires LLM backend)
+agenticom workflow run feature-dev -i "Add a hello world function"
+```
+
+**4. Open dashboard**
 
 ```bash
 agenticom dashboard
 ```
+
+> ⚠️ **Note**: Workflows execute via LLM prompts. Tools like `web_search` and `social_api` in marketing workflows are **declarative** - you must implement actual tool execution for real-world use.
 
 ## 🌐 Web Dashboard
 

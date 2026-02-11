@@ -329,6 +329,106 @@ def workflow_status(workflow_id: str) -> None:
     console.print(f"Workflow [cyan]{workflow_id}[/cyan]: [green]completed[/green]")
 
 
+@workflow.command("tools")
+@click.argument("workflow_name")
+@click.option("--resolve", is_flag=True, help="Show MCP resolution details")
+def workflow_tools(workflow_name: str, resolve: bool) -> None:
+    """Show tools required by a workflow and their MCP mappings."""
+    from pathlib import Path
+    from orchestration.workflows.parser import WorkflowParser
+    from orchestration.tools.mcp_bridge import MCPToolBridge
+
+    # Find workflow file
+    workflow_paths = [
+        Path(f"workflows/{workflow_name}.yaml"),
+        Path(f"agenticom/bundled_workflows/{workflow_name}.yaml"),
+        Path(__file__).parent.parent / f"agenticom/bundled_workflows/{workflow_name}.yaml",
+    ]
+
+    workflow_path = None
+    for path in workflow_paths:
+        if path.exists():
+            workflow_path = path
+            break
+
+    if not workflow_path:
+        console.print(f"[red]✗[/red] Workflow not found: {workflow_name}")
+        return
+
+    # Parse workflow
+    parser = WorkflowParser()
+    definition = parser.parse_file(workflow_path)
+
+    # Collect tools from all agents
+    all_tools = set()
+    agent_tools = {}
+    for agent in definition.agents:
+        if agent.tools:
+            agent_tools[agent.role] = agent.tools
+            all_tools.update(agent.tools)
+
+    console.print(f"\n[bold cyan]Workflow: {workflow_name}[/bold cyan]")
+    console.print(f"[dim]Path: {workflow_path}[/dim]\n")
+
+    # Show tools by agent
+    table = Table(title="Tools by Agent")
+    table.add_column("Agent", style="cyan")
+    table.add_column("Name")
+    table.add_column("Tools", style="yellow")
+
+    for agent in definition.agents:
+        tools_str = ", ".join(agent.tools) if agent.tools else "[dim]none[/dim]"
+        table.add_row(agent.role, agent.name or "", tools_str)
+
+    console.print(table)
+
+    if resolve and all_tools:
+        console.print("\n[bold]MCP Tool Resolution:[/bold]\n")
+
+        bridge = MCPToolBridge(use_mocks=True)
+        report = bridge.get_resolution_report(list(all_tools))
+
+        # Resolved tools
+        if report["resolved"]:
+            table = Table(title="✅ Resolved Tools")
+            table.add_column("Tool", style="green")
+            table.add_column("MCP Server")
+            table.add_column("Available Methods")
+
+            for item in report["resolved"]:
+                methods = ", ".join(item.get("tools", [])[:3])
+                if len(item.get("tools", [])) > 3:
+                    methods += "..."
+                table.add_row(item["name"], item.get("server", ""), methods)
+            console.print(table)
+
+        # Mocked tools
+        if report["mocked"]:
+            table = Table(title="🔶 Mocked Tools (for testing)")
+            table.add_column("Tool", style="yellow")
+            table.add_column("Note")
+
+            for item in report["mocked"]:
+                table.add_row(item["name"], item.get("note", ""))
+            console.print(table)
+
+        # Unresolved tools
+        if report["unresolved"]:
+            table = Table(title="❌ Unresolved Tools")
+            table.add_column("Tool", style="red")
+            table.add_column("Suggestion")
+
+            for item in report["unresolved"]:
+                table.add_row(item["name"], item.get("note", ""))
+            console.print(table)
+
+        # Summary
+        summary = report["summary"]
+        console.print(f"\n[bold]Summary:[/bold] {summary['resolved']} resolved, "
+                      f"{summary['mocked']} mocked, {summary['unresolved']} unresolved "
+                      f"(of {summary['total']} total)")
+
+
 @main.group()
 def metrics() -> None:
     """Metrics and observability commands."""

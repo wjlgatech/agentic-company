@@ -4,7 +4,7 @@
   <p>
     <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-    <img src="https://img.shields.io/badge/tests-14%2F14%20passed-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-172%20passed-brightgreen" alt="Tests">
     <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
   </p>
 </div>
@@ -15,6 +15,8 @@
 
 ## 📢 News
 
+- **2026-02-11** 🧠 **NEW: PromptEngineer** - Automatic prompt improvement using Anthropic's best practices
+- **2026-02-11** 🔌 **NEW: MCP Integration** - Connect workflow tools to real MCP servers (PubMed, Ahrefs, etc.)
 - **2026-02-11** 🔧 **Critical fixes**: YAML parser + CLI execution now work properly!
 - **2026-02-11** 🎉 Added Web Dashboard + Golden Retriever mascot
 - **2026-02-11** ✨ Core features verified with stress tests
@@ -37,17 +39,20 @@
 | 🖥️ **CLI** | ✅ Working | `workflow list`, `run --dry-run` |
 | 🌐 **Dashboard** | ✅ Working | Visual workflow management |
 | ⚡ **Multi-Backend** | ✅ Working | Ollama/Claude/GPT abstraction |
+| 🔌 **MCP Integration** | ✅ Working | Connect to real MCP servers |
+| 🧠 **Prompt Engineer** | ✅ Working | Auto-improve agent prompts |
 
-### ⚠️ What Requires Your Implementation
+### ⚠️ What Requires MCP Server Connections
 
-| Feature | Status | What You Need to Build |
-|---------|--------|------------------------|
-| 🌐 **Web Scraping** | ❌ Not Implemented | Integrate Brave/Google Search API |
-| 📱 **Social Media** | ❌ Not Implemented | Connect Twitter/Reddit/LinkedIn APIs |
-| 📊 **Analytics** | ❌ Not Implemented | Add Google Analytics, Mixpanel |
-| 🔧 **Tool Execution** | ❌ Not Implemented | Build actual tool runners |
+| Feature | Status | How to Enable |
+|---------|--------|---------------|
+| 🌐 **Web Search** | 🔌 MCP Ready | Connect Ahrefs or Similarweb MCP |
+| 📚 **Literature Search** | 🔌 MCP Ready | Connect PubMed MCP |
+| 📱 **Social Media** | 🔌 MCP Ready | Connect LunarCrush MCP |
+| 📊 **Market Research** | 🔌 MCP Ready | Connect Harmonic or S&P Global MCP |
+| 🔍 **Competitor Analysis** | 🔌 MCP Ready | Connect Similarweb MCP |
 
-**The bundled workflows (`marketing-campaign`, `feature-dev`) define WHAT agents should do via prompts, but the tools they reference (like `web_search`, `social_api`) are declarative placeholders that you must implement.**
+**The bundled workflows now include MCP Tool Bridge integration.** Tools automatically resolve to real MCP servers when connected, or provide graceful fallback guidance when not.
 
 <details>
 <summary><b>View Test Results (Critical Fixes Verified)</b></summary>
@@ -230,6 +235,7 @@ Then tell your assistant: *"Use agenticom feature-dev to research and design a m
 | `agenticom install` | Install bundled workflows |
 | `agenticom workflow list` | List available workflows |
 | `agenticom workflow run <id> <task>` | Start a run |
+| `agenticom workflow tools <id>` | **Show MCP tool resolution** |
 | `agenticom workflow status <run-id>` | Check status |
 | `agenticom workflow resume <run-id>` | Resume failed run |
 | `agenticom dashboard` | **Open web UI** |
@@ -342,6 +348,80 @@ metrics.observe("step_duration", 1.5)
 
 </details>
 
+<details>
+<summary><b>🔌 MCP Tool Integration</b></summary>
+
+Connect workflow tools to real MCP (Model Context Protocol) servers:
+
+```python
+from orchestration.tools import MCPToolBridge
+
+# Initialize bridge
+bridge = MCPToolBridge(graceful_mode=True)
+
+# Resolve tools from workflow
+tools = bridge.resolve_workflow_tools(["web_search", "literature_search"])
+
+# Execute a tool
+result = await bridge.execute("web_search", query="AI startups 2024")
+
+# Get resolution report
+report = bridge.get_resolution_report(["web_search", "market_research"])
+print(report["summary"])  # {resolved: 1, fallback: 1, waiting: 0}
+```
+
+**Supported MCP Servers:**
+- 📚 **PubMed** - Biomedical literature search
+- 🔍 **Ahrefs** - Web search & SEO data
+- 📊 **Similarweb** - Competitor traffic analysis
+- 🏢 **Harmonic** - Company enrichment data
+- 📈 **Amplitude** - Product analytics
+- 💬 **LunarCrush** - Social media intelligence
+
+</details>
+
+<details>
+<summary><b>🧠 Prompt Engineering</b></summary>
+
+Automatically improve agent prompts using Anthropic's best practices:
+
+```python
+from orchestration.tools import PromptEngineer, PromptStyle
+
+# Initialize engineer
+engineer = PromptEngineer(executor=my_llm_function)
+
+# Improve a basic prompt
+result = await engineer.improve(
+    "Find papers about AI.",
+    style=PromptStyle.AGENT
+)
+print(result.improved)  # Full structured agent prompt
+print(result.improvements)  # ["Added role setting", "Added guardrails", ...]
+
+# Generate complete agent persona
+persona = await engineer.generate_agent_persona(
+    role="Senior Data Analyst",
+    task="Analyze customer data and identify trends",
+    expertise=["Python", "SQL", "Statistics"]
+)
+
+# Sync improvement (no LLM needed - uses rule-based approach)
+from orchestration.tools import improve_prompt_sync
+better_prompt = improve_prompt_sync("analyze data", style=PromptStyle.ANALYSIS)
+```
+
+**Prompt Styles:** `AGENT`, `TASK`, `ANALYSIS`, `CREATIVE`, `CODING`
+
+**Improvements Applied:**
+- ✅ Role setting & expertise
+- ✅ Chain-of-thought reasoning
+- ✅ Output format specification
+- ✅ Guardrails & safety guidelines
+- ✅ Section structure
+
+</details>
+
 ## 📁 Project Structure
 
 ```
@@ -357,7 +437,11 @@ metrics.observe("step_duration", 1.5)
 │   ├── approval.py         # Approval gates
 │   ├── cache.py            # Response caching
 │   ├── observability.py    # Metrics
-│   └── integrations/       # Ollama, Claude, GPT
+│   ├── integrations/       # Ollama, Claude, GPT
+│   └── tools/              # MCP & Prompt Engineering
+│       ├── mcp_bridge.py   # MCP server integration
+│       ├── registry.py     # MCP server registry
+│       └── prompt_engineer.py  # Auto prompt improvement
 │
 ├── skills/                 # Assistant skills
 │   ├── agenticom-workflows/  # OpenClaw skill

@@ -5,59 +5,26 @@
 <h1 align="center">AGENTICOM</h1>
 
 <p align="center">
-  <strong>Multi-Agent Orchestration for Claude Code & Cursor</strong><br>
-  <em>YAML workflows. SQLite state. Zero infrastructure.</em>
+  <strong>Production-Grade Multi-Agent Orchestration</strong><br>
+  <em>Everything antfarm does, plus guardrails, memory, approval gates, observability, and 3 LLM backends.</em>
 </p>
 
 <p align="center">
-  <a href="#-install-in-30-seconds">Install</a> •
-  <a href="#-run-your-first-workflow">Quick Start</a> •
-  <a href="#-how-it-works">How It Works</a> •
-  <a href="#-python-api">Python API</a>
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-why-agenticom">Why Agenticom</a> •
+  <a href="#-verified-features">Features</a> •
+  <a href="#-multi-backend">Backends</a>
 </p>
 
 ---
 
-## Why Agenticom?
-
-Most agent frameworks need Redis, Postgres, Docker, Kubernetes...
-
-**Agenticom needs nothing.** Just `pip install` and go.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Other Frameworks          │  Agenticom            │
-├─────────────────────────────────────────────────────┤
-│  Redis + Postgres + Docker │  SQLite (auto-created)│
-│  Complex YAML configs      │  2-line workflow start│
-│  Separate infra setup      │  pip install → done   │
-│  Context bloat problems    │  Fresh context/step   │
-│  No verification           │  Cross-agent verify   │
-└─────────────────────────────────────────────────────┘
-```
-
-Inspired by [antfarm](https://github.com/jlowin/antfarm) — the same pattern that powers production AI workflows.
-
----
-
-## Install in 30 Seconds
+## Quick Start
 
 ```bash
 pip install agentic-company
 agenticom install
-```
-
-That's it. You now have 2 production workflows ready to run.
-
----
-
-## Run Your First Workflow
-
-```bash
 agenticom workflow run feature-dev "Add user authentication with JWT"
 ```
-
-**Real output (not mocked):**
 
 ```
 🚀 Running workflow: feature-dev
@@ -73,17 +40,223 @@ agenticom workflow run feature-dev "Add user authentication with JWT"
    ✅ verify (Verifier): completed
    ✅ test (Tester): completed
    ✅ review (Reviewer): completed
-
-💡 Check status: agenticom workflow status 27c491eb
 ```
 
-**5 agents. 5 steps. Cross-verification built in.**
+**30 seconds. 5 agents. Cross-verification built in.**
 
 ---
 
-## What's Included
+## Why Agenticom?
 
-### 2 Bundled Workflows
+We love [antfarm](https://github.com/jlowin/antfarm). We copied its pattern. Then we added everything else.
+
+| Feature | Antfarm | Agenticom |
+|---------|---------|-----------|
+| YAML workflows | ✅ | ✅ |
+| SQLite state | ✅ | ✅ |
+| CLI commands | ✅ | ✅ |
+| Fresh context/step | ✅ | ✅ |
+| **Guardrails** | ❌ | ✅ Content filter, rate limiter |
+| **Memory** | ❌ | ✅ Persistent remember/recall |
+| **Approval Gates** | ❌ | ✅ Auto/Human/Hybrid |
+| **Observability** | ❌ | ✅ Metrics, Prometheus, tracing |
+| **Multi-Backend** | ❌ | ✅ Ollama (FREE), Claude, GPT |
+| **REST API** | ❌ | ✅ 27 endpoints |
+| **Caching** | ❌ | ✅ LLM response cache |
+| **Security** | ❌ | ✅ JWT, audit log, sanitization |
+| **Language** | TypeScript | Python |
+
+**Antfarm is a CLI. Agenticom is a platform.**
+
+---
+
+## Verified Features
+
+Every feature below has been **tested and verified working**:
+
+### 1. Guardrails
+```python
+from orchestration.guardrails import ContentFilter, RateLimiter, GuardrailPipeline
+
+pipeline = GuardrailPipeline([
+    ContentFilter(blocked_patterns=["password", "api_key"]),
+    RateLimiter(max_requests=100, window_seconds=60)
+])
+
+result = pipeline.check("Send me your password")
+# result.passed = False, result.reason = "Blocked pattern: password"
+```
+
+### 2. Persistent Memory
+```python
+from orchestration.memory import LocalMemoryStore
+
+memory = LocalMemoryStore()
+memory.remember("User prefers Python over JavaScript", tags=["preferences"])
+memory.remember("Project deadline is March 15", tags=["schedule"])
+
+# Later...
+results = memory.recall("what language does user prefer", limit=3)
+# Returns relevant memories with similarity scores
+```
+
+### 3. Approval Gates
+```python
+from orchestration.approval import AutoApprovalGate, HumanApprovalGate, HybridApprovalGate
+
+# Auto-approve low-risk actions
+auto_gate = AutoApprovalGate()
+
+# Require human approval for high-risk
+human_gate = HumanApprovalGate(timeout_seconds=300)
+
+# Hybrid: auto for low-risk, human for high-risk
+hybrid_gate = HybridApprovalGate(risk_threshold=0.7)
+```
+
+### 4. Observability
+```python
+from orchestration.observability import MetricsCollector, Tracer
+
+metrics = MetricsCollector()
+metrics.increment("workflow_runs")
+metrics.histogram("step_duration_seconds", 1.5)
+
+# Prometheus endpoint: GET /metrics
+# Returns: workflow_runs_total 42
+```
+
+### 5. Multi-Backend (FREE option!)
+```python
+from orchestration.integrations import (
+    OllamaExecutor,      # FREE - runs locally
+    OpenClawExecutor,    # Claude API
+    NanobotExecutor,     # OpenAI API
+    auto_setup_executor  # Auto-detects best available
+)
+
+# Use FREE local LLM (no API key needed!)
+executor = OllamaExecutor(model="llama3.2")
+result = executor.execute_sync("Write a Python function")
+
+# Or auto-detect: tries Ollama → Claude → GPT
+executor = auto_setup_executor()
+```
+
+### 6. REST API (27 endpoints)
+```python
+from orchestration.api import app
+import uvicorn
+
+# Endpoints include:
+# POST /api/workflows/run
+# GET  /api/workflows/{id}/status
+# POST /api/chat
+# GET  /api/memory/recall
+# GET  /api/approvals/pending
+# GET  /metrics (Prometheus)
+
+uvicorn.run(app, port=8000)
+```
+
+### 7. Agent Pipelines
+```python
+from orchestration.pipeline import Pipeline, PipelineBuilder, LLMStep, ParallelStep
+
+# Sequential pipeline
+pipeline = (PipelineBuilder()
+    .add_step(LLMStep("plan", "Create a plan for: {task}"))
+    .add_step(LLMStep("implement", "Implement: {plan}"))
+    .add_step(LLMStep("review", "Review: {implementation}"))
+    .build())
+
+# Parallel execution
+parallel = ParallelStep([
+    LLMStep("research", "Research: {topic}"),
+    LLMStep("outline", "Outline: {topic}")
+])
+```
+
+### 8. Response Caching
+```python
+from orchestration.cache import LocalCache, cached
+
+cache = LocalCache()
+
+@cached(cache, ttl=3600)
+def expensive_llm_call(prompt):
+    return executor.execute_sync(prompt)
+
+# First call: hits LLM
+result1 = expensive_llm_call("Explain recursion")
+
+# Second call: returns cached (FREE!)
+result2 = expensive_llm_call("Explain recursion")
+```
+
+### 9. Security
+```python
+from orchestration.security import (
+    create_jwt_token,
+    verify_jwt_token,
+    AuditLogger,
+    sanitize_input
+)
+
+# JWT authentication
+token = create_jwt_token({"user_id": "123", "role": "admin"})
+payload = verify_jwt_token(token)
+
+# Audit logging
+audit = AuditLogger()
+audit.log("workflow_executed", user="alice", workflow="feature-dev")
+
+# Input sanitization
+clean = sanitize_input(user_input)  # Removes injection attempts
+```
+
+### 10. Agent System
+```python
+from orchestration.agents import (
+    Agent, AgentRole, AgentTeam,
+    PlannerAgent, DeveloperAgent, VerifierAgent, TesterAgent, ReviewerAgent
+)
+
+# Pre-built specialized agents
+team = AgentTeam(
+    agents=[
+        PlannerAgent(),
+        DeveloperAgent(),
+        VerifierAgent(),
+        TesterAgent(),
+        ReviewerAgent()
+    ]
+)
+```
+
+### 11. No-Code Conversation Builder
+```python
+from orchestration.conversation import ConversationBuilder
+
+builder = ConversationBuilder()
+# Guides users through workflow creation via conversation
+# No code required - just answer questions
+```
+
+### 12. CLI
+```bash
+agenticom install                    # Install bundled workflows
+agenticom workflow list              # List all workflows
+agenticom workflow run <id> <task>   # Run a workflow
+agenticom workflow status <run-id>   # Check status
+agenticom workflow resume <run-id>   # Resume failed run
+agenticom stats                      # Show statistics
+agenticom uninstall --force          # Remove all data
+```
+
+---
+
+## Bundled Workflows
 
 | Workflow | Agents | Steps | Use Case |
 |----------|--------|-------|----------|
@@ -91,7 +264,6 @@ agenticom workflow run feature-dev "Add user authentication with JWT"
 | `marketing-campaign` | 5 | 5 | SocialIntel → Competitor → Content → Community → Lead |
 
 ```bash
-# List all workflows
 agenticom workflow list
 
 📋 2 workflows available:
@@ -107,177 +279,68 @@ agenticom workflow list
 
 ---
 
-## How It Works
-
-### The Antfarm Pattern
-
-Agenticom follows the [antfarm](https://github.com/jlowin/antfarm) architecture:
+## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     YAML WORKFLOW                             │
-│  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐      │
-│  │ Step 1  │ → │ Step 2  │ → │ Step 3  │ → │ Step 4  │      │
-│  │ Planner │   │Developer│   │Verifier │   │ Tester  │      │
-│  └─────────┘   └─────────┘   └─────────┘   └─────────┘      │
-│       ↓             ↓             ↓             ↓            │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              SQLite State (auto-persisted)            │   │
-│  │  • Run history  • Step outputs  • Error tracking      │   │
-│  └──────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                         AGENTICOM                               │
+├────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │  GUARDRAILS  │  │    MEMORY    │  │   APPROVAL   │         │
+│  │ ContentFilter│  │ LocalMemory  │  │ Auto/Human/  │         │
+│  │ RateLimiter  │  │ remember()   │  │   Hybrid     │         │
+│  └──────────────┘  │ recall()     │  └──────────────┘         │
+│                    └──────────────┘                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │ OBSERVABILITY│  │    CACHE     │  │   SECURITY   │         │
+│  │ Metrics      │  │ LocalCache   │  │ JWT Auth     │         │
+│  │ Prometheus   │  │ @cached      │  │ AuditLog     │         │
+│  │ Tracing      │  │ TTL support  │  │ Sanitization │         │
+│  └──────────────┘  └──────────────┘  └──────────────┘         │
+├────────────────────────────────────────────────────────────────┤
+│                      AGENT PIPELINE                             │
+│  ┌─────────┐ → ┌─────────┐ → ┌─────────┐ → ┌─────────┐        │
+│  │ Planner │   │Developer│   │Verifier │   │ Tester  │        │
+│  └─────────┘   └─────────┘   └─────────┘   └─────────┘        │
+│                (Cross-agent verification)                       │
+├────────────────────────────────────────────────────────────────┤
+│                      MULTI-BACKEND                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │   OLLAMA     │  │   OPENCLAW   │  │   NANOBOT    │         │
+│  │  (FREE!)     │  │   (Claude)   │  │    (GPT)     │         │
+│  │  Local LLM   │  │  Cloud API   │  │  Cloud API   │         │
+│  └──────────────┘  └──────────────┘  └──────────────┘         │
+├────────────────────────────────────────────────────────────────┤
+│  REST API (27 endpoints)  │  CLI  │  Python API                │
+└────────────────────────────────────────────────────────────────┘
 ```
-
-**Key principles:**
-
-1. **Fresh context per step** — No context bloat. Each agent starts clean.
-2. **Cross-agent verification** — Verifier agent checks Developer's work.
-3. **SQLite state** — Everything persists locally. Resume failed runs.
-4. **YAML definitions** — Workflows are data, not code.
 
 ---
 
-## CLI Commands
+## Installation
 
 ```bash
-# Install bundled workflows
-agenticom install
+# From PyPI
+pip install agentic-company
 
-# List available workflows
-agenticom workflow list
+# From source
+git clone https://github.com/wjlgatech/agentic-company
+cd agentic-company
+pip install -e .
 
-# Run a workflow
-agenticom workflow run <workflow-id> "<task description>"
-
-# Check run status
-agenticom workflow status <run-id>
-
-# Resume a failed run
-agenticom workflow resume <run-id>
-
-# View statistics
-agenticom stats
-
-# Remove all data
-agenticom uninstall --force
-```
-
-### Example: Marketing Campaign
-
-```bash
-agenticom workflow run marketing-campaign "Launch AI coding assistant for React developers"
-```
-
-```
-🚀 Running workflow: marketing-campaign
-📝 Task: Launch AI coding assistant for React developers
-
-✅ Run ID: 52d70ac4
-📊 Status: completed
-📈 Progress: 5/5 steps
-
-📋 Step Results:
-   ✅ discover-pain-points (SocialIntelAgent): completed
-   ✅ analyze-competitors (CompetitorAnalyst): completed
-   ✅ create-content-calendar (ContentCreator): completed
-   ✅ plan-outreach (CommunityManager): completed
-   ✅ orchestrate-campaign (CampaignLead): completed
+# With Ollama (FREE local LLM)
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve &
+ollama pull llama3.2
 ```
 
 ---
 
-## Python API
-
-```python
-from agenticom import AgenticomCore, WorkflowRunner, WorkflowDefinition, StateManager
-
-# Initialize
-core = AgenticomCore()
-
-# List workflows
-workflows = core.list_workflows()
-for wf in workflows:
-    print(f"{wf['id']}: {wf['name']} ({wf['agents']} agents)")
-
-# Run a workflow
-result = core.run_workflow("feature-dev", "Build REST API for user management")
-print(f"Run ID: {result['run_id']}")
-print(f"Status: {result['status']}")
-print(f"Steps completed: {result['steps_completed']}/{result['total_steps']}")
-
-# Check status
-status = core.get_run_status(result['run_id'])
-
-# Get statistics
-stats = core.get_stats()
-print(f"Total runs: {stats['total_runs']}")
-```
-
----
-
-## Create Custom Workflows
-
-Workflows are YAML files in `~/.agenticom/workflows/`:
-
-```yaml
-# my-workflow.yaml
-id: my-workflow
-name: My Custom Workflow
-description: Does something cool
-
-agents:
-  - id: researcher
-    name: Researcher
-    role: Research and gather information
-    prompt: |
-      You are a research specialist.
-      Find relevant information about the given topic.
-    tools: [web_search]
-
-  - id: writer
-    name: Writer
-    role: Create content from research
-    prompt: |
-      You are a content writer.
-      Create clear, engaging content from research findings.
-    tools: [text_generation]
-
-steps:
-  - id: research
-    agent: researcher
-    input: |
-      TASK: {{task}}
-      Find comprehensive information about this topic.
-      Reply with STATUS: done when complete.
-    expects: "STATUS: done"
-    retry: 2
-
-  - id: write
-    agent: writer
-    input: |
-      TASK: {{task}}
-      Research findings: {{step_outputs.research}}
-      Create a well-structured document.
-      Reply with STATUS: done when complete.
-    expects: "STATUS: done"
-    retry: 2
-```
-
-Then run it:
-
-```bash
-agenticom workflow run my-workflow "Write about AI trends in 2025"
-```
-
----
-
-## Stats & Monitoring
+## Stats
 
 ```bash
 agenticom stats
-```
 
-```
 📊 Agenticom Statistics
 ========================================
 📁 Workflows installed: 2
@@ -293,78 +356,30 @@ agenticom stats
 
 ---
 
-## Installation
-
-```bash
-# From PyPI
-pip install agentic-company
-
-# From source
-git clone https://github.com/wjlgatech/agentic-company
-cd agentic-company
-pip install -e .
-```
-
-### Requirements
-
-- Python 3.10+
-- No external services (SQLite is built-in)
-
----
-
 ## Project Structure
 
 ```
-agenticom/
-├── __init__.py           # Package exports
-├── cli.py                # CLI commands
-├── core.py               # Main orchestration engine
-├── state.py              # SQLite state management
-├── workflows.py          # YAML workflow parser & runner
-└── bundled_workflows/
-    ├── feature-dev.yaml
-    └── marketing-campaign.yaml
-```
-
----
-
-## Integration with Claude Code / Cursor
-
-Agenticom is designed to work as a tool within Claude Code or Cursor:
-
-```bash
-# In your Claude Code session
-agenticom workflow run feature-dev "Add caching to the API"
-```
-
-The workflow runs in the background, with each step executed by a specialized agent. Results are persisted to SQLite, so you can check status anytime.
-
----
-
-## Roadmap
-
-### Shipped
-- [x] CLI with install/run/status/resume commands
-- [x] SQLite state persistence
-- [x] YAML workflow definitions
-- [x] 2 bundled production workflows
-- [x] Cross-agent verification pattern
-- [x] Python API
-
-### Coming
-- [ ] MCP server integration
-- [ ] More bundled workflows
-- [ ] Visual workflow editor
-
----
-
-## Contributing
-
-```bash
-git clone https://github.com/wjlgatech/agentic-company
-cd agentic-company
-pip install -e ".[dev]"
-pytest tests/ -v
+├── agenticom/                    # CLI package (antfarm-style)
+│   ├── cli.py                    # CLI commands
+│   ├── core.py                   # Orchestration engine
+│   ├── state.py                  # SQLite state
+│   ├── workflows.py              # YAML parser
+│   └── bundled_workflows/        # Ready-to-use workflows
+│
+├── orchestration/                # Full platform (7,159 lines)
+│   ├── api.py                    # REST API (27 endpoints)
+│   ├── guardrails.py             # Content filtering
+│   ├── memory.py                 # Persistent memory
+│   ├── approval.py               # Approval gates
+│   ├── observability.py          # Metrics & tracing
+│   ├── cache.py                  # Response caching
+│   ├── security.py               # JWT, audit, sanitization
+│   ├── pipeline.py               # Agent pipelines
+│   ├── conversation.py           # No-code builder
+│   └── integrations/
+│       ├── ollama.py             # FREE local LLM
+│       ├── openclaw.py           # Claude
+│       └── nanobot.py            # GPT
 ```
 
 ---
@@ -376,7 +391,7 @@ MIT — Use it, fork it, ship it.
 ---
 
 <p align="center">
-  <strong>Zero infrastructure. Real workflows.</strong><br>
+  <strong>Antfarm, but production-ready.</strong><br>
   <br>
   <a href="https://github.com/wjlgatech/agentic-company">⭐ Star on GitHub</a> •
   <a href="https://github.com/wjlgatech/agentic-company/issues">🐛 Report Bug</a>

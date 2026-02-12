@@ -133,18 +133,24 @@ RESULTS: 14/14 tests passed
 
 ## 📦 Install
 
-**1-Click** (auto-detects OpenClaw/Nanobot/Standalone)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/wjlgatech/agentic-company/main/install.sh | bash
-```
-
-**From source**
+**1-Click** (auto-detects OS, installs missing prerequisites, creates venv)
 
 ```bash
 git clone https://github.com/wjlgatech/agentic-company.git
-cd agentic-company && pip install -e . && agenticom install
+cd agentic-company && bash setup.sh
 ```
+
+Or with `make` (auto-creates `.venv` if needed):
+
+```bash
+git clone https://github.com/wjlgatech/agentic-company.git
+cd agentic-company && make install && .venv/bin/agenticom install
+```
+
+`setup.sh` handles everything automatically:
+- Installs `python3`, `pip`, `venv`, `make`, `git` if missing (via Homebrew / apt / dnf / pacman)
+- Creates a `.venv` virtual environment
+- Installs the package and bundled workflows
 
 ## 🚀 Quick Start
 
@@ -360,7 +366,7 @@ and board-ready security report with compliance mapping.
 [OpenClaw](https://github.com/openclaw/openclaw) - Personal AI assistant for WhatsApp, Telegram, Slack, Discord.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wjlgatech/agentic-company/main/install.sh | bash
+cd agentic-company && bash setup.sh
 ```
 
 Then tell your assistant: *"Use agenticom to build a marketing strategy for my SaaS"*
@@ -370,7 +376,7 @@ Then tell your assistant: *"Use agenticom to build a marketing strategy for my S
 [Nanobot](https://github.com/HKUDS/nanobot) - Ultra-lightweight personal AI assistant.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wjlgatech/agentic-company/main/install.sh | bash
+cd agentic-company && bash setup.sh
 ```
 
 Then tell your assistant: *"Use agenticom feature-dev to research and design a mobile app"*

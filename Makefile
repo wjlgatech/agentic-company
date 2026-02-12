@@ -3,13 +3,34 @@
 
 .PHONY: help install dev test lint format serve docker-build docker-up docker-down clean
 
+# ============== Auto-detect Python/pip ==============
+# Finds python3 or python, prefers venv when active or present.
+# SYSTEM_PYTHON is used only to create the venv.
+# PYTHON/PIP are what all targets use for running code.
+VENV := .venv
+SYSTEM_PYTHON := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
+
+ifdef VIRTUAL_ENV
+  # Already inside an activated venv — use it directly
+  PYTHON := python
+  PIP := python -m pip
+else ifneq (,$(wildcard $(VENV)/bin/python))
+  # .venv exists but not activated — use it by absolute path
+  PYTHON := $(VENV)/bin/python
+  PIP := $(VENV)/bin/python -m pip
+else
+  # No venv yet — targets that need one will create it first
+  PYTHON := $(VENV)/bin/python
+  PIP := $(VENV)/bin/python -m pip
+endif
+
 # Default target
 help:
 	@echo "Agentic Company Development Commands"
 	@echo ""
 	@echo "Setup:"
-	@echo "  make install      Install production dependencies"
-	@echo "  make dev          Install development dependencies"
+	@echo "  make install      Install production dependencies (auto-creates .venv)"
+	@echo "  make dev          Install development dependencies (auto-creates .venv)"
 	@echo ""
 	@echo "Development:"
 	@echo "  make test         Run all tests"
@@ -35,12 +56,20 @@ help:
 
 # ============== Setup ==============
 
-install:
-	pip install -e .
+# Auto-create .venv when it doesn't exist (skipped if VIRTUAL_ENV is set)
+$(VENV)/bin/python:
+	@echo "📦 Creating virtual environment in $(VENV)..."
+	$(SYSTEM_PYTHON) -m venv $(VENV)
+	@echo "✅ venv created. Activate with: source $(VENV)/bin/activate"
 
-dev:
-	pip install -e ".[dev,anthropic,openai]"
+install: $(VENV)/bin/python
+	$(PIP) install -e .
+	@echo "✅ Installed. Run: source $(VENV)/bin/activate"
+
+dev: $(VENV)/bin/python
+	$(PIP) install -e ".[dev,anthropic,openai]"
 	pre-commit install || true
+	@echo "✅ Dev environment ready. Run: source $(VENV)/bin/activate"
 
 # ============== Testing ==============
 
@@ -80,10 +109,10 @@ serve-prod:
 # ============== CLI ==============
 
 cli-health:
-	python -m orchestration.cli health
+	$(PYTHON) -m orchestration.cli health
 
 cli-config:
-	python -m orchestration.cli config show
+	$(PYTHON) -m orchestration.cli config show
 
 # ============== Docker ==============
 
@@ -142,10 +171,10 @@ db-reset:
 # ============== Utilities ==============
 
 health:
-	curl -s http://localhost:8000/health | python -m json.tool
+	curl -s http://localhost:8000/health | $(PYTHON) -m json.tool
 
 metrics:
-	curl -s http://localhost:8000/metrics | python -m json.tool
+	curl -s http://localhost:8000/metrics | $(PYTHON) -m json.tool
 
 clean:
 	rm -rf build/
@@ -170,7 +199,7 @@ docs-build:
 # ============== Release ==============
 
 version:
-	@python -c "from orchestration._version import __version__; print(__version__)"
+	@$(PYTHON) -c "from orchestration._version import __version__; print(__version__)"
 
 release-patch:
 	bump2version patch

@@ -252,8 +252,9 @@ class TestPromptGeneration:
         result = refine_intent("analyze our customer data")
         prompt = result["prompt"]
 
-        assert "## Context" in prompt or "Context" in prompt
-        assert "## Task" in prompt or "Task" in prompt
+        # Updated to match new section structure with specific context
+        assert "## Specific Situation" in prompt or "## Working Assumptions" in prompt or "context" in prompt.lower()
+        assert "## Your Task" in prompt or "## Task" in prompt or "Task" in prompt
         assert "## Guardrails" in prompt or "Guardrails" in prompt
 
     def test_prompt_role_matches_domain(self):

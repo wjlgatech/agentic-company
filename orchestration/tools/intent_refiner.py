@@ -4,8 +4,10 @@ Intent Refiner: Transform vague user input into well-defined prompts.
 This module implements Progressive Intent Refinement (PIR):
 1. PARSE - Classify intent and domain
 2. PROBE - Ask smart clarification questions
-3. MODEL - Build visual mental model
-4. GENERATE - Create optimized system prompt
+3. EXTRACT - Pull specific details from input
+4. MODEL - Build visual mental model
+5. GENERATE - Create optimized system prompt with specifics
+6. ITERATE - Refine until quality threshold met
 
 Based on research in:
 - Requirements Engineering (Goal-Oriented RE)
@@ -19,6 +21,94 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable, Any
 from enum import Enum
+
+
+# =============================================================================
+# EXTRACTED SPECIFICS
+# =============================================================================
+
+@dataclass
+class ExtractedSpecifics:
+    """Specific details extracted from user input."""
+    # Core entities
+    entities: list[str] = field(default_factory=list)  # Companies, products, people
+    technologies: list[str] = field(default_factory=list)  # Tech stack, tools
+    metrics: list[str] = field(default_factory=list)  # Numbers, KPIs, targets
+
+    # Context
+    timeframes: list[str] = field(default_factory=list)  # Deadlines, durations
+    locations: list[str] = field(default_factory=list)  # Geographic context
+    stakeholders: list[str] = field(default_factory=list)  # Who's involved
+
+    # Constraints and requirements
+    constraints: list[str] = field(default_factory=list)  # Limitations, boundaries
+    requirements: list[str] = field(default_factory=list)  # Must-haves
+    preferences: list[str] = field(default_factory=list)  # Nice-to-haves
+
+    # Problem context
+    pain_points: list[str] = field(default_factory=list)  # Current problems
+    goals: list[str] = field(default_factory=list)  # Desired outcomes
+    comparisons: list[str] = field(default_factory=list)  # Competitors, benchmarks
+
+    # Domain-specific
+    domain_terms: list[str] = field(default_factory=list)  # Technical jargon
+
+    # Original context
+    key_phrases: list[str] = field(default_factory=list)  # Important phrases
+
+    def to_context_string(self) -> str:
+        """Convert to context string for prompt injection."""
+        parts = []
+
+        if self.entities:
+            parts.append(f"Entities: {', '.join(self.entities)}")
+        if self.technologies:
+            parts.append(f"Technologies/Tools: {', '.join(self.technologies)}")
+        if self.metrics:
+            parts.append(f"Metrics/Targets: {', '.join(self.metrics)}")
+        if self.timeframes:
+            parts.append(f"Timeframe: {', '.join(self.timeframes)}")
+        if self.stakeholders:
+            parts.append(f"Stakeholders: {', '.join(self.stakeholders)}")
+        if self.constraints:
+            parts.append(f"Constraints: {', '.join(self.constraints)}")
+        if self.requirements:
+            parts.append(f"Requirements: {', '.join(self.requirements)}")
+        if self.pain_points:
+            parts.append(f"Current Problems: {', '.join(self.pain_points)}")
+        if self.goals:
+            parts.append(f"Desired Outcomes: {', '.join(self.goals)}")
+        if self.comparisons:
+            parts.append(f"Competitors/Benchmarks: {', '.join(self.comparisons)}")
+        if self.domain_terms:
+            parts.append(f"Domain Context: {', '.join(self.domain_terms)}")
+
+        return "\n".join(parts)
+
+    def has_specifics(self) -> bool:
+        """Check if any specifics were extracted."""
+        return bool(
+            self.entities or self.technologies or self.metrics or
+            self.timeframes or self.stakeholders or self.constraints or
+            self.requirements or self.pain_points or self.goals or
+            self.comparisons or self.domain_terms or self.key_phrases
+        )
+
+
+@dataclass
+class QualityScore:
+    """Quality evaluation of generated prompt."""
+    overall: float = 0.0  # 0-1 score
+    specificity: float = 0.0  # How specific vs generic
+    completeness: float = 0.0  # All aspects covered
+    actionability: float = 0.0  # Clear what to do
+    context_preservation: float = 0.0  # Original context retained
+
+    missing_elements: list[str] = field(default_factory=list)
+    improvement_suggestions: list[str] = field(default_factory=list)
+
+    def meets_threshold(self, threshold: float = 0.7) -> bool:
+        return self.overall >= threshold
 
 
 # =============================================================================
@@ -545,6 +635,184 @@ class IntentRefiner:
         )
 
     # =========================================================================
+    # STAGE 1.5: EXTRACT SPECIFICS
+    # =========================================================================
+
+    def extract_specifics(self, user_input: str, classification: IntentClassification) -> ExtractedSpecifics:
+        """
+        Extract specific details, entities, and context from user input.
+
+        This is the KEY to preserving information from vague inputs.
+        """
+        specifics = ExtractedSpecifics()
+        text = user_input
+        text_lower = text.lower()
+
+        # --- ENTITY EXTRACTION ---
+        # Company types and business models
+        business_patterns = [
+            r'\b(B2B|B2C|SaaS|startup|enterprise|SMB|agency|consultancy|e-commerce|marketplace)\b',
+            r'\b(our company|our team|our organization|our business|my company)\b',
+            r'\b(fintech|edtech|healthtech|martech|proptech|insurtech|regtech|foodtech)\b',
+        ]
+        for pattern in business_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            specifics.entities.extend(matches)
+
+        # --- TECHNOLOGY EXTRACTION ---
+        tech_patterns = [
+            # Programming
+            r'\b(Python|JavaScript|TypeScript|Java|C\+\+|Rust|Go|Ruby|PHP|Swift|Kotlin)\b',
+            # Frameworks
+            r'\b(React|Vue|Angular|Django|Flask|FastAPI|Express|Rails|Spring|Next\.js)\b',
+            # Infrastructure
+            r'\b(AWS|Azure|GCP|Docker|Kubernetes|Terraform|Redis|PostgreSQL|MongoDB|MySQL)\b',
+            # AI/ML
+            r'\b(GPT|LLM|machine learning|deep learning|neural network|NLP|computer vision)\b',
+            # Other tech
+            r'\b(API|REST|GraphQL|microservices|serverless|blockchain|CI/CD)\b',
+        ]
+        for pattern in tech_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            specifics.technologies.extend(matches)
+
+        # --- METRICS EXTRACTION ---
+        # Numbers with context
+        metric_patterns = [
+            r'\b(\d+%|\d+\s*percent)\b',  # Percentages
+            r'\$[\d,]+(?:\.\d{2})?(?:[KMB])?',  # Money
+            r'\b\d+(?:\.\d+)?[xX]\b',  # Multipliers
+            r'\b\d+[KMB]?\s*(?:users|customers|subscribers|downloads|visits|conversions)\b',
+            r'\b(?:ROI|CTR|CAC|LTV|MRR|ARR|DAU|MAU|NPS)\s*(?:of\s*)?\d+',
+        ]
+        for pattern in metric_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            specifics.metrics.extend(matches)
+
+        # --- TIMEFRAME EXTRACTION ---
+        time_patterns = [
+            r'\b(today|tomorrow|yesterday|this week|next week|this month|next month)\b',
+            r'\b(past\s+\d+\s+(?:days?|weeks?|months?|years?))\b',
+            r'\b(\d+\s+(?:days?|weeks?|months?|years?)\s*(?:ago|from now)?)\b',
+            r'\b(Q[1-4]|quarter|fiscal year|FY\d{2,4})\b',
+            r'\b(deadline|by\s+\w+day|urgent|asap|immediately)\b',
+        ]
+        for pattern in time_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            specifics.timeframes.extend(matches)
+
+        # --- STAKEHOLDER EXTRACTION ---
+        stakeholder_patterns = [
+            r'\b(CEO|CTO|CFO|CMO|COO|VP|director|manager|executive|board)\b',
+            r'\b(team|department|client|customer|user|investor|partner|vendor)\b',
+            r'\b(audience|reader|viewer|stakeholder|decision[- ]maker)\b',
+        ]
+        for pattern in stakeholder_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            specifics.stakeholders.extend(matches)
+
+        # --- CONSTRAINT EXTRACTION ---
+        constraint_indicators = [
+            "but", "however", "except", "without", "can't", "cannot", "won't",
+            "shouldn't", "must not", "limited", "constraint", "restriction",
+            "budget", "deadline", "only", "just"
+        ]
+        sentences = re.split(r'[.!?]', text)
+        for sentence in sentences:
+            if any(ind in sentence.lower() for ind in constraint_indicators):
+                # Extract the constraint phrase
+                specifics.constraints.append(sentence.strip())
+
+        # --- PAIN POINT EXTRACTION ---
+        pain_indicators = [
+            "problem", "issue", "challenge", "struggle", "difficult", "hard",
+            "failing", "broken", "doesn't work", "not working", "slow",
+            "frustrat", "annoying", "pain", "stuck", "blocked"
+        ]
+        for sentence in sentences:
+            if any(ind in sentence.lower() for ind in pain_indicators):
+                specifics.pain_points.append(sentence.strip())
+
+        # --- GOAL EXTRACTION ---
+        goal_indicators = [
+            "want to", "need to", "trying to", "goal", "objective", "aim",
+            "hope to", "would like", "looking to", "seeking", "achieve",
+            "improve", "increase", "decrease", "optimize", "enhance"
+        ]
+        for sentence in sentences:
+            if any(ind in sentence.lower() for ind in goal_indicators):
+                specifics.goals.append(sentence.strip())
+
+        # --- COMPARISON EXTRACTION ---
+        comparison_patterns = [
+            r'\b(competitor|competing|versus|vs\.?|compared to|better than|worse than)\b.*',
+            r'\b(like|similar to|such as)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\b',
+            r'\b(benchmark|industry standard|best practice)\b',
+        ]
+        for pattern in comparison_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                specifics.comparisons.extend([m if isinstance(m, str) else ' '.join(m) for m in matches])
+
+        # --- DOMAIN-SPECIFIC TERMS ---
+        # Science
+        if classification.domain == Domain.SCIENCE:
+            sci_patterns = [
+                r'\b(gene|protein|cell|enzyme|pathway|assay|PCR|sequencing|CRISPR)\b',
+                r'\b(quantum|qubit|entanglement|superposition|Hamiltonian)\b',
+                r'\b(synthesis|catalyst|reaction|compound|molecule)\b',
+            ]
+            for pattern in sci_patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                specifics.domain_terms.extend(matches)
+
+        # Finance
+        elif classification.domain == Domain.FINANCE:
+            fin_patterns = [
+                r'\b(stock|bond|ETF|mutual fund|portfolio|dividend|yield)\b',
+                r'\b(crypto|bitcoin|ethereum|DeFi|NFT|token|wallet)\b',
+                r'\b(real estate|property|mortgage|REIT|rental)\b',
+                r'\b(P/E ratio|market cap|fundamentals|technical analysis)\b',
+            ]
+            for pattern in fin_patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                specifics.domain_terms.extend(matches)
+
+        # Health
+        elif classification.domain == Domain.HEALTH:
+            health_patterns = [
+                r'\b(symptom|diagnosis|treatment|medication|therapy)\b',
+                r'\b(diet|nutrition|calories|macros|protein|carbs|fat)\b',
+                r'\b(workout|exercise|cardio|strength|muscle|weight)\b',
+                r'\b(anxiety|depression|stress|sleep|mental health)\b',
+            ]
+            for pattern in health_patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                specifics.domain_terms.extend(matches)
+
+        # --- KEY PHRASES ---
+        # Extract phrases in quotes
+        quoted = re.findall(r'"([^"]+)"', text)
+        specifics.key_phrases.extend(quoted)
+        quoted = re.findall(r"'([^']+)'", text)
+        specifics.key_phrases.extend(quoted)
+
+        # Deduplicate all lists
+        specifics.entities = list(set(specifics.entities))
+        specifics.technologies = list(set(specifics.technologies))
+        specifics.metrics = list(set(specifics.metrics))
+        specifics.timeframes = list(set(specifics.timeframes))
+        specifics.stakeholders = list(set(specifics.stakeholders))
+        specifics.constraints = list(set(specifics.constraints))
+        specifics.pain_points = list(set(specifics.pain_points))
+        specifics.goals = list(set(specifics.goals))
+        specifics.comparisons = list(set(specifics.comparisons))
+        specifics.domain_terms = list(set(specifics.domain_terms))
+        specifics.key_phrases = list(set(specifics.key_phrases))
+
+        return specifics
+
+    # =========================================================================
     # STAGE 2: PROBE
     # =========================================================================
 
@@ -775,14 +1043,16 @@ class IntentRefiner:
         model: IntentModel,
         classification: IntentClassification,
         answers: Optional[dict] = None,
+        specifics: Optional[ExtractedSpecifics] = None,
+        user_input: str = "",
     ) -> str:
         """
         Generate optimized system prompt from mental model.
 
         Applies prompt engineering best practices:
         - Role setting
-        - Context injection
-        - Task specification
+        - Context injection WITH SPECIFIC DETAILS
+        - Task specification WITH USER'S ACTUAL REQUEST
         - Output format
         - Guardrails
 
@@ -790,11 +1060,14 @@ class IntentRefiner:
             model: Intent model
             classification: Intent classification
             answers: User answers to clarification questions
+            specifics: Extracted specifics from user input
+            user_input: Original user input for context
 
         Returns:
-            Optimized system prompt
+            Optimized system prompt that preserves all specific details
         """
         answers = answers or {}
+        specifics = specifics or ExtractedSpecifics()
 
         # Build role based on domain
         role_map = {
@@ -829,6 +1102,8 @@ class IntentRefiner:
 
         # Build audience context
         audience = answers.get("audience", "a knowledgeable professional")
+        if specifics.stakeholders:
+            audience = ", ".join(specifics.stakeholders[:3])
 
         # Build success criteria
         criteria_text = "\n".join(
@@ -842,34 +1117,109 @@ class IntentRefiner:
         prompt_parts.append(f"You are a {role}.")
         prompt_parts.append("")
 
+        # ==== SPECIFIC SITUATION (NEW SECTION) ====
+        prompt_parts.append("## Specific Situation")
+        prompt_parts.append(f"The user's request: \"{user_input}\"")
+        prompt_parts.append("")
+
+        # Inject extracted specifics
+        if specifics.has_specifics():
+            prompt_parts.append("### Key Details Extracted:")
+
+            if specifics.entities:
+                prompt_parts.append(f"- **Business Context**: {', '.join(specifics.entities)}")
+
+            if specifics.technologies:
+                prompt_parts.append(f"- **Technologies/Tools**: {', '.join(specifics.technologies)}")
+
+            if specifics.metrics:
+                prompt_parts.append(f"- **Metrics/Numbers**: {', '.join(specifics.metrics)}")
+
+            if specifics.timeframes:
+                prompt_parts.append(f"- **Timeframe**: {', '.join(specifics.timeframes)}")
+
+            if specifics.stakeholders:
+                prompt_parts.append(f"- **Stakeholders**: {', '.join(specifics.stakeholders)}")
+
+            if specifics.pain_points:
+                prompt_parts.append(f"- **Current Problems**: " + "; ".join(p[:100] for p in specifics.pain_points[:3]))
+
+            if specifics.goals:
+                prompt_parts.append(f"- **Desired Outcomes**: " + "; ".join(g[:100] for g in specifics.goals[:3]))
+
+            if specifics.constraints:
+                prompt_parts.append(f"- **Constraints**: " + "; ".join(c[:100] for c in specifics.constraints[:3]))
+
+            if specifics.comparisons:
+                prompt_parts.append(f"- **Competitors/Benchmarks**: {', '.join(specifics.comparisons)}")
+
+            if specifics.domain_terms:
+                prompt_parts.append(f"- **Domain Terms**: {', '.join(specifics.domain_terms)}")
+
+            prompt_parts.append("")
+
         # Context
         if model.assumptions:
             context_items = [f"{a['key']}: {a['value']}" for a in model.assumptions]
-            prompt_parts.append("## Context")
+            prompt_parts.append("## Working Assumptions")
             prompt_parts.append("\n".join(f"- {item}" for item in context_items))
             prompt_parts.append("")
 
-        # Task
-        prompt_parts.append("## Task")
-        prompt_parts.append(f"Your task is to {task_verb} what the user requests.")
-        prompt_parts.append(f"The output is for {audience}.")
+        # Task - MORE SPECIFIC NOW
+        prompt_parts.append("## Your Task")
+
+        # Build specific task description
+        task_desc = f"Your task is to {task_verb}"
+
+        # Add specific context to task
+        if specifics.goals:
+            task_desc += f" the following: {specifics.goals[0][:150]}"
+        elif specifics.pain_points:
+            task_desc += f" addressing: {specifics.pain_points[0][:150]}"
+        else:
+            task_desc += " what the user has requested above."
+
+        prompt_parts.append(task_desc)
+        prompt_parts.append(f"The output is for: {audience}.")
         prompt_parts.append("")
 
-        # Process
-        prompt_parts.append("## Approach")
-        for proc in model.process:
-            prompt_parts.append(f"1. {proc['action']}")
+        # Process - Include specific elements
+        prompt_parts.append("## Recommended Approach")
+        for i, proc in enumerate(model.process, 1):
+            prompt_parts.append(f"{i}. {proc['action']}")
+
+        # Add specific considerations based on extracted info
+        if specifics.entities or specifics.technologies:
+            prompt_parts.append(f"{len(model.process) + 1}. Consider the specific context: {', '.join((specifics.entities + specifics.technologies)[:5])}")
+
+        if specifics.constraints:
+            prompt_parts.append(f"{len(model.process) + 2}. Work within stated constraints")
+
         prompt_parts.append("")
 
         # Output
         prompt_parts.append("## Output Requirements")
         for out in model.outputs:
             prompt_parts.append(f"- Provide: {out['name']} ({out['format']})")
+
+        # Add specific output guidance
+        if specifics.metrics:
+            prompt_parts.append(f"- Reference these metrics where relevant: {', '.join(specifics.metrics)}")
+        if specifics.comparisons:
+            prompt_parts.append(f"- Include comparison with: {', '.join(specifics.comparisons)}")
+
         prompt_parts.append("")
 
         # Success criteria
         prompt_parts.append("## Success Criteria")
         prompt_parts.append(criteria_text)
+
+        # Add criteria based on extracted goals
+        if specifics.goals:
+            prompt_parts.append(f"- Directly addresses: {specifics.goals[0][:100]}")
+        if specifics.pain_points:
+            prompt_parts.append(f"- Solves the stated problem: {specifics.pain_points[0][:100]}")
+
         prompt_parts.append("")
 
         # Guardrails
@@ -913,26 +1263,187 @@ class IntentRefiner:
         return "\n".join(prompt_parts)
 
     # =========================================================================
-    # CONVENIENCE: FULL PIPELINE
+    # QUALITY EVALUATION
     # =========================================================================
 
-    def refine(
+    def evaluate_quality(
+        self,
+        prompt: str,
+        user_input: str,
+        specifics: ExtractedSpecifics,
+    ) -> QualityScore:
+        """
+        Evaluate the quality of a generated prompt.
+
+        Checks:
+        - Specificity: Does it include specific details?
+        - Completeness: Are all aspects covered?
+        - Actionability: Is it clear what to do?
+        - Context preservation: Is original context retained?
+
+        Args:
+            prompt: Generated prompt
+            user_input: Original user input
+            specifics: Extracted specifics
+
+        Returns:
+            QualityScore with detailed breakdown
+        """
+        score = QualityScore()
+        prompt_lower = prompt.lower()
+        input_lower = user_input.lower()
+
+        missing = []
+        suggestions = []
+
+        # --- SPECIFICITY SCORE ---
+        specificity_hits = 0
+        specificity_total = 0
+
+        # Check if entities are mentioned
+        for entity in specifics.entities:
+            specificity_total += 1
+            if entity.lower() in prompt_lower:
+                specificity_hits += 1
+            else:
+                missing.append(f"Entity: {entity}")
+
+        # Check if technologies are mentioned
+        for tech in specifics.technologies:
+            specificity_total += 1
+            if tech.lower() in prompt_lower:
+                specificity_hits += 1
+            else:
+                missing.append(f"Technology: {tech}")
+
+        # Check if metrics are mentioned
+        for metric in specifics.metrics:
+            specificity_total += 1
+            if metric.lower() in prompt_lower:
+                specificity_hits += 1
+            else:
+                missing.append(f"Metric: {metric}")
+
+        # Check domain terms
+        for term in specifics.domain_terms:
+            specificity_total += 1
+            if term.lower() in prompt_lower:
+                specificity_hits += 1
+
+        score.specificity = specificity_hits / max(specificity_total, 1)
+
+        # --- COMPLETENESS SCORE ---
+        completeness_checks = {
+            "role": "you are" in prompt_lower,
+            "task": "task" in prompt_lower or "your" in prompt_lower,
+            "context": "context" in prompt_lower or "situation" in prompt_lower,
+            "output": "output" in prompt_lower or "provide" in prompt_lower,
+            "criteria": "success" in prompt_lower or "criteria" in prompt_lower,
+            "guardrails": "guardrail" in prompt_lower or "accurate" in prompt_lower,
+        }
+
+        score.completeness = sum(completeness_checks.values()) / len(completeness_checks)
+
+        for check, passed in completeness_checks.items():
+            if not passed:
+                suggestions.append(f"Add {check} section")
+
+        # --- ACTIONABILITY SCORE ---
+        actionability_checks = {
+            "clear_verb": any(v in prompt_lower for v in ["analyze", "create", "improve", "research", "recommend"]),
+            "approach": "approach" in prompt_lower or "step" in prompt_lower,
+            "requirements": "requirement" in prompt_lower or "provide" in prompt_lower,
+        }
+
+        score.actionability = sum(actionability_checks.values()) / len(actionability_checks)
+
+        # --- CONTEXT PRESERVATION SCORE ---
+        # Check if key words from input appear in prompt
+        input_words = set(input_lower.split())
+        # Remove common words
+        stopwords = {"the", "a", "an", "is", "are", "was", "were", "be", "been",
+                     "being", "have", "has", "had", "do", "does", "did", "will",
+                     "would", "could", "should", "may", "might", "must", "shall",
+                     "can", "need", "dare", "ought", "used", "to", "of", "in",
+                     "for", "on", "with", "at", "by", "from", "as", "into",
+                     "through", "during", "before", "after", "above", "below",
+                     "between", "under", "again", "further", "then", "once",
+                     "i", "me", "my", "we", "our", "you", "your", "it", "its",
+                     "this", "that", "and", "but", "or", "so", "if", "because"}
+
+        content_words = input_words - stopwords
+        preserved = sum(1 for w in content_words if w in prompt_lower)
+        score.context_preservation = preserved / max(len(content_words), 1)
+
+        if score.context_preservation < 0.5:
+            suggestions.append("Include more specific terms from user input")
+
+        # Check pain points preservation
+        for pain in specifics.pain_points:
+            pain_words = set(pain.lower().split()) - stopwords
+            if not any(w in prompt_lower for w in pain_words):
+                suggestions.append(f"Address pain point: {pain[:50]}...")
+
+        # Check goals preservation
+        for goal in specifics.goals:
+            goal_words = set(goal.lower().split()) - stopwords
+            if not any(w in prompt_lower for w in goal_words):
+                suggestions.append(f"Include goal: {goal[:50]}...")
+
+        # --- OVERALL SCORE ---
+        weights = {
+            "specificity": 0.35,
+            "completeness": 0.20,
+            "actionability": 0.15,
+            "context_preservation": 0.30,
+        }
+
+        score.overall = (
+            score.specificity * weights["specificity"] +
+            score.completeness * weights["completeness"] +
+            score.actionability * weights["actionability"] +
+            score.context_preservation * weights["context_preservation"]
+        )
+
+        score.missing_elements = missing[:10]  # Limit to top 10
+        score.improvement_suggestions = suggestions[:5]  # Limit to top 5
+
+        return score
+
+    # =========================================================================
+    # ITERATIVE REFINEMENT
+    # =========================================================================
+
+    def iterative_refine(
         self,
         user_input: str,
         answers: Optional[dict] = None,
+        quality_threshold: float = 0.7,
+        max_iterations: int = 3,
     ) -> dict:
         """
-        Run full refinement pipeline.
+        Iteratively refine the prompt until quality threshold is met.
+
+        This implements the multi-turn refinement process:
+        1. Generate initial prompt
+        2. Evaluate quality
+        3. If below threshold, identify gaps and regenerate
+        4. Repeat until threshold met or max iterations reached
 
         Args:
             user_input: Raw user input
             answers: Optional answers to clarification questions
+            quality_threshold: Minimum quality score (0-1)
+            max_iterations: Maximum refinement iterations
 
         Returns:
-            Dict with classification, model, prompt, and questions
+            Dict with final prompt, quality score, and iteration history
         """
-        # Parse
+        iterations = []
+
+        # Initial parse and extract
         classification = self.parse(user_input)
+        specifics = self.extract_specifics(user_input, classification)
 
         # Get questions (if no answers provided)
         questions = []
@@ -942,8 +1453,46 @@ class IntentRefiner:
         # Build model
         model = self.build_model(user_input, classification, answers)
 
-        # Generate prompt
-        prompt = self.generate_prompt(model, classification, answers)
+        # Track cumulative context for iterations
+        cumulative_specifics = specifics
+        current_prompt = ""
+
+        for i in range(max_iterations):
+            # Generate prompt with current specifics
+            current_prompt = self.generate_prompt(
+                model, classification, answers,
+                specifics=cumulative_specifics,
+                user_input=user_input
+            )
+
+            # Evaluate quality
+            quality = self.evaluate_quality(current_prompt, user_input, specifics)
+
+            iteration_record = {
+                "iteration": i + 1,
+                "prompt_length": len(current_prompt),
+                "quality_score": quality.overall,
+                "specificity": quality.specificity,
+                "completeness": quality.completeness,
+                "actionability": quality.actionability,
+                "context_preservation": quality.context_preservation,
+                "missing_elements": quality.missing_elements,
+                "suggestions": quality.improvement_suggestions,
+            }
+            iterations.append(iteration_record)
+
+            # Check if quality threshold met
+            if quality.meets_threshold(quality_threshold):
+                break
+
+            # If not met, enhance specifics for next iteration
+            # Add missing elements as additional requirements
+            for missing in quality.missing_elements[:3]:
+                cumulative_specifics.requirements.append(f"Must include: {missing}")
+
+            # Add suggestions as constraints
+            for suggestion in quality.improvement_suggestions[:2]:
+                cumulative_specifics.constraints.append(suggestion)
 
         return {
             "original_input": user_input,
@@ -954,12 +1503,113 @@ class IntentRefiner:
                 "confidence": classification.confidence,
                 "signals": classification.signals,
             },
+            "specifics_extracted": {
+                "entities": specifics.entities,
+                "technologies": specifics.technologies,
+                "metrics": specifics.metrics,
+                "timeframes": specifics.timeframes,
+                "stakeholders": specifics.stakeholders,
+                "pain_points": specifics.pain_points[:3],
+                "goals": specifics.goals[:3],
+                "constraints": specifics.constraints[:3],
+                "comparisons": specifics.comparisons,
+                "domain_terms": specifics.domain_terms,
+            },
+            "questions": questions,
+            "model": {
+                "ascii": model.to_ascii(),
+                "mermaid": model.to_mermaid(),
+            },
+            "prompt": current_prompt,
+            "quality": {
+                "overall": iterations[-1]["quality_score"],
+                "specificity": iterations[-1]["specificity"],
+                "completeness": iterations[-1]["completeness"],
+                "actionability": iterations[-1]["actionability"],
+                "context_preservation": iterations[-1]["context_preservation"],
+                "threshold_met": iterations[-1]["quality_score"] >= quality_threshold,
+            },
+            "iterations": iterations,
+            "total_iterations": len(iterations),
+        }
+
+    # =========================================================================
+    # CONVENIENCE: FULL PIPELINE
+    # =========================================================================
+
+    def refine(
+        self,
+        user_input: str,
+        answers: Optional[dict] = None,
+    ) -> dict:
+        """
+        Run full refinement pipeline with specific detail extraction.
+
+        Args:
+            user_input: Raw user input
+            answers: Optional answers to clarification questions
+
+        Returns:
+            Dict with classification, model, prompt, specifics, and questions
+        """
+        # Parse
+        classification = self.parse(user_input)
+
+        # Extract specifics - THIS IS THE KEY NEW STEP
+        specifics = self.extract_specifics(user_input, classification)
+
+        # Get questions (if no answers provided)
+        questions = []
+        if answers is None:
+            questions = self.get_questions_interactive(user_input, classification)
+
+        # Build model
+        model = self.build_model(user_input, classification, answers)
+
+        # Generate prompt WITH SPECIFICS
+        prompt = self.generate_prompt(
+            model, classification, answers,
+            specifics=specifics,
+            user_input=user_input
+        )
+
+        # Evaluate quality
+        quality = self.evaluate_quality(prompt, user_input, specifics)
+
+        return {
+            "original_input": user_input,
+            "classification": {
+                "task_type": classification.task_type.value,
+                "complexity": classification.complexity.value,
+                "domain": classification.domain.value,
+                "confidence": classification.confidence,
+                "signals": classification.signals,
+            },
+            "specifics_extracted": {
+                "entities": specifics.entities,
+                "technologies": specifics.technologies,
+                "metrics": specifics.metrics,
+                "timeframes": specifics.timeframes,
+                "stakeholders": specifics.stakeholders,
+                "pain_points": specifics.pain_points[:3],
+                "goals": specifics.goals[:3],
+                "constraints": specifics.constraints[:3],
+                "comparisons": specifics.comparisons,
+                "domain_terms": specifics.domain_terms,
+            },
             "questions": questions,
             "model": {
                 "ascii": model.to_ascii(),
                 "mermaid": model.to_mermaid(),
             },
             "prompt": prompt,
+            "quality": {
+                "overall": quality.overall,
+                "specificity": quality.specificity,
+                "completeness": quality.completeness,
+                "actionability": quality.actionability,
+                "context_preservation": quality.context_preservation,
+            },
         }
 
     def paraphrase(
@@ -1023,9 +1673,38 @@ class IntentRefiner:
 # =============================================================================
 
 def refine_intent(user_input: str, answers: Optional[dict] = None) -> dict:
-    """Quick function to refine user intent."""
+    """Quick function to refine user intent with specific detail extraction."""
     refiner = IntentRefiner()
     return refiner.refine(user_input, answers)
+
+
+def refine_intent_iterative(
+    user_input: str,
+    answers: Optional[dict] = None,
+    quality_threshold: float = 0.7,
+    max_iterations: int = 3,
+) -> dict:
+    """
+    Refine user intent with iterative quality improvement.
+
+    This is the RECOMMENDED function for production use.
+    It iterates until quality threshold is met.
+
+    Args:
+        user_input: Raw user input
+        answers: Optional answers to clarification questions
+        quality_threshold: Minimum quality score (0-1), default 0.7
+        max_iterations: Maximum refinement iterations, default 3
+
+    Returns:
+        Dict with prompt, quality scores, and iteration history
+    """
+    refiner = IntentRefiner()
+    return refiner.iterative_refine(
+        user_input, answers,
+        quality_threshold=quality_threshold,
+        max_iterations=max_iterations
+    )
 
 
 def get_clarification_questions(user_input: str) -> list[dict]:
@@ -1040,3 +1719,34 @@ def generate_system_prompt(user_input: str, answers: Optional[dict] = None) -> s
     refiner = IntentRefiner()
     result = refiner.refine(user_input, answers)
     return result["prompt"]
+
+
+def extract_input_specifics(user_input: str) -> dict:
+    """
+    Extract specific details from user input.
+
+    Useful for understanding what entities, technologies, metrics, etc.
+    are mentioned in a user's request.
+
+    Args:
+        user_input: Raw user input
+
+    Returns:
+        Dict with extracted specifics
+    """
+    refiner = IntentRefiner()
+    classification = refiner.parse(user_input)
+    specifics = refiner.extract_specifics(user_input, classification)
+    return {
+        "entities": specifics.entities,
+        "technologies": specifics.technologies,
+        "metrics": specifics.metrics,
+        "timeframes": specifics.timeframes,
+        "stakeholders": specifics.stakeholders,
+        "pain_points": specifics.pain_points,
+        "goals": specifics.goals,
+        "constraints": specifics.constraints,
+        "comparisons": specifics.comparisons,
+        "domain_terms": specifics.domain_terms,
+        "key_phrases": specifics.key_phrases,
+    }

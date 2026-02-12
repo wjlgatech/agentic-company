@@ -124,8 +124,9 @@ def workflow_list(ctx):
 @click.argument("workflow_id")
 @click.argument("task")
 @click.option("--context", "-c", help="JSON context string")
+@click.option("--dry-run", is_flag=True, help="Show workflow plan without executing")
 @click.pass_context
-def workflow_run(ctx, workflow_id, task, context):
+def workflow_run(ctx, workflow_id, task, context, dry_run):
     """Run a workflow with the given task"""
     core = ctx.obj["core"]
 
@@ -136,6 +137,23 @@ def workflow_run(ctx, workflow_id, task, context):
         except json.JSONDecodeError:
             click.echo("❌ Invalid JSON in --context")
             return
+
+    workflow = core.get_workflow(workflow_id)
+    if not workflow:
+        click.echo(f"❌ Workflow '{workflow_id}' not found")
+        return
+
+    if dry_run:
+        click.echo(f"📋 Workflow: {workflow.name}")
+        click.echo(f"📝 Task: {task}")
+        click.echo(f"   Agents: {len(workflow.agents)} | Steps: {len(workflow.steps)}")
+        click.echo()
+        click.echo("📋 Workflow Plan:")
+        for i, step in enumerate(workflow.steps, 1):
+            click.echo(f"   {i}. {step.id} ({step.agent})")
+            if step.expects:
+                click.echo(f"      Expects: {step.expects}")
+        return
 
     click.echo(f"🚀 Running workflow: {workflow_id}")
     click.echo(f"📝 Task: {task}")

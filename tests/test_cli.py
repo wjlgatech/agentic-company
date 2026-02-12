@@ -60,11 +60,17 @@ class TestCLIWorkflow:
         assert result.exit_code == 0
         assert "content-research" in result.output or "Workflow" in result.output
 
-    def test_workflow_run(self, runner):
-        """workflow run should execute workflow."""
+    def test_workflow_run_missing(self, runner):
+        """workflow run with unknown workflow should fail gracefully."""
         result = runner.invoke(main, ["workflow", "run", "test-workflow", "-i", "test input"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+    def test_workflow_run_dry_run(self, runner):
+        """workflow run --dry-run should show plan without executing."""
+        result = runner.invoke(main, ["workflow", "run", "feature-dev", "-i", "test input", "--dry-run"])
         assert result.exit_code == 0
-        assert "Running" in result.output or "Result" in result.output
+        assert "Workflow Plan" in result.output
 
     def test_workflow_status(self, runner):
         """workflow status should show status."""

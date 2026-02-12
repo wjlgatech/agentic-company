@@ -122,6 +122,7 @@ class TestCLIWorkflowExecution:
         """Test that running workflow fails gracefully without LLM backend."""
         from click.testing import CliRunner
         from orchestration.cli import main
+        from unittest.mock import patch
         import os
 
         # Ensure no API keys are set
@@ -132,7 +133,10 @@ class TestCLIWorkflowExecution:
 
         try:
             runner = CliRunner()
-            result = runner.invoke(main, ['workflow', 'run', 'feature-dev', '-i', 'Test task'])
+            # Also mock out Ollama so it doesn't accidentally connect to a local instance
+            with patch('orchestration.integrations.ollama.is_ollama_running', return_value=False), \
+                 patch('orchestration.integrations.unified.is_ollama_running', return_value=False):
+                result = runner.invoke(main, ['workflow', 'run', 'feature-dev', '-i', 'Test task'])
 
             # Should fail with helpful message
             assert result.exit_code == 1, "Should fail without LLM backend"

@@ -63,8 +63,8 @@ class WorkflowDefinition:
         agents = [
             AgentDefinition(
                 id=a["id"],
-                name=a["name"],
-                role=a.get("role", a["name"]),
+                name=a.get("name", a.get("role", a["id"])),
+                role=a.get("role", a.get("name", a["id"])),
                 prompt_template=a.get("prompt", ""),
                 workspace_files=a.get("workspace", {}).get("files", {}),
                 tools=a.get("tools", [])

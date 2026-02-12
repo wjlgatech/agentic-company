@@ -234,6 +234,37 @@ class AgenticomCore:
             "total_steps": updated_run.total_steps
         }
 
+    def inspect_run(self, run_id: str, step_id: str | None = None) -> dict:
+        """Get full observability for a workflow run including inputs/outputs."""
+        run = self.state.get_run(run_id)
+        if not run:
+            return {"error": f"Run '{run_id}' not found"}
+
+        results = self.state.get_step_results(run_id)
+
+        steps = []
+        for r in results:
+            if step_id and r.step_id != step_id:
+                continue
+            steps.append({
+                "step_id": r.step_id,
+                "agent": r.agent,
+                "status": r.status.value,
+                "input": r.input_context,
+                "output": r.output,
+                "error": r.error,
+                "started_at": r.started_at,
+                "completed_at": r.completed_at,
+            })
+
+        return {
+            "run_id": run.id,
+            "workflow": run.workflow_id,
+            "task": run.task,
+            "status": run.status.value,
+            "steps": steps,
+        }
+
     def get_stats(self) -> dict:
         """Get overall statistics."""
         workflows = self.list_workflows()

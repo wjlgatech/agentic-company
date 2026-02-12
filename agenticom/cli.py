@@ -8,6 +8,7 @@ Usage:
     agenticom workflow list        List available workflows
     agenticom workflow run <id> <task>  Run a workflow
     agenticom workflow status <run-id>  Check run status
+    agenticom workflow inspect <run-id> View step inputs/outputs
     agenticom workflow resume <run-id>  Resume failed run
     agenticom stats                Show statistics
     agenticom dashboard            Start web dashboard
@@ -230,6 +231,46 @@ def workflow_resume(ctx, run_id):
     click.echo(f"✅ Run ID: {result['run_id']}")
     click.echo(f"📊 Status: {result['status']}")
     click.echo(f"📈 Progress: {result['steps_completed']}/{result['total_steps']} steps")
+
+
+@workflow.command("inspect")
+@click.argument("run_id")
+@click.option("--step", "-s", default=None, help="Show only a specific step")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.pass_context
+def workflow_inspect(ctx, run_id, step, as_json):
+    """Inspect inputs and outputs of each step in a workflow run"""
+    core = ctx.obj["core"]
+    result = core.inspect_run(run_id, step_id=step)
+
+    if result.get("error"):
+        click.echo(f"❌ {result['error']}")
+        return
+
+    if as_json:
+        click.echo(format_json(result))
+        return
+
+    click.echo(f"🔍 Run: {result['run_id']}  |  Workflow: {result['workflow']}  |  Status: {result['status']}")
+    click.echo(f"📝 Task: {result['task']}")
+    click.echo("=" * 80)
+
+    for i, s in enumerate(result["steps"], 1):
+        status_icon = "✅" if s["status"] == "completed" else "❌"
+        click.echo(f"\n{status_icon} Step {i}: {s['step_id']} ({s['agent']})")
+        click.echo("-" * 80)
+
+        if s.get("error"):
+            click.echo(f"❌ Error: {s['error']}")
+
+        click.echo(f"\n📥 INPUT:")
+        click.echo(s["input"].strip())
+
+        click.echo(f"\n📤 OUTPUT:")
+        click.echo(s["output"].strip() if s["output"] else "(empty)")
+
+        click.echo(f"\n🕐 {s['started_at']} → {s['completed_at'] or 'n/a'}")
+        click.echo("=" * 80)
 
 
 # ============== Stats ==============

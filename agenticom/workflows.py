@@ -266,7 +266,7 @@ and provide the output back to continue the workflow.
 
         # Build the prompt with dot-notation support (e.g. {{step_outputs.plan}})
         input_text = step.input_template
-        for match in re.findall(r"\{\{([\w.]+)\}\}", input_text):
+        for match in re.findall(r"\{\{([\w.\-]+)\}\}", input_text):
             parts = match.split(".")
             val = context
             for part in parts:

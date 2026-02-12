@@ -132,7 +132,8 @@ steps:
       Find at least 10 actionable insights from the last 7 days.
       Prioritize by engagement level and response opportunity.
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2
 
@@ -148,7 +149,8 @@ steps:
       Identify the top 3-5 competitors and create battle cards.
       Focus on weaknesses we can exploit.
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2
 
@@ -167,7 +169,8 @@ steps:
       3. 3 meme concepts
       4. 1 technical deep-dive outline
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2
 
@@ -182,7 +185,8 @@ steps:
 
       Create response templates and daily outreach schedule.
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2
 
@@ -200,6 +204,7 @@ steps:
 
       Create a 30-day execution plan with daily tasks and metrics goals.
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2

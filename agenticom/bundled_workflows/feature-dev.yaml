@@ -104,7 +104,8 @@ steps:
       Analyze this feature request and create a detailed implementation plan.
       Include acceptance criteria for each task.
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2
 
@@ -118,7 +119,8 @@ steps:
       Implement all tasks according to the plan.
       Follow the acceptance criteria exactly.
 
-      Reply with STATUS: done when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 3
 
@@ -135,7 +137,8 @@ steps:
       Verify the implementation meets ALL acceptance criteria.
       Be thorough - the developer doesn't grade their own work.
 
-      Reply with VERIFIED if all criteria met, or list issues.
+      IMPORTANT: You MUST include exactly the word VERIFIED in your response
+      if all criteria are met. If not, list the issues.
     expects: "VERIFIED"
     retry: 2
 
@@ -149,7 +152,8 @@ steps:
       Create comprehensive tests for this implementation.
       All tests must pass.
 
-      Reply with STATUS: done and TEST RESULTS when complete.
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
     expects: "STATUS: done"
     retry: 2
 
@@ -167,6 +171,8 @@ steps:
       {{step_outputs.test}}
 
       Perform final code review.
-      Reply with APPROVED if ready to merge, or list changes needed.
+
+      IMPORTANT: You MUST include exactly the word APPROVED in your response
+      if the code is ready to merge. If not, list the required changes.
     expects: "APPROVED"
     retry: 2

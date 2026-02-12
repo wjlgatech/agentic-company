@@ -8,6 +8,7 @@ Following antfarm pattern:
 - Automatic retry & escalation
 """
 
+import re
 import uuid
 import yaml
 from datetime import datetime
@@ -263,10 +264,19 @@ and provide the output back to continue the workflow.
             context["previous_output"] = last_result.output
             context["previous_agent"] = last_result.agent
 
-        # Build the prompt
+        # Build the prompt with dot-notation support (e.g. {{step_outputs.plan}})
         input_text = step.input_template
-        for key, value in context.items():
-            input_text = input_text.replace(f"{{{{{key}}}}}", str(value))
+        for match in re.findall(r"\{\{([\w.]+)\}\}", input_text):
+            parts = match.split(".")
+            val = context
+            for part in parts:
+                if isinstance(val, dict) and part in val:
+                    val = val[part]
+                else:
+                    val = None
+                    break
+            if val is not None:
+                input_text = input_text.replace(f"{{{{{match}}}}}", str(val))
 
         agent_prompt = f"""You are {agent.name} - {agent.role}.
 
@@ -294,6 +304,9 @@ YOUR TASK FOR THIS STEP:
         try:
             # Execute the step
             output = self.executor(agent_prompt, input_text)
+
+            # Always save output (even on expects failure, for debugging)
+            result.output = output
 
             # Check if output covers expected topics (keyword matching)
             if step.expects and not self._output_matches_expects(output, step.expects):

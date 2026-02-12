@@ -49,7 +49,7 @@ class Backend(Enum):
 class UnifiedConfig:
     """Configuration for unified executor"""
     preferred_backend: Backend = Backend.AUTO
-    openclaw_model: str = "claude-3-5-sonnet-20241022"
+    openclaw_model: str = "claude-sonnet-4-20250514"
     nanobot_model: str = "gpt-4-turbo-preview"
     ollama_model: str = "llama3.2"  # Default local model
     ollama_url: str = "http://localhost:11434"

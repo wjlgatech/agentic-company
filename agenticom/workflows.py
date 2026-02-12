@@ -153,6 +153,46 @@ class WorkflowRunner:
         self.state = state_manager or StateManager()
         self.executor = executor or self._default_executor
 
+    @staticmethod
+    def _output_matches_expects(output: str, expects: str) -> bool:
+        """Check if output matches expects using flexible keyword matching.
+
+        At least half of the significant words (4+ chars) from expects must
+        appear in the output.  Falls back to exact substring match first.
+        """
+        output_lower = output.lower()
+        expects_lower = expects.lower()
+
+        # Try exact substring first
+        if expects_lower in output_lower:
+            return True
+
+        # Keyword matching: at least half of significant words must be present
+        skip_words = {"with", "and", "the", "for", "from", "that", "this", "into"}
+        keywords = [w for w in expects_lower.split() if len(w) >= 4 and w not in skip_words]
+        if not keywords:
+            return False
+
+        def word_found(kw: str) -> bool:
+            """Check keyword with morphological flexibility."""
+            if kw in output_lower:
+                return True
+            # Try without trailing 's' or with added 's'
+            if kw.endswith("s") and kw[:-1] in output_lower:
+                return True
+            if (kw + "s") in output_lower:
+                return True
+            # Try common suffixes: -tion/-sion, -ing, -ed, -ment, -ity
+            stem = kw.rstrip("s")
+            for suffix in ("tion", "sion", "ing", "ed", "ment", "ity", "ies", "ment"):
+                if (stem + suffix) in output_lower:
+                    return True
+            return False
+
+        matched = sum(1 for kw in keywords if word_found(kw))
+        threshold = max(1, len(keywords) // 2)  # At least half, minimum 1
+        return matched >= threshold
+
     def _default_executor(self, agent_prompt: str, task_context: str) -> str:
         """
         Default executor - returns the prompt for manual execution.
@@ -255,8 +295,8 @@ YOUR TASK FOR THIS STEP:
             # Execute the step
             output = self.executor(agent_prompt, input_text)
 
-            # Check if output matches expected pattern
-            if step.expects and step.expects not in output:
+            # Check if output covers expected topics (keyword matching)
+            if step.expects and not self._output_matches_expects(output, step.expects):
                 result.status = StepStatus.FAILED
                 result.error = f"Output did not contain expected: {step.expects}"
             else:

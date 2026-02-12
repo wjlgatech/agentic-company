@@ -134,6 +134,48 @@ class AgenticomCore:
 
         return None
 
+    def _create_llm_executor(self):
+        """Create an LLM executor from available backends, or None."""
+        try:
+            from orchestration.integrations.unified import (
+                get_ready_backends, UnifiedExecutor, Backend, UnifiedConfig,
+            )
+            ready = get_ready_backends()
+            if not ready:
+                return None
+
+            # Prefer cloud backends when API keys are set (higher quality)
+            if Backend.OPENCLAW in ready:
+                config = UnifiedConfig(preferred_backend=Backend.OPENCLAW)
+            elif Backend.NANOBOT in ready:
+                config = UnifiedConfig(preferred_backend=Backend.NANOBOT)
+            else:
+                config = UnifiedConfig()
+
+            executor = UnifiedExecutor(config, eager_init=True)
+
+            def llm_executor(agent_prompt: str, task_context: str) -> str:
+                import asyncio
+                prompt = f"{agent_prompt}\n\n{task_context}"
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                if loop and loop.is_running():
+                    # Already in an async context — run in a new thread
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        future = pool.submit(
+                            asyncio.run, executor.execute(prompt)
+                        )
+                        return future.result()
+                else:
+                    return asyncio.run(executor.execute(prompt))
+
+            return llm_executor
+        except Exception:
+            return None
+
     def run_workflow(
         self,
         workflow_id: str,
@@ -145,7 +187,8 @@ class AgenticomCore:
         if not workflow:
             return {"error": f"Workflow '{workflow_id}' not found"}
 
-        runner = WorkflowRunner(self.state)
+        executor = self._create_llm_executor()
+        runner = WorkflowRunner(self.state, executor=executor)
         run, results = runner.run_all(workflow, task, context)
 
         return {

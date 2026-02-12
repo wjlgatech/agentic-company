@@ -15,7 +15,7 @@ from dataclasses import dataclass
 @dataclass
 class OpenClawConfig:
     """Configuration for OpenClaw"""
-    model: str = "claude-3-5-sonnet-20241022"
+    model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 4096
     temperature: float = 0.7
     api_key: Optional[str] = None  # Uses ANTHROPIC_API_KEY env var if not set
@@ -144,7 +144,7 @@ class OpenClawExecutor:
 
 
 def create_openclaw_executor(
-    model: str = "claude-3-5-sonnet-20241022",
+    model: str = "claude-sonnet-4-20250514",
     api_key: Optional[str] = None,
     **kwargs
 ) -> OpenClawExecutor:

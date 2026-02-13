@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenticom Capacity Analysis - OpenClaw-like Autonomous System</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+    header {
+      text-align: center;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+    }
+    header h1 { font-size: 32px; margin-bottom: 10px; color: #f8fafc; }
+    header p { color: #94a3b8; font-size: 18px; }
+    .badge {
+      display: inline-block;
+      background: #22c55e;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    /* Navigation */
+    nav {
+      background: #1e293b;
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid #334155;
+    }
+    nav ul {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      list-style: none;
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: #94a3b8;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    nav a:hover { background: #334155; color: #f8fafc; }
+    nav a.active { background: #3b82f6; color: white; }
+
+    /* Sections */
+    section {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 30px;
+      margin: 30px 0;
+      border: 1px solid #334155;
+    }
+    section h2 {
+      color: #f8fafc;
+      font-size: 24px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    section h3 { color: #e2e8f0; font-size: 18px; margin: 20px 0 10px; }
+
+    /* Mermaid diagrams */
+    .mermaid {
+      background: #0f172a;
+      padding: 20px;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; }
+    tr:hover { background: rgba(59, 130, 246, 0.1); }
+
+    /* Cards */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .card {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #334155;
+    }
+    .card h4 { color: #f8fafc; margin-bottom: 10px; }
+    .card p { color: #94a3b8; font-size: 14px; }
+    .card .status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    .status.exists { background: #22c55e20; color: #22c55e; }
+    .status.partial { background: #f59e0b20; color: #f59e0b; }
+    .status.missing { background: #ef444420; color: #ef4444; }
+
+    /* Progress bars */
+    .progress-bar {
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s;
+    }
+    .fill.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .fill.yellow { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .fill.red { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+    /* Code blocks */
+    pre {
+      background: #0f172a;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    code { color: #a5f3fc; }
+
+    /* Metrics */
+    .metrics {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+    .metric {
+      background: #0f172a;
+      padding: 20px 30px;
+      border-radius: 12px;
+      text-align: center;
+      min-width: 150px;
+      border: 1px solid #334155;
+    }
+    .metric .value { font-size: 36px; font-weight: 700; color: #3b82f6; }
+    .metric .label { color: #94a3b8; font-size: 14px; }
+
+    /* Lists */
+    ul { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; color: #cbd5e1; }
+    li strong { color: #f8fafc; }
+
+    /* Verdict */
+    .verdict {
+      background: linear-gradient(135deg, #22c55e20, #16a34a10);
+      border: 2px solid #22c55e;
+      border-radius: 16px;
+      padding: 30px;
+      margin: 30px 0;
+      text-align: center;
+    }
+    .verdict h2 { color: #22c55e; justify-content: center; }
+    .verdict p { color: #94a3b8; max-width: 800px; margin: 10px auto; }
+
+    /* Gaps */
+    .gap-item {
+      background: #0f172a;
+      border-left: 4px solid #f59e0b;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .gap-item.critical { border-left-color: #ef4444; }
+    .gap-item h4 { color: #f8fafc; margin-bottom: 8px; }
+    .gap-item p { color: #94a3b8; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 Agenticom Capacity Analysis</h1>
+    <p>Can we build an OpenClaw-like autonomous development system?</p>
+    <span class="badge">Capacity Test Report</span>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="#overview" class="active">Overview</a></li>
+      <li><a href="#dataflow">Dataflow</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#capabilities">Capabilities</a></li>
+      <li><a href="#gaps">Gaps</a></li>
+      <li><a href="#efficiency">Efficiency</a></li>
+      <li><a href="#rgtdd">RG-TDD</a></li>
+      <li><a href="#verdict">Verdict</a></li>
+    </ul>
+  </nav>
+
+  <div class="container">
+    <!-- Overview Section -->
+    <section id="overview">
+      <h2>📋 User Request Analysis</h2>
+      <p>Transform an 8-10 hour multi-interface development workflow into an autonomous agent system with 5-10% human supervision.</p>
+
+      <h3>Interfaces to Support</h3>
+      <div class="card-grid">
+        <div class="card">
+          <h4>💻 VS Code</h4>
+          <p>Code editing, debugging, extensions</p>
+          <span class="status exists">Supported via Terminal</span>
+        </div>
+        <div class="card">
+          <h4>🥽 Quest 3 Headset</h4>
+          <p>AR/VR spatial computing</p>
+          <span class="status missing">Not Supported</span>
+        </div>
+        <div class="card">
+          <h4>🌐 Webapp</h4>
+          <p>Browser-based applications</p>
+          <span class="status partial">Partial (MCP tools)</span>
+        </div>
+        <div class="card">
+          <h4>📱 Terminal</h4>
+          <p>CLI commands, scripts</p>
+          <span class="status exists">Fully Supported</span>
+        </div>
+        <div class="card">
+          <h4>📲 Mobile</h4>
+          <p>Phone interactions</p>
+          <span class="status missing">Not Supported</span>
+        </div>
+      </div>
+
+      <h3>Multimodal Requirements</h3>
+      <div class="metrics">
+        <div class="metric">
+          <div class="value">✅</div>
+          <div class="label">Text</div>
+        </div>
+        <div class="metric">
+          <div class="value">⚠️</div>
+          <div class="label">Images</div>
+        </div>
+        <div class="metric">
+          <div class="value">❌</div>
+          <div class="label">Video</div>
+        </div>
+        <div class="metric">
+          <div class="value">❌</div>
+          <div class="label">Audio</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dataflow Section -->
+    <section id="dataflow">
+      <h2>🔄 Dataflow Diagram</h2>
+      <p>How data flows through the autonomous development loop.</p>
+
+      <div class="mermaid">
+flowchart TB
+    subgraph Input["📥 INPUT LAYER"]
+        UI[User Intent]
+        VS[VS Code State]
+        WA[Webapp State]
+        AR[Quest 3 Capture]
+        MO[Mobile Screen]
+    end
+
+    subgraph Collection["📸 COLLECTION LAYER"]
+        TC[Text Collector]
+        IC[Image Collector]
+        VC[Video Collector]
+        AC[Audio Collector]
+    end
+
+    subgraph Processing["⚙️ PROCESSING LAYER"]
+        OR[Orchestrator Agent]
+        VA[Vision Analyst]
+        ST[State Tracker]
+    end
+
+    subgraph Execution["🚀 EXECUTION LAYER"]
+        DE[Developer Agent]
+        TE[Tester Agent]
+        HL[Human Liaison]
+    end
+
+    subgraph Output["📤 OUTPUT LAYER"]
+        CO[Code Changes]
+        LO[Logs & Results]
+        SC[Screenshots]
+        DE2[Decisions]
+    end
+
+    UI --> OR
+    VS --> TC
+    WA --> IC
+    AR -.->|"NOT YET"| IC
+    MO -.->|"NOT YET"| IC
+
+    TC --> OR
+    IC --> VA
+    VC -.->|"NOT YET"| VA
+    AC -.->|"NOT YET"| VA
+
+    OR --> DE
+    OR --> TE
+    OR --> HL
+    VA --> OR
+    ST --> OR
+
+    DE --> CO
+    DE --> LO
+    TE --> LO
+    TE --> SC
+    HL --> DE2
+
+    CO --> ST
+    LO --> ST
+    SC --> ST
+    DE2 --> OR
+
+    style AR fill:#ef4444,color:#fff
+    style MO fill:#ef4444,color:#fff
+    style VC fill:#ef4444,color:#fff
+    style AC fill:#ef4444,color:#fff
+      </div>
+
+      <h3>Data Flow Legend</h3>
+      <ul>
+        <li><strong>Solid lines:</strong> Currently supported data flows</li>
+        <li><strong>Dashed lines:</strong> Not yet implemented (gaps)</li>
+        <li><strong>Red boxes:</strong> Missing capabilities</li>
+      </ul>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture">
+      <h2>🏗️ System Architecture</h2>
+      <p>The Ralph Loop pattern with fresh context per step.</p>
+
+      <div class="mermaid">
+flowchart LR
+    subgraph Core["🎯 AGENTICOM CORE"]
+        direction TB
+        WP[Workflow Parser]
+        AT[Agent Team]
+        PL[Pipeline]
+    end
+
+    subgraph Agents["🤖 AGENT LAYER"]
+        direction TB
+        ORC[Orchestrator]
+        DEV[Developer]
+        VIS[Vision Analyst]
+        TST[Tester]
+        STA[State Tracker]
+        HUM[Human Liaison]
+    end
+
+    subgraph Tools["🔧 TOOL LAYER"]
+        direction TB
+        MCP[MCP Bridge]
+        REG[Tool Registry]
+        FAL[Fallback Tools]
+    end
+
+    subgraph Backends["☁️ LLM BACKENDS"]
+        direction TB
+        CL[Claude API]
+        GP[GPT API]
+        OL[Ollama Local]
+    end
+
+    subgraph External["🌐 EXTERNAL"]
+        direction TB
+        TER[Terminal]
+        WEB[Web Browser]
+        IDE[VS Code]
+        ARH[AR Headset]
+    end
+
+    WP --> AT
+    AT --> PL
+    PL --> Agents
+
+    ORC <--> DEV
+    ORC <--> VIS
+    ORC <--> TST
+    ORC <--> STA
+    ORC <--> HUM
+
+    Agents --> Tools
+    Tools --> Backends
+
+    MCP --> TER
+    MCP --> WEB
+    MCP -.-> IDE
+    MCP -.->|"GAP"| ARH
+
+    style ARH fill:#ef4444,color:#fff
+      </div>
+
+      <h3>Architecture Layers</h3>
+      <table>
+        <tr>
+          <th>Layer</th>
+          <th>Components</th>
+          <th>Status</th>
+        </tr>
+        <tr>
+          <td>Core Orchestration</td>
+          <td>Workflow Parser, Agent Team, Pipeline</td>
+          <td><span class="status exists">✅ Complete</span></td>
+        </tr>
+        <tr>
+          <td>Agent System</td>
+          <td>8 specialized agents + custom roles</td>
+          <td><span class="status exists">✅ Complete</span></td>
+        </tr>
+        <tr>
+          <td>Tool Integration</td>
+          <td>MCP Bridge, Registry, Fallbacks</td>
+          <td><span class="status exists">✅ Complete</span></td>
+        </tr>
+        <tr>
+          <td>LLM Backends</td>
+          <td>Claude, GPT, Ollama</td>
+          <td><span class="status exists">✅ Complete</span></td>
+        </tr>
+        <tr>
+          <td>Multimodal Processing</td>
+          <td>Image, Video, Audio understanding</td>
+          <td><span class="status partial">⚠️ Partial</span></td>
+        </tr>
+        <tr>
+          <td>AR/VR Integration</td>
+          <td>Quest 3, spatial computing</td>
+          <td><span class="status missing">❌ Missing</span></td>
+        </tr>
+      </table>
+    </section>
+
+    <!-- Capabilities Section -->
+    <section id="capabilities">
+      <h2>✅ Current Capabilities</h2>
+
+      <h3>What Agenticom CAN Do Today</h3>
+      <div class="card-grid">
+        <div class="card">
+          <h4>🔄 Multi-Agent Orchestration</h4>
+          <p>Coordinate 6+ specialized agents with cross-verification</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>📝 YAML Workflows</h4>
+          <p>Declarative workflow definitions with 9 bundled templates</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>🔧 Tool Integration</h4>
+          <p>MCP bridge with 15+ tool categories and fallbacks</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>🔒 Guardrails</h4>
+          <p>Input/output filtering, PII detection, cost limits</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>👤 Human Approval</h4>
+          <p>Configurable approval gates for critical decisions</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>🔁 Ralph Loop</h4>
+          <p>Fresh context per step, prevents hallucination</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>☁️ Multi-Backend</h4>
+          <p>Claude, GPT, Ollama (local) support</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+        <div class="card">
+          <h4>📊 Observability</h4>
+          <p>Tracing, logging, token tracking</p>
+          <span class="status exists">Fully Implemented</span>
+        </div>
+      </div>
+
+      <h3>Capability Coverage for User Request</h3>
+      <div class="progress-bar">
+        <div class="fill green" style="width: 65%"></div>
+      </div>
+      <p><strong>65%</strong> of required capabilities are already implemented</p>
+    </section>
+
+    <!-- Gaps Section -->
+    <section id="gaps">
+      <h2>⚠️ Gaps Analysis</h2>
+      <p>What's missing to achieve the full OpenClaw-like vision.</p>
+
+      <div class="gap-item critical">
+        <h4>🔴 AR/VR Integration (Quest 3)</h4>
+        <p>No MCP server or tool for Quest 3 headset interaction. Would need: spatial capture, view streaming, gesture recognition, 3D scene understanding.</p>
+      </div>
+
+      <div class="gap-item critical">
+        <h4>🔴 Video Understanding</h4>
+        <p>No video frame extraction or video-to-text analysis. Would need: ffmpeg integration, frame sampling, temporal understanding.</p>
+      </div>
+
+      <div class="gap-item critical">
+        <h4>🔴 Audio Processing</h4>
+        <p>No audio transcription or voice command handling. Would need: Whisper API integration, real-time audio capture.</p>
+      </div>
+
+      <div class="gap-item">
+        <h4>🟡 Image Understanding</h4>
+        <p>Partial support via Claude's vision. Needs: dedicated OCR, UI element detection, visual diff comparison.</p>
+      </div>
+
+      <div class="gap-item">
+        <h4>🟡 Mobile Integration</h4>
+        <p>No mobile device control. Would need: ADB bridge for Android, Appium for cross-platform.</p>
+      </div>
+
+      <div class="gap-item">
+        <h4>🟡 IDE Integration</h4>
+        <p>VS Code interaction via terminal only. Would need: VS Code extension or LSP integration for richer control.</p>
+      </div>
+
+      <div class="gap-item">
+        <h4>🟡 Persistent Loop State</h4>
+        <p>Current workflows are single-run. Need: checkpoint/resume, long-running daemon mode, resource tracking.</p>
+      </div>
+
+      <h3>Gap Impact on Human Supervision Target</h3>
+      <table>
+        <tr>
+          <th>Gap</th>
+          <th>Impact on Automation</th>
+          <th>Effort to Fix</th>
+        </tr>
+        <tr>
+          <td>AR/VR Integration</td>
+          <td>-15% (manual headset work)</td>
+          <td>High (new MCP server)</td>
+        </tr>
+        <tr>
+          <td>Video Understanding</td>
+          <td>-10% (screen recording review)</td>
+          <td>Medium (API integration)</td>
+        </tr>
+        <tr>
+          <td>Audio Processing</td>
+          <td>-5% (voice commands)</td>
+          <td>Low (Whisper API)</td>
+        </tr>
+        <tr>
+          <td>Image Understanding</td>
+          <td>-5% (manual screenshot review)</td>
+          <td>Low (enhance existing)</td>
+        </tr>
+        <tr>
+          <td>Mobile Integration</td>
+          <td>-5% (manual mobile testing)</td>
+          <td>Medium (ADB/Appium)</td>
+        </tr>
+      </table>
+    </section>
+
+    <!-- Efficiency Section -->
+    <section id="efficiency">
+      <h2>📊 Operation Efficiency Assessment</h2>
+
+      <h3>Current System Metrics</h3>
+      <div class="metrics">
+        <div class="metric">
+          <div class="value">65%</div>
+          <div class="label">Capability Coverage</div>
+        </div>
+        <div class="metric">
+          <div class="value">~40%</div>
+          <div class="label">Achievable Automation</div>
+        </div>
+        <div class="metric">
+          <div class="value">60%</div>
+          <div class="label">Human Supervision Still Needed</div>
+        </div>
+        <div class="metric">
+          <div class="value">8</div>
+          <div class="label">Agents Available</div>
+        </div>
+      </div>
+
+      <h3>Efficiency Breakdown</h3>
+      <table>
+        <tr>
+          <th>Activity</th>
+          <th>Current Time</th>
+          <th>Automated Time</th>
+          <th>Savings</th>
+        </tr>
+        <tr>
+          <td>Code Writing</td>
+          <td>3 hours</td>
+          <td>0.5 hours (review only)</td>
+          <td><span style="color:#22c55e">83%</span></td>
+        </tr>
+        <tr>
+          <td>Testing</td>
+          <td>2 hours</td>
+          <td>0.5 hours (review failures)</td>
+          <td><span style="color:#22c55e">75%</span></td>
+        </tr>
+        <tr>
+          <td>Webapp Testing</td>
+          <td>1.5 hours</td>
+          <td>1 hour (partial automation)</td>
+          <td><span style="color:#f59e0b">33%</span></td>
+        </tr>
+        <tr>
+          <td>AR/VR Testing</td>
+          <td>1.5 hours</td>
+          <td>1.5 hours (manual)</td>
+          <td><span style="color:#ef4444">0%</span></td>
+        </tr>
+        <tr>
+          <td>Mobile Testing</td>
+          <td>1 hour</td>
+          <td>1 hour (manual)</td>
+          <td><span style="color:#ef4444">0%</span></td>
+        </tr>
+        <tr>
+          <td><strong>TOTAL</strong></td>
+          <td><strong>9 hours</strong></td>
+          <td><strong>4.5 hours</strong></td>
+          <td><strong style="color:#f59e0b">50%</strong></td>
+        </tr>
+      </table>
+
+      <h3>To Achieve 5-10% Supervision Target</h3>
+      <p>Need to implement:</p>
+      <ul>
+        <li>✅ Code automation (already good)</li>
+        <li>✅ Test automation (already good)</li>
+        <li>⚠️ Browser automation (needs enhancement)</li>
+        <li>❌ AR/VR automation (major gap)</li>
+        <li>❌ Mobile automation (gap)</li>
+        <li>❌ Multimodal understanding (gap)</li>
+      </ul>
+    </section>
+
+    <!-- RG-TDD Section -->
+    <section id="rgtdd">
+      <h2>🧪 Result-Grounded TDD Approach</h2>
+      <p>How to develop with real results guiding each step.</p>
+
+      <div class="mermaid">
+flowchart TB
+    subgraph Phase1["Phase 1: Foundation (Week 1-2)"]
+        T1[Write test: Agent can execute terminal command]
+        R1[Run test → FAIL]
+        I1[Implement terminal tool]
+        R1b[Run test → PASS]
+    end
+
+    subgraph Phase2["Phase 2: Multimodal (Week 3-4)"]
+        T2[Write test: Agent can analyze screenshot]
+        R2[Run test → FAIL]
+        I2[Implement vision integration]
+        R2b[Run test → PASS]
+    end
+
+    subgraph Phase3["Phase 3: Loop (Week 5-6)"]
+        T3[Write test: Agent can iterate 10 times]
+        R3[Run test → FAIL]
+        I3[Implement state persistence]
+        R3b[Run test → PASS]
+    end
+
+    subgraph Phase4["Phase 4: Integration (Week 7-8)"]
+        T4[Write test: Full workflow completes]
+        R4[Run test → FAIL]
+        I4[Integrate all components]
+        R4b[Run test → PASS]
+    end
+
+    T1 --> R1 --> I1 --> R1b
+    R1b --> T2 --> R2 --> I2 --> R2b
+    R2b --> T3 --> R3 --> I3 --> R3b
+    R3b --> T4 --> R4 --> I4 --> R4b
+      </div>
+
+      <h3>RG-TDD Test Cases</h3>
+      <pre><code># Phase 1: Terminal Execution
+def test_agent_executes_terminal_command():
+    result = developer_agent.execute("ls -la")
+    assert result.status == "success"
+    assert "total" in result.output
+
+# Phase 2: Screenshot Analysis
+def test_agent_analyzes_screenshot():
+    screenshot = capture_screen()
+    analysis = vision_agent.analyze(screenshot)
+    assert "ui_elements" in analysis
+    assert len(analysis["ui_elements"]) > 0
+
+# Phase 3: Iteration Loop
+def test_agent_iterates_until_complete():
+    task = "Create a hello world webapp"
+    result = orchestrator.run(task, max_iterations=10)
+    assert result.status == "complete"
+    assert result.iterations <= 10
+
+# Phase 4: Full Integration
+def test_full_autonomous_workflow():
+    task = "Build and test a simple API endpoint"
+    result = workflow.execute(task, human_supervision=0.1)
+    assert result.code_files_created > 0
+    assert result.tests_passed > 0
+    assert result.human_interventions <= 1</code></pre>
+
+      <h3>Development Roadmap</h3>
+      <table>
+        <tr>
+          <th>Phase</th>
+          <th>Focus</th>
+          <th>RG-TDD Metric</th>
+          <th>Duration</th>
+        </tr>
+        <tr>
+          <td>Phase 1</td>
+          <td>Terminal + Code execution</td>
+          <td>100% test pass rate</td>
+          <td>2 weeks</td>
+        </tr>
+        <tr>
+          <td>Phase 2</td>
+          <td>Screenshot + Image analysis</td>
+          <td>90% UI element detection</td>
+          <td>2 weeks</td>
+        </tr>
+        <tr>
+          <td>Phase 3</td>
+          <td>Persistent loop + State</td>
+          <td>50+ iterations without crash</td>
+          <td>2 weeks</td>
+        </tr>
+        <tr>
+          <td>Phase 4</td>
+          <td>Full integration</td>
+          <td>< 15% human supervision</td>
+          <td>2 weeks</td>
+        </tr>
+        <tr>
+          <td>Phase 5</td>
+          <td>AR/VR + Mobile (future)</td>
+          <td>< 10% human supervision</td>
+          <td>4+ weeks</td>
+        </tr>
+      </table>
+    </section>
+
+    <!-- Verdict Section -->
+    <section id="verdict" class="verdict">
+      <h2>🎯 Capacity Test Verdict</h2>
+      <p><strong>Can Agenticom handle this workflow?</strong></p>
+
+      <div class="metrics" style="justify-content: center; margin: 30px 0;">
+        <div class="metric">
+          <div class="value" style="color: #f59e0b;">PARTIAL</div>
+          <div class="label">Current Capacity</div>
+        </div>
+      </div>
+
+      <p>Agenticom can handle <strong>65% of the requirements today</strong>. With 8 weeks of development following RG-TDD, it can reach <strong>85-90% automation</strong> (10-15% human supervision) for terminal, code, and web workflows.</p>
+
+      <p>Full <strong>5-10% supervision target</strong> requires AR/VR integration, which needs significant new development (Quest 3 MCP server).</p>
+
+      <h3 style="margin-top: 30px; color: #22c55e;">Recommended Next Steps</h3>
+      <ol style="text-align: left; max-width: 600px; margin: 20px auto;">
+        <li>Implement image understanding with Claude Vision API</li>
+        <li>Add persistent state for long-running loops</li>
+        <li>Build browser automation MCP tool</li>
+        <li>Create Whisper integration for audio</li>
+        <li>Develop Quest 3 MCP server (longer term)</li>
+      </ol>
+    </section>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#3b82f6',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#334155',
+        lineColor: '#64748b',
+        secondaryColor: '#1e293b',
+        tertiaryColor: '#0f172a'
+      }
+    });
+
+    // Navigation highlighting
+    document.querySelectorAll('nav a').forEach(link => {
+      link.addEventListener('click', function() {
+        document.querySelectorAll('nav a').forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

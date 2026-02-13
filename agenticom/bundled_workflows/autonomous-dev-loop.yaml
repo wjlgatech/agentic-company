@@ -1,0 +1,341 @@
+# =============================================================================
+# AUTONOMOUS DEVELOPMENT LOOP (OpenClaw-like)
+# =============================================================================
+# Reduces human supervision from 100% to 5-10% for multi-interface development
+# Handles: VS Code, Quest 3 headset, webapp, terminal, website, AR, mobile
+# Collects: text, video, image, audio outcomes
+# =============================================================================
+
+id: autonomous-dev-loop
+name: Autonomous Multi-Interface Development Loop
+description: |
+  OpenClaw-like autonomous agent system for vibe coding across multiple interfaces.
+  Plans, acts, collects multimodal outcomes, understands them, and iterates
+  until objectives fulfilled or resource limits hit.
+
+# Resource limits
+max_iterations: 50
+max_tokens_per_iteration: 100000
+timeout_minutes: 480  # 8 hours
+human_intervention_threshold: 0.15  # Request human input if confidence < 15%
+
+# Interfaces this workflow can interact with
+interfaces:
+  - id: terminal
+    type: cli
+    tools: [bash_execute, file_read, file_write, git_operations]
+  - id: vscode
+    type: ide
+    tools: [code_edit, code_search, linter, debugger]
+  - id: webapp
+    type: browser
+    tools: [web_navigate, web_screenshot, web_interact, web_scrape]
+  - id: quest3
+    type: ar_headset
+    tools: [ar_capture, ar_view, spatial_understand]
+  - id: mobile
+    type: phone
+    tools: [mobile_screenshot, mobile_interact]
+
+# Multimodal collection capabilities
+collectors:
+  - type: text
+    sources: [terminal_output, code_files, logs, api_responses]
+  - type: image
+    sources: [screenshots, ar_captures, diagrams]
+  - type: video
+    sources: [screen_recordings, ar_recordings]
+  - type: audio
+    sources: [voice_commands, notifications]
+
+# =============================================================================
+# AGENT DEFINITIONS
+# =============================================================================
+
+agents:
+  # Strategic planning agent
+  - id: orchestrator
+    role: Chief Architect
+    prompt: |
+      You are the Chief Orchestrator for an autonomous development system.
+      Your job is to break down high-level objectives into executable plans,
+      monitor progress across all interfaces, and decide when to escalate to humans.
+
+      You have access to outcomes from: terminal, VS Code, webapp, Quest 3, mobile.
+      You can understand: text, images, video frames, audio transcriptions.
+
+      CRITICAL: Only escalate to human when:
+      - Financial decisions required
+      - Irreversible strategic decisions
+      - Confidence drops below 15%
+      - Resource limits approaching
+    tools: [task_decompose, progress_monitor, resource_tracker, escalation_decision]
+
+  # Code development agent
+  - id: developer
+    role: Senior Developer
+    prompt: |
+      You are an expert developer doing vibe coding.
+      You write clean, tested code across multiple environments.
+      You can work in VS Code, terminal, and understand webapp outputs.
+
+      When coding:
+      1. Write code incrementally
+      2. Test after each change
+      3. Capture outcomes (screenshots, logs, test results)
+      4. Report progress to orchestrator
+    tools: [code_write, code_test, terminal_execute, screenshot_capture]
+
+  # Visual understanding agent
+  - id: vision_analyst
+    role: Visual Intelligence Analyst
+    prompt: |
+      You analyze visual outcomes from all interfaces:
+      - Screenshots from VS Code, webapp, mobile
+      - AR captures from Quest 3
+      - Video recordings of interactions
+
+      Extract:
+      - UI state (buttons, forms, errors)
+      - Code context (syntax highlighting, errors)
+      - Spatial information (AR layouts)
+      - Progress indicators
+
+      Report findings in structured format for other agents.
+    tools: [image_analyze, video_frame_extract, ocr_extract, ui_element_detect]
+
+  # Testing and verification agent
+  - id: tester
+    role: QA Engineer
+    prompt: |
+      You verify that development outcomes meet objectives.
+      You run tests across all interfaces and collect evidence.
+
+      Verification methods:
+      - Unit tests (terminal)
+      - Integration tests (webapp)
+      - Visual regression (screenshots)
+      - Accessibility checks
+      - Performance metrics
+
+      Report pass/fail with evidence to orchestrator.
+    tools: [test_run, screenshot_diff, performance_measure, accessibility_check]
+
+  # State tracker agent
+  - id: state_tracker
+    role: State Manager
+    prompt: |
+      You maintain the global state of the development loop.
+      Track:
+      - Current objective progress (0-100%)
+      - Resource usage (tokens, time, API calls)
+      - Interface states (what's open, what's changed)
+      - Outcome history (all collected artifacts)
+      - Decision log (what was tried, what worked)
+
+      Provide state summaries to orchestrator for decision making.
+    tools: [state_read, state_write, history_query, resource_check]
+
+  # Human interface agent
+  - id: human_liaison
+    role: Human Communication Specialist
+    prompt: |
+      You are the bridge between the autonomous system and humans.
+      When escalation is needed:
+      1. Summarize current state concisely
+      2. Explain why human input is needed
+      3. Present clear options (not open-ended questions)
+      4. Capture human decision and relay to orchestrator
+
+      Target: Keep human involvement to 5-10% of total time.
+    tools: [notification_send, option_present, decision_capture, context_summarize]
+
+# =============================================================================
+# WORKFLOW STEPS (The Ralph Loop)
+# =============================================================================
+
+steps:
+  # Step 1: Understand and decompose objective
+  - id: decompose_objective
+    agent: orchestrator
+    input: |
+      OBJECTIVE: {{task}}
+
+      Decompose this into:
+      1. Atomic sub-tasks (max 10 per iteration)
+      2. Success criteria for each
+      3. Required interfaces
+      4. Expected outcomes (text/image/video/audio)
+      5. Risk assessment (what needs human approval?)
+
+      Output as structured plan.
+    expects: "PLAN:"
+    retry: 2
+
+  # Step 2: Execute development task
+  - id: execute_dev_task
+    agent: developer
+    input: |
+      PLAN: {{step_outputs.decompose_objective}}
+      CURRENT_STATE: {{step_outputs.check_state}}
+
+      Execute the next highest-priority task.
+      Collect all outcomes (code, logs, screenshots).
+      Report completion status.
+    expects: "EXECUTED:"
+    tools: [code_write, terminal_execute, screenshot_capture]
+    retry: 3
+
+  # Step 3: Analyze visual outcomes
+  - id: analyze_visuals
+    agent: vision_analyst
+    input: |
+      TASK_CONTEXT: {{step_outputs.execute_dev_task}}
+      SCREENSHOTS: {{collected.images}}
+      AR_CAPTURES: {{collected.ar}}
+
+      Analyze all visual outcomes:
+      - What UI states are visible?
+      - Any errors or warnings?
+      - Does the output match expectations?
+
+      Provide structured analysis.
+    expects: "VISUAL_ANALYSIS:"
+    retry: 2
+
+  # Step 4: Verify outcomes
+  - id: verify_outcomes
+    agent: tester
+    input: |
+      EXPECTED: {{step_outputs.decompose_objective}}
+      ACTUAL: {{step_outputs.execute_dev_task}}
+      VISUAL_ANALYSIS: {{step_outputs.analyze_visuals}}
+
+      Verify:
+      1. Code correctness (run tests)
+      2. UI correctness (visual comparison)
+      3. Performance (within thresholds)
+
+      VERDICT: PASS or FAIL with evidence.
+    expects: "VERDICT:"
+    verified_by: orchestrator
+    retry: 2
+
+  # Step 5: Update state
+  - id: update_state
+    agent: state_tracker
+    input: |
+      TASK_RESULT: {{step_outputs.verify_outcomes}}
+      RESOURCES_USED: {{resources.current}}
+
+      Update global state:
+      - Mark completed tasks
+      - Update progress percentage
+      - Log outcomes to history
+      - Check resource limits
+
+      STATE_UPDATE: complete
+    expects: "STATE_UPDATE:"
+
+  # Step 6: Decision point
+  - id: decide_next
+    agent: orchestrator
+    input: |
+      CURRENT_STATE: {{step_outputs.update_state}}
+      PROGRESS: {{state.progress_percent}}
+      RESOURCES_REMAINING: {{resources.remaining}}
+
+      Decide:
+      1. CONTINUE - More tasks to do, resources available
+      2. COMPLETE - All objectives met
+      3. ESCALATE - Human decision needed
+      4. ABORT - Resource limit hit or unrecoverable error
+
+      DECISION with rationale.
+    expects: "DECISION:"
+
+  # Step 7: Human escalation (conditional)
+  - id: escalate_to_human
+    agent: human_liaison
+    condition: "{{step_outputs.decide_next}} contains 'ESCALATE'"
+    input: |
+      CONTEXT: {{step_outputs.update_state}}
+      REASON: {{step_outputs.decide_next}}
+
+      Prepare escalation:
+      1. Concise summary (max 200 words)
+      2. Specific question or decision needed
+      3. 2-4 clear options
+      4. Recommendation if any
+
+      Wait for human response.
+    expects: "HUMAN_DECISION:"
+    requires_approval: true
+    timeout_minutes: 30
+
+# =============================================================================
+# LOOP CONFIGURATION
+# =============================================================================
+
+loop:
+  # Steps to repeat
+  repeat_steps: [execute_dev_task, analyze_visuals, verify_outcomes, update_state, decide_next]
+
+  # Exit conditions
+  exit_when:
+    - "{{step_outputs.decide_next}} contains 'COMPLETE'"
+    - "{{step_outputs.decide_next}} contains 'ABORT'"
+    - "{{resources.tokens_used}} > {{max_tokens_per_iteration}}"
+    - "{{resources.time_elapsed_minutes}} > {{timeout_minutes}}"
+
+  # Human intervention triggers
+  human_triggers:
+    - condition: "{{state.confidence}} < 0.15"
+      action: escalate
+    - condition: "{{task.type}} == 'financial'"
+      action: require_approval
+    - condition: "{{task.type}} == 'irreversible'"
+      action: require_approval
+
+# =============================================================================
+# OUTCOME COLLECTION
+# =============================================================================
+
+outcome_schema:
+  text:
+    - code_files: "All modified source files"
+    - logs: "Terminal and application logs"
+    - test_results: "Test execution outputs"
+    - api_responses: "External API responses"
+
+  image:
+    - screenshots: "UI state captures"
+    - ar_captures: "Quest 3 spatial captures"
+    - diagrams: "Generated architecture diagrams"
+
+  video:
+    - screen_recordings: "Development session recordings"
+    - ar_recordings: "Spatial interaction recordings"
+
+  audio:
+    - voice_commands: "Voice input transcriptions"
+    - notifications: "System audio alerts"
+
+# =============================================================================
+# GUARDRAILS
+# =============================================================================
+
+guardrails:
+  input:
+    - no_credentials: "Never include API keys or passwords in prompts"
+    - sanitize_pii: "Remove personal information from inputs"
+
+  output:
+    - no_destructive_commands: "Block rm -rf, DROP TABLE, etc."
+    - confirm_deployments: "Require approval for production deployments"
+    - cost_limit: "Alert if API costs exceed $10 per iteration"
+
+  escalation:
+    - financial_decisions: "Always escalate purchases > $100"
+    - data_deletion: "Always escalate data deletion requests"
+    - external_communication: "Escalate emails/messages to external parties"

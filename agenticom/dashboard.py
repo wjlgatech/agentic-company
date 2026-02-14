@@ -321,6 +321,27 @@ select option { background: var(--bg-card); color: var(--text); }
 .step-name { flex: 1; font-weight: 500; color: var(--text); }
 .step-agent { color: var(--text-muted); font-size: 11px; }
 
+/* Stage tracking */
+.stage-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+.stage-item.stage-pending {
+  opacity: 0.5;
+}
+.stage-item.stage-active {
+  background: var(--info-bg);
+  border-color: var(--info);
+}
+.stage-item.stage-completed {
+  background: var(--success-bg);
+  border-color: var(--success);
+}
+.stage-item.stage-current {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--accent);
+}
+
 /* Empty state */
 .empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 24px; }
 
@@ -628,6 +649,77 @@ function renderCard(run) {
       return html;
     }).join('');
 
+    // Stage Progress section
+    let stageProgressHTML = '';
+    if (run.stages && Object.keys(run.stages).length > 0) {
+      const stageOrder = ['plan', 'implement', 'verify', 'test', 'review'];
+      const stageEmojis = { plan: '📋', implement: '⚙️', verify: '✓', test: '🧪', review: '👀' };
+      const stageLabels = { plan: 'Plan', implement: 'Implement', verify: 'Verify', test: 'Test', review: 'Review' };
+
+      const stageItems = stageOrder.map(stageName => {
+        const stage = run.stages[stageName];
+        if (!stage) return '';
+
+        const isStarted = !!stage.started_at;
+        const isCompleted = !!stage.completed_at;
+        const isCurrent = run.current_stage === stageName;
+
+        let statusClass = 'stage-pending';
+        let statusIcon = '○';
+        let timingInfo = '';
+
+        if (isCompleted) {
+          statusClass = 'stage-completed';
+          statusIcon = '✓';
+          if (stage.started_at && stage.completed_at) {
+            const start = new Date(stage.started_at);
+            const end = new Date(stage.completed_at);
+            const duration = Math.round((end - start) / 1000);
+            timingInfo = `<span style="font-size: 10px; color: var(--text-muted);">(${duration}s)</span>`;
+          }
+        } else if (isStarted) {
+          statusClass = 'stage-active';
+          statusIcon = '●';
+          if (stage.started_at) {
+            timingInfo = `<span style="font-size: 10px; color: var(--info);">In progress...</span>`;
+          }
+        }
+
+        const emoji = stageEmojis[stageName] || '○';
+        const label = stageLabels[stageName] || stageName;
+        const artifactInfo = stage.artifacts && stage.artifacts.length > 0
+          ? `<span style="font-size: 10px; color: var(--text-muted); margin-left: 8px;">📦 ${stage.artifacts.length}</span>`
+          : '';
+
+        return `
+          <div class="stage-item ${statusClass} ${isCurrent ? 'stage-current' : ''}"
+               style="display: flex; align-items: center; padding: 8px; border-radius: 6px; transition: all 0.2s;">
+            <span style="font-size: 16px; margin-right: 8px;">${emoji}</span>
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 500; font-size: 12px;">${label}</span>
+                ${timingInfo}
+                ${artifactInfo}
+              </div>
+            </div>
+            <span class="stage-icon" style="font-size: 14px; opacity: 0.7;">${statusIcon}</span>
+          </div>
+        `;
+      }).join('');
+
+      stageProgressHTML = `
+        <div style="margin-top: 16px; padding: 12px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="font-weight: 600; color: var(--text);">🎯 Stage Progress</span>
+            ${run.current_stage ? `<span style="font-size: 11px; padding: 2px 6px; background: var(--info-bg); color: var(--info); border-radius: 4px;">Current: ${run.current_stage}</span>` : ''}
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            ${stageItems}
+          </div>
+        </div>
+      `;
+    }
+
     // Artifacts section
     let artifactsHTML = '';
     if (run.artifacts && run.artifacts.length > 0) {
@@ -645,6 +737,7 @@ function renderCard(run) {
 
     detailsHTML = `
       <div class="card-details">
+        ${stageProgressHTML}
         <div class="step-list">${stepsHTML}</div>
         ${artifactsHTML}
         <div class="card-actions">

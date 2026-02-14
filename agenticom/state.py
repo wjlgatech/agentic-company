@@ -21,6 +21,50 @@ class StepStatus(str, Enum):
     SKIPPED = "skipped"
 
 
+class WorkflowStage(str, Enum):
+    """Workflow stages matching the 5-agent pattern."""
+    PLAN = "plan"
+    IMPLEMENT = "implement"
+    VERIFY = "verify"
+    TEST = "test"
+    REVIEW = "review"
+
+
+@dataclass
+class StageInfo:
+    """Information about a workflow stage execution."""
+    stage: WorkflowStage
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    step_id: Optional[str] = None  # The step that triggered this stage
+    artifacts: list[str] = None  # Paths to artifacts/documentation
+
+    def __post_init__(self):
+        if self.artifacts is None:
+            self.artifacts = []
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "stage": self.stage.value if isinstance(self.stage, WorkflowStage) else self.stage,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "step_id": self.step_id,
+            "artifacts": self.artifacts
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "StageInfo":
+        """Create from dictionary."""
+        return cls(
+            stage=WorkflowStage(data["stage"]),
+            started_at=data.get("started_at"),
+            completed_at=data.get("completed_at"),
+            step_id=data.get("step_id"),
+            artifacts=data.get("artifacts", [])
+        )
+
+
 @dataclass
 class WorkflowRun:
     """A single workflow execution."""
@@ -34,6 +78,16 @@ class WorkflowRun:
     created_at: str
     updated_at: str
     error: Optional[str] = None
+    stages: dict[str, StageInfo] = None  # Map of stage name -> StageInfo
+    current_stage: Optional[WorkflowStage] = None
+
+    def __post_init__(self):
+        if self.stages is None:
+            # Initialize all stages as not started
+            self.stages = {
+                stage.value: StageInfo(stage=stage)
+                for stage in WorkflowStage
+            }
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -47,8 +101,40 @@ class WorkflowRun:
             "context": self.context,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "error": self.error
+            "error": self.error,
+            "stages": {k: v.to_dict() for k, v in (self.stages or {}).items()},
+            "current_stage": self.current_stage.value if self.current_stage else None
         }
+
+    def start_stage(self, stage: WorkflowStage, step_id: str) -> None:
+        """Mark a stage as started."""
+        if self.stages is None:
+            self.__post_init__()
+
+        stage_key = stage.value
+        if stage_key in self.stages:
+            self.stages[stage_key].started_at = datetime.now().isoformat()
+            self.stages[stage_key].step_id = step_id
+        self.current_stage = stage
+
+    def complete_stage(self, stage: WorkflowStage) -> None:
+        """Mark a stage as completed."""
+        if self.stages is None:
+            self.__post_init__()
+
+        stage_key = stage.value
+        if stage_key in self.stages:
+            self.stages[stage_key].completed_at = datetime.now().isoformat()
+
+    def add_artifact(self, stage: WorkflowStage, artifact_path: str) -> None:
+        """Add an artifact to a stage."""
+        if self.stages is None:
+            self.__post_init__()
+
+        stage_key = stage.value
+        if stage_key in self.stages:
+            if artifact_path not in self.stages[stage_key].artifacts:
+                self.stages[stage_key].artifacts.append(artifact_path)
 
 
 @dataclass
@@ -104,7 +190,9 @@ class StateManager:
                     context TEXT DEFAULT '{}',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    error TEXT
+                    error TEXT,
+                    stages TEXT DEFAULT '{}',
+                    current_stage TEXT
                 )
             """)
             conn.execute("""
@@ -128,19 +216,39 @@ class StateManager:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_steps_run ON step_results(run_id)
             """)
+
+            # Migration: Add stages and current_stage columns if they don't exist
+            try:
+                conn.execute("ALTER TABLE workflow_runs ADD COLUMN stages TEXT DEFAULT '{}'")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            try:
+                conn.execute("ALTER TABLE workflow_runs ADD COLUMN current_stage TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
             conn.commit()
 
     def create_run(self, run: WorkflowRun) -> str:
         """Create a new workflow run."""
+        # Ensure stages are initialized
+        if run.stages is None:
+            run.__post_init__()
+
+        stages_json = json.dumps({k: v.to_dict() for k, v in run.stages.items()})
+        current_stage_val = run.current_stage.value if run.current_stage else None
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 INSERT INTO workflow_runs
-                (id, workflow_id, task, status, current_step, total_steps, context, created_at, updated_at, error)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, workflow_id, task, status, current_step, total_steps, context, created_at, updated_at, error, stages, current_stage)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 run.id, run.workflow_id, run.task, run.status.value,
                 run.current_step, run.total_steps, json.dumps(run.context),
-                run.created_at, run.updated_at, run.error
+                run.created_at, run.updated_at, run.error,
+                stages_json, current_stage_val
             ))
             conn.commit()
         return run.id
@@ -154,6 +262,14 @@ class StateManager:
             ).fetchone()
 
             if row:
+                # Deserialize stages
+                stages_data = json.loads(row.get("stages") or "{}")
+                stages = {k: StageInfo.from_dict(v) for k, v in stages_data.items()} if stages_data else None
+
+                # Deserialize current_stage
+                current_stage_str = row.get("current_stage")
+                current_stage = WorkflowStage(current_stage_str) if current_stage_str else None
+
                 return WorkflowRun(
                     id=row["id"],
                     workflow_id=row["workflow_id"],
@@ -164,7 +280,9 @@ class StateManager:
                     context=json.loads(row["context"]),
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
-                    error=row["error"]
+                    error=row["error"],
+                    stages=stages,
+                    current_stage=current_stage
                 )
         return None
 
@@ -174,6 +292,17 @@ class StateManager:
             updates["context"] = json.dumps(updates["context"])
         if "status" in updates and isinstance(updates["status"], StepStatus):
             updates["status"] = updates["status"].value
+        if "stages" in updates and isinstance(updates["stages"], dict):
+            # Convert StageInfo objects to dict
+            stages_dict = {}
+            for k, v in updates["stages"].items():
+                if isinstance(v, StageInfo):
+                    stages_dict[k] = v.to_dict()
+                else:
+                    stages_dict[k] = v
+            updates["stages"] = json.dumps(stages_dict)
+        if "current_stage" in updates and isinstance(updates["current_stage"], WorkflowStage):
+            updates["current_stage"] = updates["current_stage"].value
 
         updates["updated_at"] = datetime.now().isoformat()
 
@@ -251,8 +380,17 @@ class StateManager:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, params).fetchall()
 
-            return [
-                WorkflowRun(
+            runs = []
+            for row in rows:
+                # Deserialize stages
+                stages_data = json.loads(row.get("stages") or "{}")
+                stages = {k: StageInfo.from_dict(v) for k, v in stages_data.items()} if stages_data else None
+
+                # Deserialize current_stage
+                current_stage_str = row.get("current_stage")
+                current_stage = WorkflowStage(current_stage_str) if current_stage_str else None
+
+                runs.append(WorkflowRun(
                     id=row["id"],
                     workflow_id=row["workflow_id"],
                     task=row["task"],
@@ -262,10 +400,12 @@ class StateManager:
                     context=json.loads(row["context"]),
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
-                    error=row["error"]
-                )
-                for row in rows
-            ]
+                    error=row["error"],
+                    stages=stages,
+                    current_stage=current_stage
+                ))
+
+            return runs
 
     def get_stats(self) -> dict[str, Any]:
         """Get workflow execution statistics."""

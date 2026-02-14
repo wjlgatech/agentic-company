@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 from dataclasses import dataclass, field
 
-from .state import StateManager, WorkflowRun, StepResult, StepStatus
+from .state import StateManager, WorkflowRun, StepResult, StepStatus, WorkflowStage
 from orchestration.artifact_manager import ArtifactManager
 from orchestration.artifacts import ArtifactCollection
 
@@ -156,6 +156,29 @@ class WorkflowRunner:
         self.state = state_manager or StateManager()
         self.executor = executor or self._default_executor
         self.artifact_manager = ArtifactManager()
+
+    @staticmethod
+    def _detect_stage_from_step_id(step_id: str) -> Optional[WorkflowStage]:
+        """Detect workflow stage from step ID.
+
+        Matches step IDs like 'plan', 'develop'/'implement', 'verify', 'test', 'review'.
+        """
+        step_id_lower = step_id.lower()
+
+        # Direct matches
+        stage_keywords = {
+            WorkflowStage.PLAN: ["plan", "planning", "analyze", "breakdown"],
+            WorkflowStage.IMPLEMENT: ["develop", "implement", "code", "build", "create"],
+            WorkflowStage.VERIFY: ["verify", "check", "validate", "review-code"],
+            WorkflowStage.TEST: ["test", "testing", "qa"],
+            WorkflowStage.REVIEW: ["review", "finalize", "approve", "feedback"],
+        }
+
+        for stage, keywords in stage_keywords.items():
+            if any(kw in step_id_lower for kw in keywords):
+                return stage
+
+        return None
 
     @staticmethod
     def _output_matches_expects(output: str, expects: str) -> bool:
@@ -306,6 +329,12 @@ YOUR TASK FOR THIS STEP:
 {step.description}
 """
 
+        # Detect and start stage if applicable
+        detected_stage = self._detect_stage_from_step_id(step.id)
+        if detected_stage:
+            run.start_stage(detected_stage, step.id)
+            self.state.update_run(run.id, stages=run.stages, current_stage=run.current_stage)
+
         # Record step start
         now = datetime.now().isoformat()
         result = StepResult(
@@ -331,12 +360,18 @@ YOUR TASK FOR THIS STEP:
             # Extract artifacts FIRST, before validation
             # This ensures we capture code even if validation fails
             extracted_artifacts = []
+            output_dir = None
             if output:
                 try:
                     extracted_artifacts = self.artifact_manager.extract_artifacts_from_text(output, run_id=run.id)
                     if extracted_artifacts:
                         collection = ArtifactCollection(run_id=run.id, artifacts=extracted_artifacts)
                         output_dir = self.artifact_manager.save_collection(collection)
+
+                        # Add artifacts to current stage
+                        if detected_stage and output_dir:
+                            run.add_artifact(detected_stage, str(output_dir))
+                            self.state.update_run(run.id, stages=run.stages)
                 except Exception as e:
                     # Don't fail the step if artifact extraction fails
                     pass
@@ -352,8 +387,16 @@ YOUR TASK FOR THIS STEP:
                     result.error = f"Output did not contain expected: {step.expects}"
                 else:
                     result.status = StepStatus.COMPLETED
+                    # Complete stage on successful step completion
+                    if detected_stage:
+                        run.complete_stage(detected_stage)
+                        self.state.update_run(run.id, stages=run.stages)
             else:
                 result.status = StepStatus.COMPLETED
+                # Complete stage on successful step completion
+                if detected_stage:
+                    run.complete_stage(detected_stage)
+                    self.state.update_run(run.id, stages=run.stages)
 
             result.completed_at = datetime.now().isoformat()
 

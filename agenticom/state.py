@@ -263,11 +263,11 @@ class StateManager:
 
             if row:
                 # Deserialize stages
-                stages_data = json.loads(row.get("stages") or "{}")
+                stages_data = json.loads(row["stages"] or "{}")
                 stages = {k: StageInfo.from_dict(v) for k, v in stages_data.items()} if stages_data else None
 
                 # Deserialize current_stage
-                current_stage_str = row.get("current_stage")
+                current_stage_str = row["current_stage"]
                 current_stage = WorkflowStage(current_stage_str) if current_stage_str else None
 
                 return WorkflowRun(
@@ -332,6 +332,48 @@ class StateManager:
             conn.commit()
             return cursor.lastrowid
 
+    def archive_run(self, run_id: str) -> bool:
+        """Archive a workflow run (soft delete)."""
+        with sqlite3.connect(self.db_path) as conn:
+            # Add is_archived column if it doesn't exist
+            try:
+                conn.execute("ALTER TABLE runs ADD COLUMN is_archived INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            # Mark as archived
+            conn.execute("UPDATE runs SET is_archived = 1 WHERE id = ?", (run_id,))
+            conn.commit()
+            return True
+
+    def unarchive_run(self, run_id: str) -> bool:
+        """Unarchive a workflow run."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE runs SET is_archived = 0 WHERE id = ?", (run_id,))
+            conn.commit()
+            return True
+
+    def delete_run(self, run_id: str, permanent: bool = False) -> bool:
+        """Delete a workflow run.
+
+        Args:
+            run_id: Run ID to delete
+            permanent: If True, permanently delete. If False, archive instead.
+        """
+        if permanent:
+            with sqlite3.connect(self.db_path) as conn:
+                # Delete step results first (foreign key)
+                conn.execute("DELETE FROM step_results WHERE run_id = ?", (run_id,))
+                # Delete artifacts
+                conn.execute("DELETE FROM artifacts WHERE run_id = ?", (run_id,))
+                # Delete run
+                conn.execute("DELETE FROM runs WHERE id = ?", (run_id,))
+                conn.commit()
+                return True
+        else:
+            # Soft delete = archive
+            return self.archive_run(run_id)
+
     def get_step_results(self, run_id: str) -> list[StepResult]:
         """Get all step results for a run."""
         with sqlite3.connect(self.db_path) as conn:
@@ -360,11 +402,23 @@ class StateManager:
         self,
         status: Optional[StepStatus] = None,
         workflow_id: Optional[str] = None,
-        limit: int = 50
+        limit: int = 50,
+        include_archived: bool = False
     ) -> list[WorkflowRun]:
-        """List workflow runs with optional filters."""
+        """List workflow runs with optional filters.
+
+        Args:
+            status: Filter by status
+            workflow_id: Filter by workflow ID
+            limit: Maximum number of runs
+            include_archived: If True, include archived runs. Default False.
+        """
         query = "SELECT * FROM workflow_runs WHERE 1=1"
         params = []
+
+        # Exclude archived by default
+        if not include_archived:
+            query += " AND (is_archived IS NULL OR is_archived = 0)"
 
         if status:
             query += " AND status = ?"
@@ -383,11 +437,11 @@ class StateManager:
             runs = []
             for row in rows:
                 # Deserialize stages
-                stages_data = json.loads(row.get("stages") or "{}")
+                stages_data = json.loads(row["stages"] or "{}")
                 stages = {k: StageInfo.from_dict(v) for k, v in stages_data.items()} if stages_data else None
 
                 # Deserialize current_stage
-                current_stage_str = row.get("current_stage")
+                current_stage_str = row["current_stage"]
                 current_stage = WorkflowStage(current_stage_str) if current_stage_str else None
 
                 runs.append(WorkflowRun(

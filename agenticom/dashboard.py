@@ -5,6 +5,7 @@ Run with: agenticom dashboard
 
 import json
 import os
+import asyncio
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -18,6 +19,14 @@ try:
 except ImportError:
     from .state import StateManager
     from .core import AgenticomCore
+
+# Import SmartRefiner for guided workflow creation
+try:
+    from orchestration.tools.smart_refiner import SmartRefiner
+    from orchestration.integrations.unified import UnifiedExecutor, UnifiedConfig, Backend
+    SMARTREFINER_AVAILABLE = True
+except ImportError:
+    SMARTREFINER_AVAILABLE = False
 
 
 DASHBOARD_HTML = '''<!DOCTYPE html>
@@ -323,6 +332,49 @@ select option { background: var(--bg-card); color: var(--text); }
   .new-run-form { flex-direction: column; }
   .new-run-form select { min-width: unset; }
 }
+
+/* Chat animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Confidence meter colors */
+#confidence-bar {
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Chat input focus */
+#chat-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.2);
+}
+
+/* Chat scrollbar */
+#chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+#chat-messages::-webkit-scrollbar-track {
+  background: var(--bg);
+  border-radius: 3px;
+}
+
+#chat-messages::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+#chat-messages::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 </style>
 </head>
 <body>
@@ -356,11 +408,55 @@ select option { background: var(--bg-card); color: var(--text); }
 </div>
 
 <div class="new-run">
-  <form class="new-run-form" id="new-run-form">
+  <!-- Mode Toggle -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button id="mode-toggle" onclick="toggleMode()" style="background: var(--bg-card); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;">
+        <span id="mode-icon">✨</span> <span id="mode-text">Try Guided Mode</span>
+      </button>
+      <span style="color: var(--text-muted); font-size: 12px;" id="mode-help">Get help refining your task through conversation</span>
+    </div>
+  </div>
+
+  <!-- Quick Start Form (default) -->
+  <form class="new-run-form" id="new-run-form" style="display: flex;">
     <input type="text" id="task-input" placeholder="Describe your task... e.g., 'Create a marketing strategy for my SaaS product'" required>
     <select id="run-workflow-select"><option value="feature-dev">feature-dev</option><option value="marketing-campaign">marketing-campaign</option></select>
     <button type="submit">▶ Start Run</button>
   </form>
+
+  <!-- Guided Mode Chat Interface (hidden by default) -->
+  <div id="chat-container" style="display: none;">
+    <!-- Confidence Meter -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span style="color: var(--text); font-weight: 500; font-size: 13px;">Understanding Confidence</span>
+        <span id="confidence-percent" style="color: var(--accent); font-weight: 600; font-size: 14px;">0%</span>
+      </div>
+      <div style="background: var(--bg); border-radius: 8px; height: 8px; overflow: hidden;">
+        <div id="confidence-bar" style="background: linear-gradient(90deg, var(--warning), var(--accent), var(--success)); height: 100%; width: 0%; transition: width 0.5s ease;"></div>
+      </div>
+      <div id="understanding-summary" style="color: var(--text-muted); font-size: 12px; margin-top: 8px; font-style: italic;"></div>
+    </div>
+
+    <!-- Chat Messages -->
+    <div id="chat-messages" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; max-height: 400px; overflow-y: auto; box-shadow: var(--shadow);"></div>
+
+    <!-- Chat Input -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; gap: 8px; box-shadow: var(--shadow);">
+      <input type="text" id="chat-input" placeholder="Type your response..." style="flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 14px; color: var(--text);">
+      <button id="chat-send" onclick="sendMessage()" style="background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 500; cursor: pointer;">Send</button>
+    </div>
+
+    <!-- Workflow Selection (shown when ready) -->
+    <div id="workflow-selector" style="display: none; margin-top: 12px;">
+      <select id="guided-workflow-select" style="width: 100%; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text);">
+        <option value="feature-dev">feature-dev</option>
+        <option value="marketing-campaign">marketing-campaign</option>
+      </select>
+      <button id="execute-workflow" onclick="executeGuidedWorkflow()" style="width: 100%; margin-top: 8px; background: var(--success); color: #fff; border: none; border-radius: 8px; padding: 12px; font-weight: 500; cursor: pointer;">▶ Execute Workflow</button>
+    </div>
+  </div>
 </div>
 
 <div class="board" id="board">
@@ -795,6 +891,214 @@ document.getElementById('new-run-form').addEventListener('submit', async (e) => 
 // Workflow selector
 document.getElementById('workflow-select').addEventListener('change', loadRuns);
 
+// ============================================================================
+// GUIDED MODE - SmartRefiner Integration
+// ============================================================================
+
+let guidedMode = false;
+let refinerSession = null;
+let chatMessages = [];
+
+function toggleMode() {
+  guidedMode = !guidedMode;
+  const quickForm = document.getElementById('new-run-form');
+  const chatContainer = document.getElementById('chat-container');
+  const modeIcon = document.getElementById('mode-icon');
+  const modeText = document.getElementById('mode-text');
+  const modeHelp = document.getElementById('mode-help');
+
+  if (guidedMode) {
+    // Switch to guided mode
+    quickForm.style.display = 'none';
+    chatContainer.style.display = 'block';
+    modeIcon.textContent = '⚡';
+    modeText.textContent = 'Quick Start';
+    modeHelp.textContent = 'Skip the interview and start directly';
+
+    // Initialize chat session
+    initGuidedSession();
+  } else {
+    // Switch to quick mode
+    quickForm.style.display = 'flex';
+    chatContainer.style.display = 'none';
+    modeIcon.textContent = '✨';
+    modeText.textContent = 'Try Guided Mode';
+    modeHelp.textContent = 'Get help refining your task through conversation';
+
+    // Reset chat
+    refinerSession = null;
+    chatMessages = [];
+    document.getElementById('chat-messages').innerHTML = '';
+    updateConfidence(0, '');
+  }
+}
+
+async function initGuidedSession() {
+  try {
+    const result = await apiPost('/refiner/session', {});
+
+    if (result.error) {
+      alert('Guided mode unavailable: ' + result.error);
+      toggleMode(); // Switch back
+      return;
+    }
+
+    refinerSession = result.session_id;
+    chatMessages = [];
+
+    // Add welcome message
+    addChatMessage('assistant', result.message || 'Hi! How can I help you today?');
+
+  } catch (err) {
+    console.error('Failed to initialize guided session:', err);
+    alert('Failed to start guided mode. Please try again.');
+    toggleMode();
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const message = input.value.trim();
+
+  if (!message || !refinerSession) return;
+
+  // Add user message to chat
+  addChatMessage('user', message);
+  input.value = '';
+
+  // Disable input while processing
+  input.disabled = true;
+  document.getElementById('chat-send').disabled = true;
+
+  try {
+    const result = await apiPost('/refiner/message', {
+      session_id: refinerSession,
+      message: message
+    });
+
+    // Add assistant response
+    addChatMessage('assistant', result.response);
+
+    // Update confidence meter
+    if (result.understanding) {
+      const confidence = Math.round((result.understanding.confidence || 0) * 100);
+      updateConfidence(confidence, result.understanding.summary || '');
+    }
+
+    // Check if ready to proceed
+    if (result.ready && result.state === 'complete') {
+      // Show workflow selector
+      document.getElementById('workflow-selector').style.display = 'block';
+
+      // Store the final prompt
+      window.guidedFinalPrompt = result.final_prompt;
+
+      // Disable further chat
+      input.disabled = true;
+      document.getElementById('chat-send').style.display = 'none';
+    } else {
+      // Re-enable input
+      input.disabled = false;
+      document.getElementById('chat-send').disabled = false;
+      input.focus();
+    }
+
+  } catch (err) {
+    console.error('Failed to send message:', err);
+    alert('Failed to process message. Please try again.');
+    input.disabled = false;
+    document.getElementById('chat-send').disabled = false;
+  }
+}
+
+function addChatMessage(role, content) {
+  const messagesDiv = document.getElementById('chat-messages');
+  const messageDiv = document.createElement('div');
+
+  const isUser = role === 'user';
+  messageDiv.style.cssText = `
+    display: flex;
+    justify-content: ${isUser ? 'flex-end' : 'flex-start'};
+    margin-bottom: 12px;
+    animation: slideIn 0.3s ease;
+  `;
+
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: ${isUser ? 'var(--accent)' : 'var(--bg)'};
+    color: ${isUser ? '#fff' : 'var(--text)'};
+    border: ${isUser ? 'none' : '1px solid var(--border)'};
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  `;
+  bubble.textContent = content;
+
+  messageDiv.appendChild(bubble);
+  messagesDiv.appendChild(messageDiv);
+
+  // Auto-scroll to bottom
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  chatMessages.push({ role, content });
+}
+
+function updateConfidence(percent, summary) {
+  document.getElementById('confidence-percent').textContent = percent + '%';
+  document.getElementById('confidence-bar').style.width = percent + '%';
+
+  if (summary) {
+    document.getElementById('understanding-summary').textContent = summary;
+  }
+}
+
+async function executeGuidedWorkflow() {
+  const workflow = document.getElementById('guided-workflow-select').value;
+  const finalPrompt = window.guidedFinalPrompt;
+
+  if (!finalPrompt) {
+    alert('No refined prompt available');
+    return;
+  }
+
+  // Execute workflow with refined prompt
+  const result = await apiPost('/runs', {
+    workflow: workflow,
+    task: finalPrompt
+  });
+
+  if (result.run_id) {
+    // Reset guided mode
+    toggleMode();
+
+    // Reload runs
+    document.getElementById('workflow-select').value = workflow;
+    loadRuns();
+
+    // Show success message
+    alert('Workflow started successfully with refined prompt!');
+  }
+}
+
+// Enable Enter key to send messages
+document.addEventListener('DOMContentLoaded', () => {
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  }
+});
+
+// ============================================================================
+
 // Theme toggle
 (function initTheme() {
   const btn = document.getElementById('theme-toggle');
@@ -833,9 +1137,10 @@ setInterval(loadRuns, 10000);
 class DashboardHandler(SimpleHTTPRequestHandler):
     """HTTP handler for the Agenticom dashboard"""
 
-    def __init__(self, *args, state=None, core=None, **kwargs):
+    def __init__(self, *args, state=None, core=None, refiner=None, **kwargs):
         self.state = state
         self.core = core
+        self.refiner = refiner
         super().__init__(*args, **kwargs)
 
     def log_message(self, format, *args):
@@ -905,6 +1210,30 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             else:
                 self.send_error(404, 'Run not found')
 
+        elif path.startswith('/api/refiner/session/'):
+            # Get SmartRefiner session state
+            if not SMARTREFINER_AVAILABLE or not self.refiner:
+                self.send_json({'error': 'SmartRefiner not available'}, status=503)
+                return
+
+            session_id = path.split('/')[-1]
+            session = self.refiner.sessions.get(session_id)
+
+            if session:
+                self.send_json({
+                    'session_id': session.session_id,
+                    'state': session.state.value,
+                    'understanding': {
+                        'summary': session.understanding.summary,
+                        'confidence': session.understanding.confidence,
+                        'key_points': session.understanding.key_points,
+                    },
+                    'questions_asked': session.questions_asked,
+                    'final_prompt': session.final_prompt if session.state.value == 'complete' else None
+                })
+            else:
+                self.send_error(404, 'Session not found')
+
         else:
             self.send_error(404, 'Not found')
 
@@ -936,6 +1265,45 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             result = self.core.resume_run(run_id)
             self.send_json(result)
 
+        elif path == '/api/refiner/session':
+            # Create new SmartRefiner session
+            if not SMARTREFINER_AVAILABLE or not self.refiner:
+                self.send_json({'error': 'SmartRefiner not available'}, status=503)
+                return
+
+            session_id = self.refiner.create_session()
+            self.send_json({
+                'session_id': session_id,
+                'state': 'interviewing',
+                'message': 'Hi! I\'m here to help you create the perfect workflow. What would you like to accomplish?'
+            })
+
+        elif path == '/api/refiner/message':
+            # Process message in SmartRefiner session
+            if not SMARTREFINER_AVAILABLE or not self.refiner:
+                self.send_json({'error': 'SmartRefiner not available'}, status=503)
+                return
+
+            session_id = data.get('session_id')
+            message = data.get('message', '')
+
+            if not session_id or not message:
+                self.send_json({'error': 'session_id and message required'}, status=400)
+                return
+
+            try:
+                # Run async process in sync context
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    self.refiner.process(session_id, message)
+                )
+                loop.close()
+
+                self.send_json(result)
+            except Exception as e:
+                self.send_json({'error': str(e)}, status=500)
+
         else:
             self.send_error(404, 'Not found')
 
@@ -947,11 +1315,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
 
 
-def create_handler(state, core):
-    """Create handler class with state and core injected"""
+def create_handler(state, core, refiner=None):
+    """Create handler class with state, core, and refiner injected"""
     class Handler(DashboardHandler):
         def __init__(self, *args, **kwargs):
-            super().__init__(*args, state=state, core=core, **kwargs)
+            super().__init__(*args, state=state, core=core, refiner=refiner, **kwargs)
     return Handler
 
 
@@ -960,7 +1328,32 @@ def start_dashboard(port=8080, open_browser=True):
     state = StateManager()
     core = AgenticomCore()
 
-    handler = create_handler(state, core)
+    # Initialize SmartRefiner if available
+    refiner = None
+    if SMARTREFINER_AVAILABLE:
+        try:
+            # Create LLM executor
+            executor = UnifiedExecutor(config=UnifiedConfig(
+                preferred_backend=Backend.AUTO,
+                temperature=0.7,
+                max_tokens=2000
+            ))
+
+            # Create async LLM call function for SmartRefiner
+            # Combines system and user prompts since UnifiedExecutor doesn't separate them
+            async def llm_call(system: str, user: str) -> str:
+                # Combine system and user prompts
+                combined_prompt = f"{system}\n\n{user}"
+                result = await executor.execute(combined_prompt)
+                return result
+
+            refiner = SmartRefiner(llm_call=llm_call, max_questions=4)
+            print("✨ SmartRefiner enabled - Guided workflow creation available!")
+        except Exception as e:
+            print(f"⚠️  SmartRefiner initialization failed: {e}")
+            print("   Falling back to standard mode")
+
+    handler = create_handler(state, core, refiner)
     server = HTTPServer(('localhost', port), handler)
 
     print(f"🚀 Agenticom Dashboard running at http://localhost:{port}")

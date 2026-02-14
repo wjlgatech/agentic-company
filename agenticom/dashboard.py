@@ -374,8 +374,20 @@ let currentWf = null;
 let expandedCard = null;
 
 async function api(endpoint) {
-  const r = await fetch('/api' + endpoint);
-  return r.json();
+  try {
+    console.log('Fetching:', '/api' + endpoint);
+    const r = await fetch('/api' + endpoint);
+    if (!r.ok) {
+      console.error('API error:', r.status, r.statusText);
+      return null;
+    }
+    const data = await r.json();
+    console.log('API response:', endpoint, data);
+    return data;
+  } catch (err) {
+    console.error('API fetch error:', err);
+    return null;
+  }
 }
 
 async function apiPost(endpoint, data) {
@@ -388,7 +400,15 @@ async function apiPost(endpoint, data) {
 }
 
 async function loadWorkflows() {
+  console.log('Loading workflows...');
   workflows = await api('/workflows');
+  console.log('Workflows loaded:', workflows);
+
+  if (!workflows || !Array.isArray(workflows)) {
+    console.error('Failed to load workflows');
+    return;
+  }
+
   const sel = document.getElementById('workflow-select');
   const runSel = document.getElementById('run-workflow-select');
 
@@ -481,25 +501,60 @@ function renderCard(run) {
   const title = run.task.length > 80 ? run.task.slice(0, 77) + '...' : run.task;
   const time = run.updated_at ? new Date(run.updated_at).toLocaleDateString() : '';
   const isExpanded = expandedCard === run.id;
+  const artifactCount = run.artifact_count || 0;
+
+  console.log('renderCard:', run.id, 'expanded:', isExpanded, 'has steps:', !!run.steps, 'step count:', run.steps && run.steps.length, 'artifacts:', artifactCount);
 
   let detailsHTML = '';
   if (isExpanded && run.steps) {
-    const icons = { done: '✓', running: '●', pending: '○', failed: '✗' };
+    const icons = { done: '✓', completed: '✓', running: '●', pending: '○', failed: '✗' };
+    const stepsHTML = run.steps.map(s => {
+      const icon = icons[s.status] || '○';
+      const output = s.output || '';
+      const previewText = output.length > 150 ? output.substring(0, 150) + '...' : output;
+      const escapedPreview = previewText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const escapedError = s.error ? s.error.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+
+      let html = '<div class="step-item" style="flex-direction: column; align-items: flex-start;">';
+      html += '<div style="display: flex; align-items: center; gap: 10px; width: 100%;">';
+      html += '<div class="step-icon ' + s.status + '">' + icon + '</div>';
+      html += '<span class="step-name">' + s.step_id + '</span>';
+      html += '<span class="step-agent">' + (s.agent || '') + '</span>';
+      html += '<span class="badge badge-' + s.status + '">' + s.status + '</span>';
+      html += '</div>';
+      if (escapedPreview) {
+        html += '<div style="margin-left: 30px; margin-top: 8px; font-size: 11px; color: var(--text-muted); font-family: monospace; background: var(--bg); padding: 8px; border-radius: 4px; max-width: 100%; overflow: hidden; white-space: pre-wrap;">' + escapedPreview + '</div>';
+      }
+      if (escapedError) {
+        html += '<div style="color: var(--warning); font-size: 11px; margin-top: 4px;">⚠️ ' + escapedError + '</div>';
+      }
+      html += '</div>';
+      return html;
+    }).join('');
+
+    // Artifacts section
+    let artifactsHTML = '';
+    if (run.artifacts && run.artifacts.length > 0) {
+      artifactsHTML = `
+        <div style="margin-top: 16px; padding: 12px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="font-weight: 600; color: var(--text);">📦 Generated Files (${run.artifacts.length})</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            ${run.artifacts.map(f => `<span style="font-size: 11px; padding: 4px 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; font-family: monospace;">${f}</span>`).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     detailsHTML = `
       <div class="card-details">
-        <div class="step-list">
-          ${run.steps.map(s => `
-            <div class="step-item">
-              <div class="step-icon ${s.status}">${icons[s.status] || '○'}</div>
-              <span class="step-name">${s.step_id}</span>
-              <span class="step-agent">${s.agent_id || ''}</span>
-              <span class="badge badge-${s.status}">${s.status}</span>
-            </div>
-          `).join('')}
-        </div>
+        <div class="step-list">${stepsHTML}</div>
+        ${artifactsHTML}
         <div class="card-actions">
           ${status === 'failed' ? `<button onclick="resumeRun('${run.id}'); event.stopPropagation();">↺ Resume</button>` : ''}
-          <button onclick="viewLogs('${run.id}'); event.stopPropagation();">📋 Logs</button>
+          <button onclick="viewLogs('${run.id}'); event.stopPropagation();">📋 View Full Logs</button>
+          ${run.artifacts && run.artifacts.length > 0 ? `<button onclick="viewArtifacts('${run.id}'); event.stopPropagation();">📂 View Code</button>` : ''}
         </div>
       </div>
     `;
@@ -510,21 +565,31 @@ function renderCard(run) {
     <div class="card-meta">
       <span class="badge badge-${status}">${status}</span>
       <span>${time}</span>
+      ${artifactCount > 0 ? `<span style="font-size: 11px; color: var(--text-muted);">📦 ${artifactCount} files</span>` : ''}
     </div>
     ${detailsHTML}
   </div>`;
 }
 
 async function toggleCard(runId) {
+  console.log('toggleCard called:', runId);
   if (expandedCard === runId) {
+    console.log('Collapsing card');
     expandedCard = null;
   } else {
+    console.log('Expanding card, fetching details...');
     // Fetch full run details
     const run = await api(`/runs/${runId}`);
+    console.log('Run details:', run);
+    console.log('Run has steps:', run && run.steps, 'count:', run && run.steps && run.steps.length);
     const idx = runs.findIndex(r => r.id === runId);
-    if (idx >= 0) runs[idx] = run;
+    if (idx >= 0) {
+      console.log('Updating run in array at index:', idx);
+      runs[idx] = run;
+    }
     expandedCard = runId;
   }
+  console.log('Rendering board...');
   renderBoard();
 }
 
@@ -533,8 +598,182 @@ async function resumeRun(runId) {
   loadRuns();
 }
 
-function viewLogs(runId) {
-  alert('Logs feature coming soon! Run ID: ' + runId);
+async function viewLogs(runId) {
+  const run = await api(`/runs/${runId}`);
+  if (!run || !run.steps) {
+    alert('No logs available for this run');
+    return;
+  }
+
+  // Create logs modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  `;
+
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: var(--bg-card);
+    border-radius: 12px;
+    max-width: 900px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+  `;
+
+  let logsHtml = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2 style="color: var(--text); margin: 0;">Workflow Logs</h2>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="
+        background: transparent;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text);
+      ">&times;</button>
+    </div>
+    <div style="color: var(--text-muted); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+      <strong>Task:</strong> ${run.task}<br>
+      <strong>Status:</strong> <span class="badge badge-${run.status}">${run.status}</span><br>
+      <strong>Steps:</strong> ${run.current_step}/${run.total_steps}
+    </div>
+  `;
+
+  run.steps.forEach((step, idx) => {
+    const statusColor = {
+      'completed': 'var(--success)',
+      'failed': 'var(--warning)',
+      'running': 'var(--info)',
+      'pending': 'var(--text-muted)'
+    }[step.status] || 'var(--text-muted)';
+
+    const output = step.output || 'No output';
+    const outputPreview = output.length > 500 ? output.substring(0, 500) + '... (truncated)' : output;
+    const escapedOutput = outputPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escapedError = step.error ? step.error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+
+    logsHtml += '<div style="margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">';
+    logsHtml += '<div style="background: var(--bg); padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">';
+    logsHtml += '<div><strong style="color: ' + statusColor + ';">Step ' + (idx + 1) + ': ' + step.step_id + '</strong>';
+    logsHtml += '<span style="color: var(--text-muted); margin-left: 12px;">Agent: ' + step.agent + '</span></div>';
+    logsHtml += '<span class="badge badge-' + step.status + '">' + step.status + '</span>';
+    logsHtml += '</div>';
+    logsHtml += '<div style="padding: 16px;">';
+    logsHtml += '<pre style="background: var(--bg); padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.5; color: var(--text); margin: 0; max-height: 300px; overflow-y: auto;">' + escapedOutput + '</pre>';
+    if (escapedError) {
+      logsHtml += '<div style="background: var(--warning-bg); border-left: 3px solid var(--warning); padding: 12px; margin-top: 12px; border-radius: 4px; color: var(--warning);"><strong>Error:</strong> ' + escapedError + '</div>';
+    }
+    logsHtml += '</div></div>';
+  });
+
+  content.innerHTML = logsHtml;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  // Close on background click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+async function viewArtifacts(runId) {
+  const artifactsData = await api(`/runs/${runId}/artifacts`);
+
+  if (!artifactsData || !artifactsData.artifacts || artifactsData.artifacts.length === 0) {
+    alert('No artifacts available for this run');
+    return;
+  }
+
+  // Create artifacts modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  `;
+
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: var(--bg-card);
+    border-radius: 12px;
+    max-width: 900px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+  `;
+
+  let artifactsHtml = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2 style="color: var(--text); margin: 0;">Generated Code</h2>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="
+        background: transparent;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text);
+      ">&times;</button>
+    </div>
+    <div style="color: var(--text-muted); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+      <strong>Run ID:</strong> ${runId}<br>
+      <strong>Files:</strong> ${artifactsData.count}<br>
+      <strong>Location:</strong> <code style="font-size: 11px; background: var(--bg); padding: 2px 6px; border-radius: 3px;">${artifactsData.output_dir}</code>
+    </div>
+  `;
+
+  // Add file list and copy instructions
+  artifactsHtml += `
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: var(--text); margin: 0 0 12px 0;">Files Generated:</h3>
+      <div style="display: grid; gap: 8px;">
+  `;
+
+  artifactsData.artifacts.forEach((filename) => {
+    artifactsHtml += `
+      <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;">
+        <span style="font-family: monospace; font-size: 13px; color: var(--text);">${filename}</span>
+      </div>
+    `;
+  });
+
+  artifactsHtml += `
+      </div>
+    </div>
+    <div style="background: var(--info-bg); border-left: 3px solid var(--info); padding: 12px; border-radius: 4px; margin-top: 16px;">
+      <strong style="color: var(--info);">💡 How to use the code:</strong><br>
+      <code style="font-size: 12px; background: var(--bg); padding: 2px 6px; border-radius: 3px; margin-top: 8px; display: inline-block;">
+        cp -r ${artifactsData.output_dir}/* ./my-project/
+      </code>
+    </div>
+  `;
+
+  content.innerHTML = artifactsHtml;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  // Close on background click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 // New run form
@@ -621,13 +860,48 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             query = parse_qs(parsed.query)
             workflow_id = query.get('workflow', [None])[0]
             runs = self.state.list_runs(workflow_id=workflow_id)
-            self.send_json(runs)
+            self.send_json([r.to_dict() for r in runs])
+
+        elif path.startswith('/api/runs/') and path.endswith('/artifacts'):
+            # Get artifacts for a run
+            run_id = path.split('/')[-2]
+            from orchestration.artifact_manager import ArtifactManager
+            from pathlib import Path
+
+            artifact_manager = ArtifactManager()
+            artifacts = artifact_manager.list_artifacts(run_id)
+
+            if artifacts:
+                self.send_json({
+                    'run_id': run_id,
+                    'artifacts': artifacts,
+                    'count': len(artifacts),
+                    'output_dir': str(artifact_manager.get_run_dir(run_id))
+                })
+            else:
+                self.send_json({
+                    'run_id': run_id,
+                    'artifacts': [],
+                    'count': 0
+                })
 
         elif path.startswith('/api/runs/') and not path.endswith('/resume'):
             run_id = path.split('/')[-1]
             run = self.state.get_run(run_id)
             if run:
-                self.send_json(run)
+                # Get step results and include them
+                steps = self.state.get_step_results(run_id)
+                run_dict = run.to_dict()
+                run_dict['steps'] = [s.to_dict() for s in steps]
+
+                # Add artifact information
+                from orchestration.artifact_manager import ArtifactManager
+                artifact_manager = ArtifactManager()
+                artifacts = artifact_manager.list_artifacts(run_id)
+                run_dict['artifacts'] = artifacts
+                run_dict['artifact_count'] = len(artifacts)
+
+                self.send_json(run_dict)
             else:
                 self.send_error(404, 'Run not found')
 

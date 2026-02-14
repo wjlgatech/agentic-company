@@ -180,6 +180,10 @@ class LocalMemoryStore(MemoryStore):
         """Count total entries."""
         return len(self.entries)
 
+    def get_recent(self, limit: int = 10) -> list[MemoryEntry]:
+        """Get most recent memory entries (alias for list_all with limit)."""
+        return self.list_all(limit=limit, offset=0)
+
 
 class RedisMemoryStore(MemoryStore):
     """Redis-backed memory store."""

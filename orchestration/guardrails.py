@@ -43,6 +43,17 @@ class ContentFilter(BaseGuardrail):
 
     name = "content_filter"
 
+    # Common security patterns for sensitive data
+    COMMON_SECURITY_PATTERNS = [
+        r'sk-ant-[a-zA-Z0-9\-_]{40,}',  # Anthropic API keys
+        r'sk-[a-zA-Z0-9]{20,}',  # OpenAI API keys
+        r'xoxb-[a-zA-Z0-9\-]+',  # Slack bot tokens
+        r'ghp_[a-zA-Z0-9]{36,}',  # GitHub personal access tokens
+        r'AKIA[0-9A-Z]{16}',  # AWS access key IDs
+        r'[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}',  # Credit card numbers
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Email addresses (optional - may be too broad)
+    ]
+
     def __init__(
         self,
         blocked_topics: Optional[list[str]] = None,
@@ -55,6 +66,37 @@ class ContentFilter(BaseGuardrail):
             for p in (blocked_patterns or [])
         ]
         self.case_sensitive = case_sensitive
+
+    @classmethod
+    def with_security_patterns(
+        cls,
+        blocked_topics: Optional[list[str]] = None,
+        additional_patterns: Optional[list[str]] = None,
+        case_sensitive: bool = False,
+    ) -> "ContentFilter":
+        """Create a ContentFilter with common security patterns pre-configured.
+
+        Args:
+            blocked_topics: List of blocked topic keywords
+            additional_patterns: Additional regex patterns to block (added to security patterns)
+            case_sensitive: Whether pattern matching is case-sensitive
+
+        Returns:
+            ContentFilter with security patterns enabled
+
+        Example:
+            >>> filter = ContentFilter.with_security_patterns()
+            >>> result = filter.check("My key is sk-ant-api03-...")
+            >>> assert not result.passed  # API key blocked
+        """
+        patterns = cls.COMMON_SECURITY_PATTERNS.copy()
+        if additional_patterns:
+            patterns.extend(additional_patterns)
+        return cls(
+            blocked_topics=blocked_topics,
+            blocked_patterns=patterns,
+            case_sensitive=case_sensitive,
+        )
 
     def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
         """Check content for blocked topics and patterns."""

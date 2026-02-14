@@ -985,8 +985,19 @@ async function sendMessage() {
       updateConfidence(confidence, result.understanding.summary || '');
     }
 
-    // Check if ready to proceed
-    if (result.ready && result.state === 'complete') {
+    // Check if user is reviewing draft prompt
+    if (result.reviewing && result.draft_prompt) {
+      // Store draft for potential approval
+      window.guidedDraftPrompt = result.draft_prompt;
+
+      // Highlight that user should approve or request changes
+      input.placeholder = 'Approve or request changes...';
+      input.disabled = false;
+      document.getElementById('chat-send').disabled = false;
+      input.focus();
+    }
+    // Check if ready to proceed (user approved)
+    else if (result.ready && result.state === 'complete') {
       // Show workflow selector
       document.getElementById('workflow-selector').style.display = 'block';
 
@@ -997,7 +1008,8 @@ async function sendMessage() {
       input.disabled = true;
       document.getElementById('chat-send').style.display = 'none';
     } else {
-      // Re-enable input
+      // Re-enable input for continued conversation
+      input.placeholder = 'Type your response...';
       input.disabled = false;
       document.getElementById('chat-send').disabled = false;
       input.focus();
@@ -1347,7 +1359,7 @@ def start_dashboard(port=8080, open_browser=True):
                 result = await executor.execute(combined_prompt)
                 return result
 
-            refiner = SmartRefiner(llm_call=llm_call, max_questions=4)
+            refiner = SmartRefiner(llm_call=llm_call, max_questions=6, ready_threshold=0.85)
             print("✨ SmartRefiner enabled - Guided workflow creation available!")
         except Exception as e:
             print(f"⚠️  SmartRefiner initialization failed: {e}")

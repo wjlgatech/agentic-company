@@ -140,11 +140,17 @@ git clone https://github.com/wjlgatech/agentic-company.git
 cd agentic-company && bash setup.sh
 ```
 
-Or with `make` (auto-creates `.venv` if needed):
+**Or with `make`:**
 
 ```bash
 git clone https://github.com/wjlgatech/agentic-company.git
-cd agentic-company && make install && .venv/bin/agenticom install
+cd agentic-company
+
+# For users (production use)
+make install && .venv/bin/agenticom install
+
+# For developers (includes pytest, ruff, mypy, black)
+make dev
 ```
 
 `setup.sh` handles everything automatically:
@@ -171,14 +177,14 @@ export OPENAI_API_KEY=sk-...
 
 ```bash
 # See what a workflow will do without executing
-agenticom workflow run feature-dev -i "Add login button" --dry-run
+agenticom workflow run feature-dev "Add login button" --dry-run
 ```
 
 **3. Run a workflow**
 
 ```bash
 # Actually execute the workflow (requires LLM backend)
-agenticom workflow run feature-dev -i "Add a hello world function"
+agenticom workflow run feature-dev "Add a hello world function"
 ```
 
 **4. Open dashboard**

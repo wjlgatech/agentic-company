@@ -63,6 +63,7 @@ class AgentResult:
     error: Optional[str] = None
     duration_ms: float = 0
     tokens_used: int = 0
+    artifacts: list = field(default_factory=list)  # List of Artifact objects
     metadata: dict = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
 

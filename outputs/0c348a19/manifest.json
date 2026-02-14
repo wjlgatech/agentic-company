@@ -1,0 +1,51 @@
+{
+  "run_id": "0c348a19",
+  "artifacts": [
+    {
+      "type": "code",
+      "filename": "output_0.py",
+      "content": "# requirements.txt\npytest>=7.0.0\npytest-cov>=4.0.0\npytest-mock>=3.10.0",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 0,
+        "step_id": "implement",
+        "agent": "Developer"
+      },
+      "created_at": "2026-02-14T00:21:32.433158"
+    },
+    {
+      "type": "test",
+      "filename": "conftest.py",
+      "content": "# conftest.py\n\"\"\"\nTest configuration and fixtures for authentication system tests.\n\"\"\"\nimport pytest\nfrom typing import Dict, Any\nfrom unittest.mock import Mock\n\n@pytest.fixture\ndef mock_database():\n    \"\"\"Mock database connection for testing.\"\"\"\n    db = Mock()\n    db.get_user.return_value = None\n    db.create_user.return_value = True\n    db.update_user.return_value = True\n    return db\n\n@pytest.fixture\ndef valid_user_data() -> Dict[str, Any]:\n    \"\"\"Valid user data for testing.\"\"\"\n    return {\n        \"username\": \"testuser\",\n        \"email\": \"test@example.com\",\n        \"password\": \"SecurePass123!\"\n    }\n\n@pytest.fixture\ndef auth_service(mock_database):\n    \"\"\"Authentication service instance with mocked dependencies.\"\"\"\n    from auth_service import AuthenticationService\n    return AuthenticationService(database=mock_database)",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 1,
+        "step_id": "implement",
+        "agent": "Developer"
+      },
+      "created_at": "2026-02-14T00:21:32.433174"
+    },
+    {
+      "type": "code",
+      "filename": "auth_service.py",
+      "content": "# auth_service.py\n\"\"\"\nAuthentication service for user management.\n\"\"\"\nimport re\nimport hashlib\nfrom typing import Optional, Dict, Any, Tuple\nfrom dataclasses import dataclass\n\n@dataclass\nclass User:\n    \"\"\"User data model.\"\"\"\n    username: str\n    email: str\n    password_hash: str\n    is_active: bool = True\n\nclass AuthenticationError(Exception):\n    \"\"\"Custom exception for authentication errors.\"\"\"\n    pass\n\nclass AuthenticationService:\n    \"\"\"Service for handling user authentication operations.\"\"\"\n    \n    def __init__(self, database):\n        self.database = database\n        self.min_password_length = 8\n        self.email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$')\n    \n    def validate_email(self, email: str) -> bool:\n        \"\"\"Validate email format.\"\"\"\n        if not email or not isinstance(email, str):\n            return False\n        return bool(self.email_pattern.match(email))\n    \n    def validate_password(self, password: str) -> Tuple[bool, str]:\n        \"\"\"\n        Validate password strength.\n        \n        Returns:\n            Tuple of (is_valid, error_message)\n        \"\"\"\n        if not password or not isinstance(password, str):\n            return False, \"Password is required\"\n        \n        if len(password) < self.min_password_length:\n            return False, f\"Password must be at least {self.min_password_length} characters\"\n        \n        if not re.search(r'[A-Z]', password):\n            return False, \"Password must contain at least one uppercase letter\"\n        \n        if not re.search(r'[a-z]', password):\n            return False, \"Password must contain at least one lowercase letter\"\n        \n        if not re.search(r'\\d', password):\n            return False, \"Password must contain at least one digit\"\n        \n        if not re.search(r'[!@#$%^&*(),.?\":{}|<>]', password):\n            return False, \"Password must contain at least one special character\"\n        \n        return True, \"\"\n    \n    def hash_password(self, password: str) -> str:\n        \"\"\"Hash password using SHA-256.\"\"\"\n        return hashlib.sha256(password.encode()).hexdigest()\n    \n    def register_user(self, username: str, email: str, password: str) -> Dict[str, Any]:\n        \"\"\"\n        Register a new user.\n        \n        Args:\n            username: User's chosen username\n            email: User's email address\n            password: User's password\n            \n        Returns:\n            Dictionary with success status and message\n            \n        Raises:\n            AuthenticationError: If registration fails\n        \"\"\"\n        # Validate inputs\n        if not username or not isinstance(username, str) or len(username.strip()) < 3:\n            raise AuthenticationError(\"Username must be at least 3 characters long\")\n        \n        if not self.validate_email(email):\n            raise AuthenticationError(\"Invalid email format\")\n        \n        is_valid_password, password_error = self.validate_password(password)\n        if not is_valid_password:\n            raise AuthenticationError(password_error)\n        \n        # Check if user already exists\n        existing_user = self.database.get_user(username=username)\n        if existing_user:\n            raise AuthenticationError(\"Username already exists\")\n        \n        existing_email = self.database.get_user(email=email)\n        if existing_email:\n            raise AuthenticationError(\"Email already registered\")\n        \n        # Create user\n        password_hash = self.hash_password(password)\n        user = User(\n            username=username.strip(),\n            email=email.lower().strip(),\n            password_hash=password_hash\n        )\n        \n        success = self.database.create_user(user)\n        if not success:\n            raise AuthenticationError(\"Failed to create user\")\n        \n        return {\n            \"success\": True,\n            \"message\": \"User registered successfully\",\n            \"username\": user.username\n        }\n    \n    def authenticate_user(self, username: str, password: str) -> Optional[User]:\n        \"\"\"\n        Authenticate user credentials.\n        \n        Args:\n            username: Username or email\n            password: User's password\n            \n        Returns:\n            User object if authentication successful, None otherwise\n        \"\"\"\n        if not username or not password:\n            return None\n        \n        # Try to find user by username or email\n        user = self.database.get_user(username=username)\n        if not user:\n            user = self.database.get_user(email=username)\n        \n        if not user or not user.is_active:\n            return None\n        \n        # Verify password\n        password_hash = self.hash_password(password)\n        if password_hash != user.password_hash:\n            return None\n        \n        return user",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 2,
+        "step_id": "implement",
+        "agent": "Developer"
+      },
+      "created_at": "2026-02-14T00:21:32.433221"
+    }
+  ],
+  "created_at": "2026-02-14T00:21:32.433134",
+  "metadata": {},
+  "stats": {
+    "count": 3,
+    "total_size_bytes": 5767,
+    "total_lines": 182
+  }
+}

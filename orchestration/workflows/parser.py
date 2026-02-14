@@ -41,6 +41,8 @@ class StepDefinition:
     max_retries: int = 3
     timeout_seconds: int = 300
     on_fail: str = "retry"
+    execute: Optional[str] = None  # Command to execute after step
+    artifacts_required: bool = False  # Require artifacts to be created
 
 
 @dataclass
@@ -327,6 +329,8 @@ class WorkflowParser:
                 max_retries=step_def.max_retries,
                 timeout_seconds=step_def.timeout_seconds,
                 on_fail=step_def.on_fail,
+                execute=step_def.execute,
+                artifacts_required=step_def.artifacts_required,
             )
             team.add_step(step)
 

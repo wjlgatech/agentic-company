@@ -119,10 +119,14 @@ steps:
       Implement all tasks according to the plan.
       Follow the acceptance criteria exactly.
 
+      IMPORTANT: Include filename comments in your code blocks.
+      For example: # auth_service.py at the top of the file.
+
       IMPORTANT: You MUST end your response with exactly this line:
       STATUS: done
     expects: "STATUS: done"
     retry: 3
+    artifacts_required: true  # Require code artifacts to be generated
 
   - id: verify
     agent: verifier
@@ -150,12 +154,15 @@ steps:
       {{step_outputs.implement}}
 
       Create comprehensive tests for this implementation.
+      Include filename comments for test files.
       All tests must pass.
 
       IMPORTANT: You MUST end your response with exactly this line:
       STATUS: done
     expects: "STATUS: done"
     retry: 2
+    artifacts_required: true  # Require test files to be generated
+    execute: "python -m pytest -v"  # Auto-run tests after generation
 
   - id: review
     agent: reviewer

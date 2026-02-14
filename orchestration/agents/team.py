@@ -20,6 +20,9 @@ from orchestration.agents.base import (
     AgentResult,
     VerificationResult,
 )
+from orchestration.artifact_manager import ArtifactManager
+from orchestration.artifacts import ArtifactCollection
+from orchestration.executor import SafeExecutor, ExecutionResult
 
 
 class StepStatus(Enum):
@@ -46,6 +49,8 @@ class WorkflowStep:
     max_retries: int = 3
     timeout_seconds: int = 300
     on_fail: str = "retry"  # retry, skip, escalate, abort
+    execute: Optional[str] = None  # Command to execute after step completes
+    artifacts_required: bool = False  # Require artifacts to be created
     metadata: dict = field(default_factory=dict)
 
 
@@ -106,6 +111,10 @@ class AgentTeam:
         self.steps: list[WorkflowStep] = []
         self._running = False
         self._observers: list[Callable[[StepResult], Awaitable[None]]] = []
+        self.artifact_manager = ArtifactManager()
+        self.safe_executor = SafeExecutor(
+            approval_callback=config.approval_handler if hasattr(config, 'approval_handler') else None
+        )
 
     def add_agent(self, agent: Agent) -> 'AgentTeam':
         """Add an agent to the team"""
@@ -150,7 +159,7 @@ class AgentTeam:
 
                 # Execute step with retries
                 step_result = await self._execute_step(
-                    step, agent, task, outputs, context or {}
+                    step, agent, task, outputs, context or {}, workflow_id
                 )
                 step_results.append(step_result)
 
@@ -240,7 +249,8 @@ class AgentTeam:
         agent: Agent,
         task: str,
         outputs: dict[str, Any],
-        context: dict
+        context: dict,
+        workflow_id: str
     ) -> StepResult:
         """Execute a single step with retries and verification"""
         started_at = datetime.utcnow()
@@ -322,6 +332,50 @@ class AgentTeam:
                         started_at=started_at,
                         completed_at=datetime.utcnow()
                     )
+
+            # Extract and save artifacts
+            artifacts = self.artifact_manager.extract_artifacts_from_text(
+                agent_result.output,
+                run_id=workflow_id
+            )
+
+            # Add artifacts to agent result
+            agent_result.artifacts = artifacts
+
+            # Save artifacts to disk
+            if artifacts:
+                collection = ArtifactCollection(run_id=workflow_id, artifacts=artifacts)
+                output_dir = self.artifact_manager.save_collection(collection)
+                agent_result.metadata['artifact_dir'] = str(output_dir)
+                agent_result.metadata['artifact_count'] = len(artifacts)
+
+            # Check if artifacts are required
+            if step.artifacts_required and not artifacts:
+                return StepResult(
+                    step=step,
+                    agent_result=agent_result,
+                    verification=verification,
+                    status=StepStatus.FAILED,
+                    retries=retries,
+                    started_at=started_at,
+                    completed_at=datetime.utcnow()
+                )
+
+            # Execute command if specified
+            execution_result = None
+            if step.execute and artifacts:
+                try:
+                    # Run in the output directory where artifacts are saved
+                    output_dir = self.artifact_manager.get_run_dir(workflow_id)
+                    execution_result = await self.safe_executor.execute(
+                        step.execute,
+                        cwd=output_dir
+                    )
+                    agent_result.metadata['execution'] = execution_result.to_dict()
+                except Exception as e:
+                    # Execution failure doesn't necessarily fail the step
+                    # (depends on use case - could make configurable)
+                    agent_result.metadata['execution_error'] = str(e)
 
             # Success!
             return StepResult(

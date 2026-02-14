@@ -1,0 +1,56 @@
+{
+  "run_id": "c30db624",
+  "artifacts": [
+    {
+      "type": "code",
+      "filename": "output_0.py",
+      "content": "MAX_SAFE_INTEGER = 2**53 - 1  # JavaScript-like safe integer limit\nif abs(minuend) > MAX_SAFE_INTEGER or abs(subtrahend) > MAX_SAFE_INTEGER:\n    raise ValueError(\"Input values exceed safe computation limits\")",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 0
+      },
+      "created_at": "2026-02-14T01:15:28.515986"
+    },
+    {
+      "type": "code",
+      "filename": "output_1.py",
+      "content": "if math.isinf(minuend) and math.isinf(subtrahend) and minuend == subtrahend:\n    raise ValueError(\"Cannot subtract infinity from infinity (indeterminate result)\")",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 1
+      },
+      "created_at": "2026-02-14T01:15:28.515995"
+    },
+    {
+      "type": "code",
+      "filename": "output_2.py",
+      "content": "Warning:\n    Floating-point arithmetic may introduce precision errors. For financial\n    calculations requiring exact decimal precision, consider using the\n    decimal module instead.",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 2
+      },
+      "created_at": "2026-02-14T01:15:28.516001"
+    },
+    {
+      "type": "code",
+      "filename": "output_3.py",
+      "content": "# Required additions:\ndef subtract(minuend: Union[int, float], subtrahend: Union[int, float], \n            precision_mode: str = 'default') -> Union[int, float]:\n    \"\"\"Add precision_mode parameter for different use cases\"\"\"\n    \n    # Add input sanitization\n    if not (-MAX_SAFE_INTEGER <= minuend <= MAX_SAFE_INTEGER):\n        raise ValueError(f\"Minuend {minuend} exceeds safe limits\")\n        \n    # Add precision handling\n    if precision_mode == 'decimal':\n        from decimal import Decimal\n        return float(Decimal(str(minuend)) - Decimal(str(subtrahend)))",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 3
+      },
+      "created_at": "2026-02-14T01:15:28.516011"
+    }
+  ],
+  "created_at": "2026-02-14T01:15:28.516025",
+  "metadata": {},
+  "stats": {
+    "count": 4,
+    "total_size_bytes": 1122,
+    "total_lines": 22
+  }
+}

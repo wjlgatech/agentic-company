@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Agenticom is a Python framework for orchestrating multi-agent AI teams. Agents (planner, developer, verifier, tester, reviewer) collaborate through YAML-defined workflows with production safety features: guardrails, memory, approval gates, and observability. Inspired by Antfarm but adds MCP integration for real tool execution.
 
+**9 Bundled Workflows**: 2 core (feature-dev, marketing-campaign) + 7 enterprise (due-diligence, compliance-audit, patent-landscape, security-assessment, churn-analysis, grant-proposal, incident-postmortem).
+
 ## Common Commands
 
 ```bash
@@ -28,6 +30,10 @@ make serve                # uvicorn on port 8000 with reload
 # CLI
 agenticom workflow list
 agenticom workflow run <id> "<task description>"
+agenticom workflow inspect <id>            # Show step inputs/outputs
+agenticom workflow status <run-id>
+agenticom workflow resume <run-id>
+agenticom dashboard                        # Open web UI
 ```
 
 ## Architecture
@@ -53,7 +59,7 @@ agenticom workflow run <id> "<task description>"
 | `agents/` | Base agent, specialized agents (Planner/Developer/Verifier/Tester/Reviewer), AgentTeam orchestration, TeamBuilder fluent API |
 | `workflows/` | YAML parser, template substitution engine |
 | `integrations/` | LLM backends: OpenClaw, Nanobot, Ollama + `auto_setup_executor()` |
-| `tools/` | MCP bridge, tool registry, intent refiner (PIR), prompt engineer |
+| `tools/` | MCP bridge, tool registry, PromptEngineer, IntentRefiner (PIR), ConversationalRefiner, SmartRefiner (multi-turn interview → coherent prompt synthesis), HybridRefiner |
 | `guardrails.py` | Composable pipeline: content filter, PII detection, rate limiting |
 | `memory.py` | Local/Redis/PostgreSQL memory backends |
 | `approval.py` | Auto/Human/Hybrid approval gates |
@@ -105,3 +111,44 @@ Three CLI entry points defined in `pyproject.toml`:
 - `agentic` → `orchestration.cli:main`
 - `agenticom` → `agenticom.cli:main`
 - `agenticom-launch` → `orchestration.launcher:main`
+
+## Demo & Examples
+
+- **`demo/`** — SmartChatbox: Real LLM-powered multi-turn interview demo with Claude API integration (`demo/server.py` + `demo/index.html`)
+- **`examples/`** — Code examples for using the framework
+- **`experiments/`** — Research/evaluation scripts (not for production use)
+
+## Debugging Web Applications
+
+**IMPORTANT:** When implementing or debugging web features (dashboard, frontend, etc.):
+
+1. **Always check the browser console first**
+   - Press `F12` (or `Cmd+Option+I` on Mac)
+   - Look for JavaScript errors (red messages)
+   - Check Network tab for API failures
+   - Example: "Uncaught SyntaxError" indicates a JavaScript syntax error
+
+2. **Common issues:**
+   - Nested template literals cause syntax errors → Use string concatenation instead
+   - Unescaped quotes in dynamic content → Always escape with `.replace(/"/g, '&quot;')`
+   - API returning data but UI empty → JavaScript error preventing execution
+   - CORS errors → Check server headers
+
+3. **Debugging workflow:**
+   ```javascript
+   // Add console.log to trace execution
+   console.log('Loading data...', data);
+
+   // Add error handling
+   try {
+     await someOperation();
+   } catch (err) {
+     console.error('Operation failed:', err);
+   }
+   ```
+
+4. **Test API endpoints independently:**
+   ```bash
+   curl http://localhost:3000/api/workflows
+   curl http://localhost:3000/api/runs
+   ```

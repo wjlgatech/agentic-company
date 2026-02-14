@@ -43,16 +43,25 @@ Based on this conversation, respond with a JSON object containing:
 INTERVIEWING PRINCIPLES:
 1. Ask ONE question at a time (not a list)
 2. Make questions conversational, not interrogative
-3. Only ask what's truly necessary - respect their time
-4. If you have 70%+ confidence and no critical gaps, you're ready
+3. Be thorough but efficient - gather what truly matters
+4. If you have 85%+ confidence AND no critical gaps AND have asked at least 3 questions, you're ready
 5. Build on what they've said, don't ask for things they already told you
-6. Max 3-4 questions total - then proceed with what you have
+6. Max 5-6 questions total - then proceed with what you have
+
+CRITICAL INFORMATION CHECKLIST (must have before proceeding):
+- Core objective: What exactly do they want to accomplish?
+- Scope/Scale: How big/complex is this task?
+- Context: What's the domain, audience, or use case?
+- Constraints: Any must-haves, must-nots, deadlines, or limitations?
+- Success criteria: How will they know if it worked?
 
 QUESTION PRIORITY:
 1. What's the core outcome they need? (if unclear)
-2. Who is the audience/user? (if it affects the response)
-3. Any constraints that would change the approach?
-4. Specific context that would make your help more relevant?
+2. What's the scope and scale of this work?
+3. Who is the audience/user? (if it affects the response)
+4. Any constraints that would change the approach?
+5. What does success look like for them?
+6. Specific context that would make your help more relevant?
 
 Be warm, professional, and efficient. Get to helping them quickly.
 Return valid JSON only."""
@@ -125,6 +134,7 @@ Return ONLY the response text."""
 class ConversationState(Enum):
     INTERVIEWING = "interviewing"
     READY = "ready"
+    REVIEWING = "reviewing"  # User reviewing draft prompt
     COMPLETE = "complete"
 
 
@@ -211,12 +221,17 @@ class SmartRefiner:
         # Add user turn
         session.turns.append(ConversationTurn(role="user", content=user_input))
 
-        # Check for acceptance if we're ready
-        if session.state == ConversationState.READY:
+        # Check for user response if we're reviewing draft prompt
+        if session.state == ConversationState.REVIEWING:
             if self._is_acceptance(user_input.lower()):
+                # User approved the draft - finalize
                 return await self._finalize(session)
-            elif self._is_refinement(user_input.lower()):
-                # User wants to add more context
+            elif self._is_refinement(user_input.lower()) or "change" in user_input.lower() or "add" in user_input.lower():
+                # User wants modifications - go back to interviewing
+                session.state = ConversationState.INTERVIEWING
+                # Continue with normal interview flow to gather more info
+            else:
+                # User might be giving specific feedback - process it
                 session.state = ConversationState.INTERVIEWING
 
         # Interview phase
@@ -241,26 +256,46 @@ class SmartRefiner:
             next_action = "ready_to_proceed"
 
         if next_action == "ready_to_proceed" or confidence >= self.ready_threshold:
-            session.state = ConversationState.READY
-            response = await self._generate_ready_response(session, analysis)
+            # Generate draft prompt and show to user for approval
+            session.state = ConversationState.REVIEWING
+            draft_result = await self._generate_draft_for_review(session)
+            response = draft_result["response"]
+
+            # Add assistant turn
+            session.turns.append(ConversationTurn(role="assistant", content=response))
+
+            return {
+                "response": response,
+                "state": session.state.value,
+                "understanding": {
+                    "summary": session.understanding.summary,
+                    "confidence": session.understanding.confidence,
+                    "key_points": session.understanding.key_points,
+                },
+                "ready": False,  # Not ready until user approves
+                "reviewing": True,  # User is reviewing draft
+                "draft_prompt": draft_result.get("draft_prompt", ""),
+                "questions_asked": session.questions_asked,
+            }
         else:
             session.questions_asked += 1
             response = await self._generate_question_response(session, analysis)
 
-        # Add assistant turn
-        session.turns.append(ConversationTurn(role="assistant", content=response))
+            # Add assistant turn
+            session.turns.append(ConversationTurn(role="assistant", content=response))
 
-        return {
-            "response": response,
-            "state": session.state.value,
-            "understanding": {
-                "summary": session.understanding.summary,
-                "confidence": session.understanding.confidence,
-                "key_points": session.understanding.key_points,
-            },
-            "ready": session.state == ConversationState.READY,
-            "questions_asked": session.questions_asked,
-        }
+            return {
+                "response": response,
+                "state": session.state.value,
+                "understanding": {
+                    "summary": session.understanding.summary,
+                    "confidence": session.understanding.confidence,
+                    "key_points": session.understanding.key_points,
+                },
+                "ready": False,
+                "reviewing": False,
+                "questions_asked": session.questions_asked,
+            }
 
     async def _analyze_conversation(self, session: Session, latest_input: str) -> Dict:
         """Use LLM to analyze the conversation and decide next steps."""
@@ -353,11 +388,11 @@ class SmartRefiner:
 
         return response.strip()
 
-    async def _finalize(self, session: Session) -> Dict[str, Any]:
-        """Synthesize the final prompt from the conversation."""
-
-        session.state = ConversationState.COMPLETE
-
+    async def _generate_draft_for_review(self, session: Session) -> Dict[str, Any]:
+        """
+        Generate a DRAFT prompt and present it to user for approval.
+        User must explicitly approve before finalization.
+        """
         # Build conversation summary for the synthesizer
         conversation_summary = "\n".join([
             f"{t.role.upper()}: {t.content}"
@@ -367,7 +402,7 @@ class SmartRefiner:
         # Extract key information
         understanding = session.understanding
 
-        # Synthesize the prompt using LLM
+        # Synthesize the DRAFT prompt using LLM
         synthesis_prompt = SYNTHESIZER_PROMPT.format(
             conversation_summary=conversation_summary,
             what_they_want=understanding.summary,
@@ -378,18 +413,42 @@ class SmartRefiner:
             success_criteria="Addresses the user's stated needs comprehensively"
         )
 
-        final_prompt = await self.llm_call(
+        draft_prompt = await self.llm_call(
             "You are a world-class prompt engineer. Write an excellent, coherent system prompt.",
             synthesis_prompt
         )
 
-        session.final_prompt = final_prompt.strip()
+        # Store draft in session
+        session.final_prompt = draft_prompt.strip()
+
+        # Create response asking for approval
+        response = f"""Based on our conversation, I've created a draft prompt for you. Please review it:
+
+---
+{draft_prompt.strip()}
+---
+
+Does this capture what you need? You can:
+• Say "yes" or "approve" to use this prompt
+• Tell me what to change or add if you want modifications
+• Continue asking questions if you need more refinement"""
 
         return {
-            "response": "Perfect! I've created your prompt. Here it is:",
+            "response": response,
+            "draft_prompt": draft_prompt.strip()
+        }
+
+    async def _finalize(self, session: Session) -> Dict[str, Any]:
+        """Finalize and return the approved prompt."""
+
+        session.state = ConversationState.COMPLETE
+        understanding = session.understanding
+
+        return {
+            "response": "Perfect! Your prompt is ready to use. I'll pass it to the workflow system now.",
             "state": "complete",
             "ready": True,
-            "final_prompt": session.final_prompt,
+            "final_prompt": session.final_prompt,  # Already generated in draft stage
             "understanding": {
                 "summary": understanding.summary,
                 "confidence": understanding.confidence,

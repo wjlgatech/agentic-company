@@ -35,6 +35,21 @@ class WorkflowRun:
     updated_at: str
     error: Optional[str] = None
 
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "workflow_id": self.workflow_id,
+            "task": self.task,
+            "status": self.status.value if isinstance(self.status, StepStatus) else self.status,
+            "current_step": self.current_step,
+            "total_steps": self.total_steps,
+            "context": self.context,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "error": self.error
+        }
+
 
 @dataclass
 class StepResult:
@@ -48,6 +63,20 @@ class StepResult:
     started_at: str
     completed_at: Optional[str] = None
     error: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "run_id": self.run_id,
+            "step_id": self.step_id,
+            "agent": self.agent,
+            "status": self.status.value if isinstance(self.status, StepStatus) else self.status,
+            "input_context": self.input_context,
+            "output": self.output,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "error": self.error
+        }
 
 
 class StateManager:

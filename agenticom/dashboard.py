@@ -489,6 +489,7 @@ let workflows = [];
 let runs = [];
 let currentWf = null;
 let expandedCard = null;
+let autoRefreshInterval = null;
 
 async function api(endpoint) {
   try {
@@ -575,26 +576,62 @@ function getSteps() {
 }
 
 function getActiveStep(run) {
+  // Use current_stage from run if available (more reliable)
+  if (run.current_stage) {
+    return run.current_stage.toLowerCase();
+  }
+
+  // Fallback: infer from steps
   if (!run.steps || !run.steps.length) return 'plan';
   const active = run.steps.find(s => s.status !== 'done' && s.status !== 'skipped');
-  return active ? active.step_id : run.steps[run.steps.length - 1].step_id;
+
+  if (active) {
+    return active.step_id;
+  }
+
+  // For completed workflows, use the last completed stage
+  if (run.stages) {
+    const stageOrder = ['review', 'test', 'verify', 'implement', 'plan'];
+    for (const stageName of stageOrder) {
+      if (run.stages[stageName] && run.stages[stageName].completed_at) {
+        return stageName;
+      }
+    }
+  }
+
+  return run.steps[run.steps.length - 1].step_id;
 }
 
 function renderBoard() {
   const board = document.getElementById('board');
   const steps = getSteps();
 
-  // Group runs by their active step
+  // Group runs by their active stage (not step ID)
   const columns = {};
   steps.forEach(s => { columns[s.id] = []; });
 
   runs.forEach(run => {
-    const stepId = getActiveStep(run);
-    if (columns[stepId]) {
-      columns[stepId].push(run);
-    } else {
-      columns[steps[steps.length - 1].id].push(run);
+    let stageId = getActiveStep(run);
+
+    // Map step IDs to stage names for non-standard workflows
+    if (!columns[stageId]) {
+      // Try to find which stage this step belongs to by checking run.stages
+      if (run.stages) {
+        for (const [stageName, stageInfo] of Object.entries(run.stages)) {
+          if (stageInfo.started_at && !stageInfo.completed_at) {
+            stageId = stageName.toLowerCase();
+            break;
+          }
+        }
+      }
+
+      // If still not found, default to last column
+      if (!columns[stageId]) {
+        stageId = steps[steps.length - 1].id;
+      }
     }
+
+    columns[stageId].push(run);
   });
 
   board.innerHTML = steps.map(step => {
@@ -765,8 +802,12 @@ async function toggleCard(runId) {
   if (expandedCard === runId) {
     console.log('Collapsing card');
     expandedCard = null;
+    // Resume auto-refresh when card is collapsed
+    startAutoRefresh();
   } else {
     console.log('Expanding card, fetching details...');
+    // Stop auto-refresh when card is expanded (so user can read without interruption)
+    stopAutoRefresh();
     // Fetch full run details
     const run = await api(`/runs/${runId}`);
     console.log('Run details:', run);
@@ -785,6 +826,159 @@ async function toggleCard(runId) {
 async function resumeRun(runId) {
   await apiPost(`/runs/${runId}/resume`, {});
   loadRuns();
+}
+
+// Parse content into collapsible tree structure
+function parseContentTree(text) {
+  const lines = text.split('\\n');
+  const tree = [];
+  let currentH2 = null;
+  let currentH3 = null;
+  let currentList = null;
+  let currentParagraph = [];
+
+  const flushParagraph = () => {
+    if (currentParagraph.length > 0) {
+      const target = currentList || currentH3 || currentH2 || tree;
+      target.push({ type: 'paragraph', text: currentParagraph.join('\\n') });
+      currentParagraph = [];
+    }
+  };
+
+  lines.forEach(line => {
+    // H2 headers (## )
+    if (line.match(/^##\\s+/)) {
+      flushParagraph();
+      currentList = null;
+      currentH3 = null;
+      currentH2 = { type: 'h2', title: line.replace(/^##\\s+/, ''), children: [], collapsed: true };
+      tree.push(currentH2);
+    }
+    // H3 headers (### )
+    else if (line.match(/^###\\s+/)) {
+      flushParagraph();
+      currentList = null;
+      currentH3 = { type: 'h3', title: line.replace(/^###\\s+/, ''), children: [], collapsed: true };
+      if (currentH2) {
+        currentH2.children.push(currentH3);
+      } else {
+        tree.push(currentH3);
+      }
+    }
+    // Numbered list (1. 2. etc)
+    else if (line.match(/^\\d+\\.\\s+\\*\\*/)) {
+      flushParagraph();
+      const match = line.match(/^\\d+\\.\\s+\\*\\*([^*]+)\\*\\*(.*)/);
+      if (match) {
+        currentList = { type: 'list-item', title: match[1].trim(), content: match[2].trim(), collapsed: true };
+        const target = currentH3 || currentH2 || tree;
+        target.children.push(currentList);
+      }
+    }
+    // Bullet list (- )
+    else if (line.match(/^-\\s+/)) {
+      flushParagraph();
+      const target = currentList || currentH3 || currentH2 || tree;
+      target.children = target.children || [];
+      target.children.push({ type: 'bullet', text: line.replace(/^-\\s+/, '') });
+    }
+    // STATUS lines
+    else if (line.match(/^STATUS:/i)) {
+      flushParagraph();
+      const target = currentH3 || currentH2 || tree;
+      target.children = target.children || [];
+      target.children.push({ type: 'status', text: line });
+    }
+    // Empty line
+    else if (line.trim() === '') {
+      flushParagraph();
+    }
+    // Regular text
+    else if (line.trim()) {
+      currentParagraph.push(line);
+    }
+  });
+
+  flushParagraph();
+  return tree;
+}
+
+// Render collapsible tree node
+function renderTreeNode(node, depth = 0, nodeId = '') {
+  const indent = depth * 16;
+  let html = '';
+
+  if (node.type === 'h2') {
+    const id = 'node-' + nodeId + '-' + Math.random().toString(36).substr(2, 9);
+    html += `<div class="tree-node" style="margin-left: ${indent}px; margin-bottom: 8px;">`;
+    html += `<div class="tree-header" onclick="toggleTreeNode('${id}')" style="display: flex; align-items: center; cursor: pointer; padding: 8px; background: var(--bg); border-radius: 6px; border-left: 3px solid var(--accent); user-select: none;">`;
+    html += `<span id="${id}-icon" class="tree-icon" style="margin-right: 8px; font-family: monospace; color: var(--accent); font-weight: bold;">▶</span>`;
+    html += `<span style="color: var(--accent); font-weight: 600; font-size: 14px;">&lt;section&gt;</span>`;
+    html += `<span style="color: var(--text); font-weight: 600; margin-left: 8px;">${node.title}</span>`;
+    html += `</div>`;
+    html += `<div id="${id}-content" class="tree-content" style="display: none; margin-top: 4px;">`;
+    (node.children || []).forEach((child, i) => {
+      html += renderTreeNode(child, depth + 1, id + '-' + i);
+    });
+    html += `<div style="margin-left: ${(depth + 1) * 16}px; color: var(--text-muted); font-size: 12px; padding: 4px; font-family: monospace;">&lt;/section&gt;</div>`;
+    html += `</div></div>`;
+  }
+  else if (node.type === 'h3') {
+    const id = 'node-' + nodeId + '-' + Math.random().toString(36).substr(2, 9);
+    html += `<div class="tree-node" style="margin-left: ${indent}px; margin-bottom: 6px;">`;
+    html += `<div class="tree-header" onclick="toggleTreeNode('${id}')" style="display: flex; align-items: center; cursor: pointer; padding: 6px; background: var(--bg); border-radius: 4px; border-left: 2px solid var(--info); user-select: none;">`;
+    html += `<span id="${id}-icon" class="tree-icon" style="margin-right: 8px; font-family: monospace; color: var(--info);">▶</span>`;
+    html += `<span style="color: var(--info); font-weight: 500; font-size: 13px;">&lt;subsection&gt;</span>`;
+    html += `<span style="color: var(--text); font-weight: 500; margin-left: 8px; font-size: 13px;">${node.title}</span>`;
+    html += `</div>`;
+    html += `<div id="${id}-content" class="tree-content" style="display: none; margin-top: 4px;">`;
+    (node.children || []).forEach((child, i) => {
+      html += renderTreeNode(child, depth + 1, id + '-' + i);
+    });
+    html += `<div style="margin-left: ${(depth + 1) * 16}px; color: var(--text-muted); font-size: 11px; padding: 2px; font-family: monospace;">&lt;/subsection&gt;</div>`;
+    html += `</div></div>`;
+  }
+  else if (node.type === 'list-item') {
+    const id = 'node-' + nodeId + '-' + Math.random().toString(36).substr(2, 9);
+    html += `<div class="tree-node" style="margin-left: ${indent}px; margin-bottom: 4px;">`;
+    html += `<div class="tree-header" onclick="toggleTreeNode('${id}')" style="display: flex; align-items: center; cursor: pointer; padding: 6px; background: var(--bg-card); border-radius: 4px; border-left: 2px solid var(--success); user-select: none;">`;
+    html += `<span id="${id}-icon" class="tree-icon" style="margin-right: 8px; font-family: monospace; color: var(--success);">▶</span>`;
+    html += `<span style="color: var(--success); font-size: 12px;">&lt;task&gt;</span>`;
+    html += `<span style="color: var(--text); margin-left: 8px; font-size: 12px;">${node.title}</span>`;
+    html += `</div>`;
+    html += `<div id="${id}-content" class="tree-content" style="display: none; margin-top: 4px; margin-left: ${(depth + 1) * 16}px; padding: 8px; background: var(--bg); border-radius: 4px; font-size: 12px; color: var(--text); line-height: 1.6;">`;
+    html += node.content;
+    (node.children || []).forEach((child, i) => {
+      html += renderTreeNode(child, 0, id + '-' + i);
+    });
+    html += `<div style="color: var(--text-muted); font-size: 11px; padding: 2px; font-family: monospace; margin-top: 4px;">&lt;/task&gt;</div>`;
+    html += `</div></div>`;
+  }
+  else if (node.type === 'bullet') {
+    html += `<div style="margin-left: ${indent}px; padding: 4px; font-size: 12px; color: var(--text); line-height: 1.5;">`;
+    html += `<span style="color: var(--accent); margin-right: 6px;">•</span>${node.text}`;
+    html += `</div>`;
+  }
+  else if (node.type === 'paragraph') {
+    html += `<div style="margin-left: ${indent}px; padding: 6px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap;">${node.text}</div>`;
+  }
+  else if (node.type === 'status') {
+    html += `<div style="margin-left: ${indent}px; padding: 8px; font-size: 13px; color: var(--success); font-weight: 600; background: var(--success-bg); border-radius: 4px; margin-top: 8px;">${node.text}</div>`;
+  }
+
+  return html;
+}
+
+function toggleTreeNode(nodeId) {
+  const icon = document.getElementById(nodeId + '-icon');
+  const content = document.getElementById(nodeId + '-content');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    icon.textContent = '▼';
+  } else {
+    content.style.display = 'none';
+    icon.textContent = '▶';
+  }
 }
 
 async function viewLogs(runId) {
@@ -814,8 +1008,9 @@ async function viewLogs(runId) {
   content.style.cssText = `
     background: var(--bg-card);
     border-radius: 12px;
-    max-width: 900px;
-    max-height: 80vh;
+    max-width: 1000px;
+    width: 100%;
+    max-height: 85vh;
     overflow-y: auto;
     padding: 24px;
     box-shadow: var(--shadow-lg);
@@ -823,14 +1018,36 @@ async function viewLogs(runId) {
 
   let logsHtml = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <h2 style="color: var(--text); margin: 0;">Workflow Logs</h2>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="
-        background: transparent;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        color: var(--text);
-      ">&times;</button>
+      <h2 style="color: var(--text); margin: 0;">📋 Workflow Logs</h2>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button onclick="expandAllNodes()" style="
+          background: var(--accent);
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+        ">Expand All</button>
+        <button onclick="collapseAllNodes()" style="
+          background: var(--bg);
+          color: var(--text);
+          border: 1px solid var(--border);
+          padding: 6px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+        ">Collapse All</button>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="
+          background: transparent;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: var(--text);
+        ">&times;</button>
+      </div>
     </div>
     <div style="color: var(--text-muted); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
       <strong>Task:</strong> ${run.task}<br>
@@ -842,14 +1059,13 @@ async function viewLogs(runId) {
   run.steps.forEach((step, idx) => {
     const statusColor = {
       'completed': 'var(--success)',
+      'done': 'var(--success)',
       'failed': 'var(--warning)',
       'running': 'var(--info)',
       'pending': 'var(--text-muted)'
     }[step.status] || 'var(--text-muted)';
 
     const output = step.output || 'No output';
-    const outputPreview = output.length > 500 ? output.substring(0, 500) + '... (truncated)' : output;
-    const escapedOutput = outputPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const escapedError = step.error ? step.error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
 
     logsHtml += '<div style="margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">';
@@ -859,7 +1075,21 @@ async function viewLogs(runId) {
     logsHtml += '<span class="badge badge-' + step.status + '">' + step.status + '</span>';
     logsHtml += '</div>';
     logsHtml += '<div style="padding: 16px;">';
-    logsHtml += '<pre style="background: var(--bg); padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.5; color: var(--text); margin: 0; max-height: 300px; overflow-y: auto;">' + escapedOutput + '</pre>';
+
+    // Parse and render tree structure
+    const tree = parseContentTree(output);
+    if (tree.length > 0) {
+      logsHtml += '<div class="content-tree" style="background: var(--bg-card); font-family: monospace;">';
+      tree.forEach((node, i) => {
+        logsHtml += renderTreeNode(node, 0, `step-${idx}-${i}`);
+      });
+      logsHtml += '</div>';
+    } else {
+      // Fallback for non-structured content
+      const escapedOutput = output.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      logsHtml += '<pre style="background: var(--bg); padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.5; color: var(--text); margin: 0;">' + escapedOutput + '</pre>';
+    }
+
     if (escapedError) {
       logsHtml += '<div style="background: var(--warning-bg); border-left: 3px solid var(--warning); padding: 12px; margin-top: 12px; border-radius: 4px; color: var(--warning);"><strong>Error:</strong> ' + escapedError + '</div>';
     }
@@ -874,6 +1104,17 @@ async function viewLogs(runId) {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.remove();
   });
+}
+
+// Expand/collapse all nodes
+function expandAllNodes() {
+  document.querySelectorAll('.tree-content').forEach(el => el.style.display = 'block');
+  document.querySelectorAll('.tree-icon').forEach(el => el.textContent = '▼');
+}
+
+function collapseAllNodes() {
+  document.querySelectorAll('.tree-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tree-icon').forEach(el => el.textContent = '▶');
 }
 
 async function viewArtifacts(runId) {
@@ -1228,11 +1469,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 })();
 
+// Auto-refresh control functions
+function startAutoRefresh() {
+  if (!autoRefreshInterval) {
+    console.log('Starting auto-refresh (every 10 seconds)');
+    autoRefreshInterval = setInterval(loadRuns, 10000);
+  }
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshInterval) {
+    console.log('Stopping auto-refresh');
+    clearInterval(autoRefreshInterval);
+    autoRefreshInterval = null;
+  }
+}
+
 // Initial load
 loadWorkflows();
 
-// Auto-refresh every 10 seconds
-setInterval(loadRuns, 10000);
+// Start auto-refresh
+startAutoRefresh();
 </script>
 </body>
 </html>

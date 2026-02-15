@@ -152,3 +152,86 @@ Three CLI entry points defined in `pyproject.toml`:
    curl http://localhost:3000/api/workflows
    curl http://localhost:3000/api/runs
    ```
+
+## Verification Testing Protocol
+
+**CRITICAL RULE:** Before claiming any fix or feature is working, you MUST verify it from the user's perspective.
+
+### Testing Requirements:
+
+1. **For API/Backend Changes:**
+   ```bash
+   # Test the actual HTTP endpoint
+   curl -s http://localhost:PORT/api/endpoint | jq .
+
+   # Verify data structure
+   curl -s http://localhost:PORT/api/runs | jq '.[0] | keys'
+
+   # Test with actual user parameters
+   curl -X POST http://localhost:PORT/api/action -d '{"param": "value"}'
+   ```
+
+2. **For UI/Frontend Changes:**
+   ```bash
+   # Verify served HTML contains your changes
+   curl -s http://localhost:PORT/ | grep -A5 "your-new-function"
+
+   # Check that JavaScript is syntactically valid
+   curl -s http://localhost:PORT/ > /tmp/page.html
+   # Then inspect /tmp/page.html for your changes
+   ```
+
+3. **For CLI Commands:**
+   ```bash
+   # Run the actual command the user would run
+   agenticom workflow list
+   agenticom workflow status <run-id>
+
+   # Verify output format and content
+   agenticom workflow status <run-id> | grep "Status:"
+   ```
+
+4. **For Dashboard/Web UI:**
+   - After making code changes and restarting server
+   - Verify served HTML actually contains your changes (curl test)
+   - Clear Python cache if needed: `find . -name "*.pyc" -delete`
+   - Force kill and restart: `pkill -9 -f "process-name"`
+   - Check browser console (F12) for JavaScript errors
+   - Test the actual user interaction flow
+
+### Before Reporting Success:
+
+✅ **DO:**
+- Test the endpoint/command exactly as the user would interact with it
+- Verify the served content matches your source code changes
+- Check for JavaScript/Python syntax errors in logs
+- Confirm data is flowing through the entire pipeline
+- Test edge cases (empty data, errors, etc.)
+
+❌ **DON'T:**
+- Claim something works without testing it
+- Assume changes took effect without verification
+- Test only the source file (test the runtime behavior)
+- Skip testing if "it should work in theory"
+
+### Example Verification Flow:
+
+```bash
+# 1. Make changes to code
+vim agenticom/dashboard.py
+
+# 2. Restart service
+pkill -9 -f "agenticom dashboard" && sleep 1
+agenticom dashboard &
+
+# 3. VERIFY changes are live
+curl -s http://localhost:8080/ | grep "my-new-function"  # Should find it
+
+# 4. Test user interaction
+curl -s http://localhost:8080/api/runs | jq '.[0]'  # Should show data
+
+# 5. Check for errors
+tail /tmp/dashboard.log  # Should be empty or show startup only
+```
+
+**Remember:** The user experiences the running application, not the source code. Always test the running system.

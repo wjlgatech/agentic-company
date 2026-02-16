@@ -142,9 +142,25 @@ steps:
       Be thorough - the developer doesn't grade their own work.
 
       IMPORTANT: You MUST include exactly the word VERIFIED in your response
-      if all criteria are met. If not, list the issues.
+      if all criteria are met. If not, list the issues clearly.
     expects: "VERIFIED"
-    retry: 2
+    retry: 1
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 2
+      feedback_template: |
+        ⚠️ VERIFICATION FAILED - Acceptance Criteria Not Met
+
+        The verifier found issues with the implementation:
+        {{error}}
+
+        VERIFICATION FEEDBACK:
+        {{step_outputs.verify}}
+
+        INSTRUCTIONS:
+        Fix the identified issues and ensure all acceptance criteria are met.
+        This is attempt {{loop_count}} of {{max_loops}}.
 
   - id: test
     agent: tester
@@ -166,7 +182,7 @@ steps:
 
   - id: review
     agent: reviewer
-    description: Final code review
+    description: Final code review and production readiness assessment
     input: |
       IMPLEMENTATION:
       {{step_outputs.implement}}
@@ -177,9 +193,44 @@ steps:
       TESTS:
       {{step_outputs.test}}
 
-      Perform final code review.
+      Perform final code review and assess production readiness.
 
-      IMPORTANT: You MUST include exactly the word APPROVED in your response
-      if the code is ready to merge. If not, list the required changes.
+      CRITICAL EVALUATION CRITERIA:
+      1. Is this code production-ready? (not just "good enough")
+      2. Are ALL core features fully implemented? (not partially)
+      3. Does it meet security and quality standards?
+      4. Is the implementation complete or just a skeleton?
+
+      RESPONSE FORMAT:
+      - If production-ready: Include "APPROVED FOR PRODUCTION" in your response
+      - If not ready: Clearly state "MAJOR REWORK REQUIRED" or "NOT APPROVED"
+        and list ALL missing critical components
+
+      Be honest and thorough - partial implementations are NOT acceptable.
     expects: "APPROVED"
-    retry: 2
+    retry: 1
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 2
+      feedback_template: |
+        ⚠️ CODE REVIEW FAILED - Quality Gate Not Met
+
+        The reviewer identified critical issues with the implementation:
+        {{error}}
+
+        PREVIOUS IMPLEMENTATION OUTPUT:
+        {{step_outputs.implement}}
+
+        REVIEW FEEDBACK:
+        {{step_outputs.review}}
+
+        INSTRUCTIONS FOR RE-IMPLEMENTATION:
+        1. Address ALL issues identified in the review
+        2. Implement ALL missing core features (not just stubs)
+        3. Ensure production-grade quality (not prototype quality)
+        4. Include proper error handling and security measures
+        5. Make this a COMPLETE implementation, not a partial one
+
+        This is attempt {{loop_count}} of {{max_loops}}.
+        Make it count - implement everything properly this time.

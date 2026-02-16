@@ -18,6 +18,11 @@ from dataclasses import dataclass, field
 
 from .state import StateManager, WorkflowRun, StepResult, StepStatus, WorkflowStage
 from orchestration.artifact_manager import ArtifactManager
+
+# Lazy import to avoid circular dependency
+def get_failure_handler():
+    from .failure_handler import FailureHandler
+    return FailureHandler
 from orchestration.artifacts import ArtifactCollection
 
 
@@ -33,6 +38,17 @@ class AgentDefinition:
 
 
 @dataclass
+class FailureAction:
+    """Configuration for what to do when a step fails."""
+    action: str  # "stop", "retry", "loop_back", "escalate", "llm_decide"
+    to_step: Optional[str] = None  # For loop_back: which step to return to
+    max_loops: int = 2  # Maximum number of loop-backs
+    feedback_template: Optional[str] = None  # Feedback to provide on retry
+    escalate_to: Optional[str] = None  # For escalate: which agent
+    use_llm_analysis: bool = False  # Use LLM to analyze failure and decide
+
+
+@dataclass
 class StepDefinition:
     """Definition of a step in a workflow."""
     id: str
@@ -44,6 +60,7 @@ class StepDefinition:
     timeout_seconds: int = 300
     requires_approval: bool = False
     verify_with: Optional[str] = None  # Agent ID for cross-verification
+    on_failure: Optional[FailureAction] = None  # What to do if step fails
 
 
 @dataclass
@@ -85,7 +102,15 @@ class WorkflowDefinition:
                 retry_count=s.get("retry", 2),
                 timeout_seconds=s.get("timeout", 300),
                 requires_approval=s.get("approval", False),
-                verify_with=s.get("verify_with")
+                verify_with=s.get("verify_with"),
+                on_failure=FailureAction(
+                    action=s.get("on_failure", {}).get("action", "stop"),
+                    to_step=s.get("on_failure", {}).get("to_step"),
+                    max_loops=s.get("on_failure", {}).get("max_loops", 2),
+                    feedback_template=s.get("on_failure", {}).get("feedback_template"),
+                    escalate_to=s.get("on_failure", {}).get("escalate_to"),
+                    use_llm_analysis=s.get("on_failure", {}).get("use_llm_analysis", False)
+                ) if s.get("on_failure") else None
             )
             for s in data.get("steps", [])
         ]
@@ -144,18 +169,24 @@ class WorkflowRunner:
     Key principles (from antfarm):
     - Fresh context per step (no bloat)
     - Cross-agent verification
-    - Automatic retry on failure
+    - Automatic retry on failure with intelligent recovery
     - State persisted to SQLite
     """
 
     def __init__(
         self,
         state_manager: Optional[StateManager] = None,
-        executor: Optional[Callable[[str, str], str]] = None
+        executor: Optional[Callable[[str, str], str]] = None,
+        failure_handler: Optional["FailureHandler"] = None
     ):
         self.state = state_manager or StateManager()
         self.executor = executor or self._default_executor
         self.artifact_manager = ArtifactManager()
+        self.failure_handler = failure_handler
+        if self.failure_handler is None and self.executor:
+            # Auto-create failure handler with LLM support
+            FailureHandler = get_failure_handler()
+            self.failure_handler = FailureHandler(llm_executor=self.executor)
 
     @staticmethod
     def _detect_stage_from_step_id(step_id: str) -> Optional[WorkflowStage]:
@@ -236,6 +267,67 @@ class WorkflowRunner:
         matched = sum(1 for kw in keywords if word_found(kw))
         threshold = max(1, len(keywords) // 2)  # At least half, minimum 1
         return matched >= threshold
+
+    def _check_quality_gate(self, step_id: str, output: str) -> tuple[bool, Optional[str]]:
+        """
+        Check if output passes quality gate for critical review steps.
+        Returns (passed, error_message).
+
+        For REVIEW steps, look for negative indicators that suggest rejection.
+        """
+        # Only apply quality gate to review/verification steps
+        if not any(keyword in step_id.lower() for keyword in ['review', 'verify', 'validate', 'approve']):
+            return True, None
+
+        output_lower = output.lower()
+
+        # Negative indicators that suggest review failed
+        negative_indicators = [
+            'not approved',
+            'cannot be approved',
+            'major rework required',
+            'not suitable for production',
+            'fails to meet',
+            'recommendation: reject',
+            'must be rejected',
+            'does not meet requirements',
+            'incomplete implementation',
+            'missing critical',
+            'security vulnerabilities',
+            'not production-ready',
+            'requires complete redesign',
+            'approximately 0%',
+            'approximately 10%',
+            'approximately 15%',
+            'approximately 20%',  # Less than 25% completion is failure
+        ]
+
+        # Check for negative indicators
+        found_negative = [ind for ind in negative_indicators if ind in output_lower]
+        if found_negative:
+            return False, f"Quality gate failed: Review contains rejection indicators: {', '.join(found_negative[:3])}"
+
+        # Positive indicators that suggest approval
+        positive_indicators = [
+            'approved for production',
+            'production-ready',
+            'meets all requirements',
+            'ready for deployment',
+            'passes all checks',
+            'recommendation: approve',
+            'fully implemented',
+        ]
+
+        # If it's a review step with expects pattern, we need either:
+        # 1. Positive indicator present, OR
+        # 2. No negative indicators (neutral review)
+        has_positive = any(ind in output_lower for ind in positive_indicators)
+
+        # For review steps, we want explicit approval OR at least no rejection
+        if found_negative:
+            return False, f"Quality gate failed: Review rejected with: {found_negative[0]}"
+
+        return True, None
 
     def _default_executor(self, agent_prompt: str, task_context: str) -> str:
         """
@@ -376,9 +468,16 @@ YOUR TASK FOR THIS STEP:
                     # Don't fail the step if artifact extraction fails
                     pass
 
+            # Check quality gate FIRST (for review/validation steps)
+            quality_passed, quality_error = self._check_quality_gate(step.id, output)
+
+            if not quality_passed:
+                # Quality gate failed - mark as failed even if expectations match
+                result.status = StepStatus.FAILED
+                result.error = quality_error
             # Check if output covers expected topics (keyword matching)
             # Special handling for "STATUS: done" - make it optional if code was generated
-            if step.expects:
+            elif step.expects:
                 has_artifacts = len(extracted_artifacts) > 0
 
                 # If step has artifacts OR matches expected output, it's successful
@@ -421,21 +520,46 @@ YOUR TASK FOR THIS STEP:
         initial_context: Optional[dict] = None,
         stop_on_failure: bool = True
     ) -> tuple[WorkflowRun, list[StepResult]]:
-        """Run all steps in the workflow."""
+        """Run all steps in the workflow with intelligent failure recovery."""
         run = self.start(workflow, task, initial_context)
         results = []
+        i = 0
 
-        for i, step in enumerate(workflow.steps):
+        while i < len(workflow.steps):
+            step = workflow.steps[i]
             result = self.execute_step(workflow, run, i)
-            results.append(result)
 
-            if result.status == StepStatus.FAILED and stop_on_failure:
-                self.state.update_run(run.id, status=StepStatus.FAILED, error=result.error)
-                run = self.state.get_run(run.id)
-                break
+            # Update or replace result in list
+            if len(results) > i:
+                results[i] = result
+            else:
+                results.append(result)
+
+            if result.status == StepStatus.FAILED:
+                # Use failure handler if available
+                if self.failure_handler and step.on_failure:
+                    action, target_index = self.failure_handler.handle_failure(
+                        step, run, result.error or "Unknown error", workflow.steps
+                    )
+
+                    if action == "retry":
+                        # Retry current step
+                        continue  # Loop back to retry same step
+                    elif action == "loop_back" and target_index is not None:
+                        # Jump back to target step
+                        i = target_index
+                        continue
+                    # else: action is "stop", fall through to break
+
+                # No handler or handler says stop
+                if stop_on_failure:
+                    self.state.update_run(run.id, status=StepStatus.FAILED, error=result.error)
+                    run = self.state.get_run(run.id)
+                    break
 
             # Refresh run state
             run = self.state.get_run(run.id)
+            i += 1
 
         # Mark complete if all steps passed
         if all(r.status == StepStatus.COMPLETED for r in results):

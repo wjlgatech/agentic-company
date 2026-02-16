@@ -80,6 +80,8 @@ class WorkflowRun:
     error: Optional[str] = None
     stages: dict[str, StageInfo] = None  # Map of stage name -> StageInfo
     current_stage: Optional[WorkflowStage] = None
+    loop_counts: dict[str, int] = None  # Track loops per step
+    feedback_history: list[dict] = None  # Store failure feedback
 
     def __post_init__(self):
         if self.stages is None:
@@ -88,6 +90,10 @@ class WorkflowRun:
                 stage.value: StageInfo(stage=stage)
                 for stage in WorkflowStage
             }
+        if self.loop_counts is None:
+            self.loop_counts = {}
+        if self.feedback_history is None:
+            self.feedback_history = []
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""

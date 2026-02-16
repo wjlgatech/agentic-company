@@ -235,3 +235,210 @@ tail /tmp/dashboard.log  # Should be empty or show startup only
 ```
 
 **Remember:** The user experiences the running application, not the source code. Always test the running system.
+
+## AI-Human Collaboration Workflow
+
+This section defines the optimal division of labor between AI (Claude Code) and human developers based on observed patterns and meta-analysis.
+
+### What AI Should Automate ✅
+
+**1. Implementation & Testing Loop**
+- Write code based on requirements
+- Run automated verification tests BEFORE claiming success
+- Iterate on fixes using test feedback
+- Only report success when tests pass
+- Generate test cases for edge cases
+
+**Example workflow:**
+```bash
+# AI's internal loop (don't report until this succeeds)
+1. Write fix → 2. curl test endpoint → 3. Verify output → 4. PASS? → Report success
+                                                         ↓ FAIL
+                                                         └─→ Debug → Repeat
+```
+
+**2. Verification Testing**
+- Test APIs with curl before saying "API is working"
+- Test CLI commands before saying "command works"
+- Check served HTML matches source code changes
+- Verify JavaScript syntax in browser console
+- Test the complete user interaction flow
+
+**3. Documentation Generation**
+- Auto-generate docs from code changes
+- Update README with new features
+- Create test result reports
+- Document configuration changes
+
+**4. Iterative Debugging**
+- Read error messages from logs/console
+- Identify root cause
+- Apply fix
+- Verify fix with tests
+- Repeat until resolved
+
+### What Requires Human Input ❌
+
+**1. Requirement Clarification & Design Decisions**
+- "Should we use approach A or B?"
+- "What's the priority: performance or maintainability?"
+- "Is this feature really needed?"
+- UI/UX design choices
+
+**Why:** Strategic decisions need domain expertise and context only humans have.
+
+**2. Acceptance Testing**
+- Testing in real browser with real user interactions
+- Visual inspection of UI changes
+- Workflow testing with production-like data
+- Security review of sensitive changes
+
+**Why:** Humans catch usability issues and real-world edge cases AI can't simulate.
+
+**3. Production Approvals**
+- Approving git commits
+- Deploying to production
+- Merging pull requests
+- Releasing new versions
+
+**Why:** Humans bear responsibility for production changes and should review before deployment.
+
+**4. Error Diagnosis from Real Usage**
+- Browser console errors with screenshots
+- Network tab inspection
+- Real-world bug reports from users
+- Performance profiling
+
+**Why:** AI can't access browser dev tools or see visual UI issues.
+
+**5. Strategic Direction**
+- Roadmap planning
+- Feature prioritization
+- Architecture evolution
+- Tech stack decisions
+
+**Why:** Business context and long-term vision require human judgment.
+
+### Anti-Patterns to Avoid 🚫
+
+Based on 2-day debugging session meta-analysis:
+
+**❌ Don't: Claim "Fixed!" without testing**
+```
+BAD: "I've fixed the View Full Logs button. It should work now."
+GOOD: "I've fixed the button. Let me verify: [runs curl test] ✅ Confirmed working."
+```
+
+**❌ Don't: Assume changes took effect**
+```
+BAD: "I updated dashboard.py, so the changes are live."
+GOOD: "Updated dashboard.py. Testing served HTML... ✅ Changes confirmed in output."
+```
+
+**❌ Don't: Test only source files**
+```
+BAD: cat dashboard.py | grep "my-function"  # Only checks source
+GOOD: curl http://localhost:8080/ | grep "my-function"  # Tests runtime
+```
+
+**❌ Don't: Skip edge case testing**
+```
+BAD: "The function works for normal input."
+GOOD: "Tested: normal input ✅, empty input ✅, malformed input ✅"
+```
+
+**❌ Don't: Report success on first attempt**
+```
+BAD: After 1 try: "All fixed!" → User reports still broken → 8 more iterations
+GOOD: After 1 try: Test → Still broken → Fix → Test → ✅ Now report success
+```
+
+### Improved Workflow Pattern
+
+**Traditional Pattern (High Iteration Count):**
+```
+User: "Button doesn't work"
+  ↓
+AI: "Fixed!" [no testing]
+  ↓
+User: "Still broken" [tests in browser]
+  ↓
+AI: "Fixed again!" [still no testing]
+  ↓
+Repeat 5-8 times...
+```
+
+**Optimized Pattern (Low Iteration Count):**
+```
+User: "Button doesn't work"
+  ↓
+AI: [Fix → Test → Fail → Debug → Fix → Test → Pass]
+  ↓
+AI: "Fixed and verified ✅ [shows test output]"
+  ↓
+User: [Acceptance test in browser]
+  ↓
+User: "Approved ✅" or "Issue with UX: [specific feedback]"
+```
+
+### Key Metrics from Meta-Analysis
+
+**Before Verification Protocol:**
+- Average iterations per fix: 5-8
+- False "Fixed!" claims: 80%
+- User time spent on diagnosis: High
+
+**After Verification Protocol:**
+- Average iterations per fix: 1-2
+- False "Fixed!" claims: <10%
+- User time spent on diagnosis: Low (only acceptance testing)
+
+### Practical Examples
+
+**Example 1: Dashboard Button Fix**
+```bash
+# ❌ OLD APPROACH: Claim success without testing
+echo "Fixed the button!" # No verification
+
+# ✅ NEW APPROACH: Test before claiming success
+curl -s http://localhost:8081/ | grep "btn-view-logs" # Verify button exists
+curl -s http://localhost:8081/api/runs | jq '.[0].id' # Verify data
+echo "✅ Button rendering confirmed, API working"
+```
+
+**Example 2: API Endpoint Change**
+```bash
+# ❌ OLD APPROACH:
+# "I've updated the /api/status endpoint to return more data"
+
+# ✅ NEW APPROACH:
+# Test before reporting:
+curl -s http://localhost:8081/api/status | jq .
+# Output shows new fields → ✅ Confirmed
+# "Updated /api/status endpoint. Verification: [paste output]"
+```
+
+**Example 3: CLI Command Fix**
+```bash
+# ❌ OLD APPROACH:
+# "Fixed the workflow status command"
+
+# ✅ NEW APPROACH:
+agenticom workflow status test-run-123
+# Output shows correct status → ✅ Confirmed
+# "Fixed workflow status command. Test output: [paste result]"
+```
+
+### Collaboration Model Summary
+
+| Task | AI Role | Human Role |
+|------|---------|------------|
+| **Requirements** | Ask clarifying questions | Define what/why |
+| **Design** | Propose options with tradeoffs | Choose approach |
+| **Implementation** | Write code | Review code |
+| **Testing** | Automated verification ✅ | Acceptance testing |
+| **Debugging** | Fix → Test loop | Diagnose real-world issues |
+| **Documentation** | Generate docs | Review accuracy |
+| **Deployment** | Prepare changes | Approve & deploy |
+
+**Golden Rule:** AI automates the "verify it works" loop. Human provides the "verify it's right" judgment.

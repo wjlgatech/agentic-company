@@ -273,6 +273,71 @@ def workflow_inspect(ctx, run_id, step, as_json):
         click.echo("=" * 80)
 
 
+@workflow.command("archive")
+@click.argument("run_id")
+@click.pass_context
+def workflow_archive(ctx, run_id):
+    """Archive a workflow run (soft delete)"""
+    from .state import StateManager
+
+    state = StateManager()
+    success = state.archive_run(run_id)
+
+    if success:
+        click.echo(f"📦 Archived workflow run: {run_id}")
+        click.echo("   Use 'agenticom workflow unarchive' to restore")
+    else:
+        click.echo(f"❌ Failed to archive run: {run_id}")
+
+
+@workflow.command("unarchive")
+@click.argument("run_id")
+@click.pass_context
+def workflow_unarchive(ctx, run_id):
+    """Restore an archived workflow run"""
+    from .state import StateManager
+
+    state = StateManager()
+    success = state.unarchive_run(run_id)
+
+    if success:
+        click.echo(f"📤 Unarchived workflow run: {run_id}")
+        click.echo("   Run is now visible in active list")
+    else:
+        click.echo(f"❌ Failed to unarchive run: {run_id}")
+
+
+@workflow.command("delete")
+@click.argument("run_id")
+@click.option("--permanent", is_flag=True, help="Permanently delete (cannot be undone)")
+@click.pass_context
+def workflow_delete(ctx, run_id, permanent):
+    """Delete a workflow run"""
+    from .state import StateManager
+
+    state = StateManager()
+
+    if permanent:
+        confirm = click.confirm(
+            f"⚠️  Permanently delete run {run_id}? This cannot be undone!",
+            default=False
+        )
+        if not confirm:
+            click.echo("❌ Delete cancelled")
+            return
+
+    success = state.delete_run(run_id, permanent=permanent)
+
+    if success:
+        if permanent:
+            click.echo(f"🗑️  Permanently deleted workflow run: {run_id}")
+        else:
+            click.echo(f"📦 Archived workflow run: {run_id}")
+            click.echo("   Use 'agenticom workflow unarchive' to restore")
+    else:
+        click.echo(f"❌ Failed to delete run: {run_id}")
+
+
 # ============== Stats ==============
 
 @cli.command()
@@ -303,7 +368,7 @@ def stats(ctx, as_json):
 # ============== Dashboard ==============
 
 @cli.command()
-@click.option("--port", "-p", default=8080, help="Port number (default: 8080)")
+@click.option("--port", "-p", default=8081, help="Port number (default: 8081)")
 @click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
 @click.pass_context
 def dashboard(ctx, port, no_browser):

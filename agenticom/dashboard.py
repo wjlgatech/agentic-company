@@ -576,30 +576,52 @@ function getSteps() {
 }
 
 function getActiveStep(run) {
-  // Use current_stage from run if available (more reliable)
+  // For completed/done workflows, always show in REVIEW
+  if (run.status === 'completed' || run.status === 'done') {
+    return 'review';
+  }
+
+  // Use current_stage from run if available (most reliable)
   if (run.current_stage) {
     return run.current_stage.toLowerCase();
   }
 
-  // Fallback: infer from steps
-  if (!run.steps || !run.steps.length) return 'plan';
-  const active = run.steps.find(s => s.status !== 'done' && s.status !== 'skipped');
-
-  if (active) {
-    return active.step_id;
-  }
-
-  // For completed workflows, use the last completed stage
+  // Find currently active (in-progress) stage from run.stages
   if (run.stages) {
-    const stageOrder = ['review', 'test', 'verify', 'implement', 'plan'];
+    const stageOrder = ['plan', 'implement', 'verify', 'test', 'review'];
     for (const stageName of stageOrder) {
+      const stage = run.stages[stageName];
+      if (stage && stage.started_at && !stage.completed_at) {
+        // This stage is in progress
+        return stageName;
+      }
+    }
+
+    // If all stages completed, show in review
+    if (run.stages.review && run.stages.review.completed_at) {
+      return 'review';
+    }
+
+    // Find last completed stage
+    for (let i = stageOrder.length - 1; i >= 0; i--) {
+      const stageName = stageOrder[i];
       if (run.stages[stageName] && run.stages[stageName].completed_at) {
         return stageName;
       }
     }
   }
 
-  return run.steps[run.steps.length - 1].step_id;
+  // Fallback: infer from steps
+  if (run.steps && run.steps.length > 0) {
+    const active = run.steps.find(s => s.status !== 'done' && s.status !== 'completed' && s.status !== 'skipped');
+    if (active) {
+      // Map step_id to stage if needed
+      return active.step_id;
+    }
+  }
+
+  // Default to plan stage
+  return 'plan';
 }
 
 function renderBoard() {
@@ -658,6 +680,9 @@ function renderCard(run) {
   const artifactCount = run.artifact_count || 0;
 
   console.log('renderCard:', run.id, 'expanded:', isExpanded, 'has steps:', !!run.steps, 'step count:', run.steps && run.steps.length, 'artifacts:', artifactCount);
+  if (isExpanded && run.steps) {
+    console.log('renderCard will include View Full Logs button for run:', run.id);
+  }
 
   let detailsHTML = '';
   if (isExpanded && run.steps) {
@@ -772,24 +797,37 @@ function renderCard(run) {
       `;
     }
 
+    // Build buttons with proper run.id injection
+    let buttonsHTML = '';
+    if (status === 'failed') {
+      buttonsHTML += `<button class="btn-resume" data-run-id="${run.id}">↺ Resume</button>`;
+    }
+    buttonsHTML += `<button class="btn-view-logs" data-run-id="${run.id}">📋 View Full Logs</button>`;
+    if (run.artifacts && run.artifacts.length > 0) {
+      buttonsHTML += `<button class="btn-view-code" data-run-id="${run.id}">📂 View Code</button>`;
+    }
+
     detailsHTML = `
       <div class="card-details">
         ${stageProgressHTML}
         <div class="step-list">${stepsHTML}</div>
         ${artifactsHTML}
         <div class="card-actions">
-          ${status === 'failed' ? `<button onclick="resumeRun('${run.id}'); event.stopPropagation();">↺ Resume</button>` : ''}
-          <button onclick="viewLogs('${run.id}'); event.stopPropagation();">📋 View Full Logs</button>
-          ${run.artifacts && run.artifacts.length > 0 ? `<button onclick="viewArtifacts('${run.id}'); event.stopPropagation();">📂 View Code</button>` : ''}
+          ${buttonsHTML}
         </div>
       </div>
     `;
   }
 
+  const completionBadge = (status === 'completed' || status === 'done')
+    ? '<span style="margin-left: 8px; font-size: 11px; padding: 3px 8px; background: var(--success); color: white; border-radius: 4px; font-weight: 600;">✓ ALL STAGES COMPLETE</span>'
+    : '';
+
   return `<div class="card ${status} ${isExpanded ? 'card-expanded' : ''}" onclick="toggleCard('${run.id}')">
     <div class="card-title" title="${run.task.replace(/"/g, '&quot;')}">${title}</div>
     <div class="card-meta">
       <span class="badge badge-${status}">${status}</span>
+      ${completionBadge}
       <span>${time}</span>
       ${artifactCount > 0 ? `<span style="font-size: 11px; color: var(--text-muted);">📦 ${artifactCount} files</span>` : ''}
     </div>
@@ -840,7 +878,9 @@ function parseContentTree(text) {
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
       const target = currentList || currentH3 || currentH2 || tree;
-      target.push({ type: 'paragraph', text: currentParagraph.join('\\n') });
+      // If target is an object with children array, push to children, otherwise push to target (tree array)
+      const targetArray = target.children || target;
+      targetArray.push({ type: 'paragraph', text: currentParagraph.join('\\n') });
       currentParagraph = [];
     }
   };
@@ -982,11 +1022,15 @@ function toggleTreeNode(nodeId) {
 }
 
 async function viewLogs(runId) {
+  console.log('viewLogs called with runId:', runId);
   const run = await api(`/runs/${runId}`);
+  console.log('viewLogs got run:', run);
   if (!run || !run.steps) {
+    console.error('No steps available. run:', run, 'steps:', run && run.steps);
     alert('No logs available for this run');
     return;
   }
+  console.log('viewLogs creating modal with', run.steps.length, 'steps');
 
   // Create logs modal
   const modal = document.createElement('div');
@@ -1485,6 +1529,50 @@ function stopAutoRefresh() {
   }
 }
 
+// Event delegation for action buttons
+const boardElement = document.getElementById('board');
+console.log('Setting up event delegation on board:', boardElement);
+
+boardElement.addEventListener('click', (e) => {
+  console.log('Board clicked, target:', e.target, 'classes:', e.target.className);
+  const target = e.target;
+
+  // View Full Logs button
+  if (target.classList.contains('btn-view-logs')) {
+    e.stopPropagation();
+    const runId = target.getAttribute('data-run-id');
+    console.log('✅ View Full Logs clicked, runId:', runId);
+    viewLogs(runId);
+    return;
+  }
+
+  // Resume button
+  if (target.classList.contains('btn-resume')) {
+    e.stopPropagation();
+    const runId = target.getAttribute('data-run-id');
+    console.log('✅ Resume clicked, runId:', runId);
+    resumeRun(runId);
+    return;
+  }
+
+  // View Code button
+  if (target.classList.contains('btn-view-code')) {
+    e.stopPropagation();
+    const runId = target.getAttribute('data-run-id');
+    console.log('✅ View Code clicked, runId:', runId);
+    viewArtifacts(runId);
+    return;
+  }
+
+  console.log('⚠️  Clicked element does not match any button class');
+});
+
+// Debug helper function - can be called from browser console
+window.testViewLogs = function(runId) {
+  console.log('Manual test: calling viewLogs with runId:', runId);
+  viewLogs(runId || runs[0]?.id);
+};
+
 // Initial load
 loadWorkflows();
 
@@ -1685,7 +1773,7 @@ def create_handler(state, core, refiner=None):
     return Handler
 
 
-def start_dashboard(port=8080, open_browser=True):
+def start_dashboard(port=8081, open_browser=True):
     """Start the dashboard server"""
     state = StateManager()
     core = AgenticomCore()

@@ -12,6 +12,7 @@ from datetime import datetime
 import uuid
 import asyncio
 import re
+import structlog
 
 from orchestration.agents.base import (
     Agent,
@@ -23,6 +24,8 @@ from orchestration.agents.base import (
 from orchestration.artifact_manager import ArtifactManager
 from orchestration.artifacts import ArtifactCollection
 from orchestration.executor import SafeExecutor, ExecutionResult
+
+logger = structlog.get_logger(__name__)
 
 
 class StepStatus(Enum):
@@ -64,6 +67,7 @@ class StepResult:
     retries: int = 0
     started_at: datetime = field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
+    metadata: dict = field(default_factory=dict)  # Store diagnostics and other metadata
 
 
 @dataclass
@@ -75,6 +79,7 @@ class TeamConfig:
     timeout_seconds: int = 3600
     escalation_handler: Optional[Callable[[StepResult], Awaitable[None]]] = None
     approval_handler: Optional[Callable[[StepResult], Awaitable[bool]]] = None
+    diagnostics_config: Optional[Any] = None  # DiagnosticsConfig from orchestration.diagnostics
     metadata: dict = field(default_factory=dict)
 
 
@@ -115,6 +120,26 @@ class AgentTeam:
         self.safe_executor = SafeExecutor(
             approval_callback=config.approval_handler if hasattr(config, 'approval_handler') else None
         )
+
+        # Initialize diagnostics if enabled
+        self.diagnostics = None
+        if config.diagnostics_config and getattr(config.diagnostics_config, 'enabled', False):
+            try:
+                from orchestration.diagnostics import DiagnosticsIntegrator, require_playwright
+                require_playwright()
+
+                # Get executor for meta-analysis
+                from orchestration.integrations.unified import auto_setup_executor
+                executor = auto_setup_executor()
+
+                self.diagnostics = DiagnosticsIntegrator(
+                    config.diagnostics_config,
+                    executor
+                )
+                logger.info("Diagnostics system enabled", team_id=self.id)
+            except ImportError as e:
+                logger.warning("Diagnostics disabled: %s", str(e))
+                self.diagnostics = None
 
     def add_agent(self, agent: Agent) -> 'AgentTeam':
         """Add an agent to the team"""
@@ -377,8 +402,8 @@ class AgentTeam:
                     # (depends on use case - could make configurable)
                     agent_result.metadata['execution_error'] = str(e)
 
-            # Success!
-            return StepResult(
+            # Success! Create result
+            result = StepResult(
                 step=step,
                 agent_result=agent_result,
                 verification=verification,
@@ -387,6 +412,16 @@ class AgentTeam:
                 started_at=started_at,
                 completed_at=datetime.utcnow()
             )
+
+            # Diagnostics capture (if enabled)
+            if self.diagnostics and step.metadata.get("diagnostics_enabled"):
+                try:
+                    diagnostics = await self.diagnostics.capture_step_diagnostics(step, result)
+                    result.metadata["diagnostics"] = diagnostics
+                except Exception as e:
+                    logger.warning("Diagnostics capture failed: %s", str(e))
+
+            return result
 
         # Should not reach here, but handle anyway
         return StepResult(

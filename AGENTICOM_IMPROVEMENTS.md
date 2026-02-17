@@ -10,6 +10,323 @@ Based on meta-analysis of AI-human collaboration patterns, this document propose
 
 **Impact:** Reduce bug fix iterations from 5-8 to 1-2, improve developer experience, enable self-healing workflows.
 
+## Priority 0: Automated Diagnostic Capture 🎯 NEW
+
+> **User Insight:** "Points 1-4 in 'For Human Developers' can be automated, can't we?"
+> This is correct! The most impactful automation is capturing diagnostics automatically.
+
+### Current State
+- Human must manually open browser console
+- Human must take screenshots
+- Human must copy error messages
+- Human must trigger testing after fixes
+- High burden on human for diagnostic work
+
+### Proposed: Automated Diagnostic System
+
+**File:** `orchestration/diagnostics/capture.py`
+
+```python
+from playwright.async_api import async_playwright, Page
+from dataclasses import dataclass
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+import json
+import asyncio
+
+@dataclass
+class DiagnosticSnapshot:
+    """Complete diagnostic state capture"""
+    timestamp: str
+    url: str
+    screenshot_path: Optional[str]
+    console_errors: List[Dict[str, Any]]
+    console_logs: List[Dict[str, Any]]
+    network_errors: List[Dict[str, Any]]
+    page_html: str
+    dom_state: Dict[str, Any]
+    performance_metrics: Dict[str, float]
+
+class AutomatedDiagnostics:
+    """Automatically capture diagnostic information"""
+
+    def __init__(self, headless: bool = True):
+        self.headless = headless
+        self.browser = None
+        self.page = None
+        self.console_messages = []
+        self.network_activity = []
+
+    async def start(self, url: str):
+        """Start monitoring a URL"""
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=self.headless)
+        self.context = await self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            record_har_path='/tmp/network.har'  # Capture network
+        )
+        self.page = await self.context.new_page()
+
+        # Setup listeners
+        self.page.on("console", self._on_console)
+        self.page.on("pageerror", self._on_error)
+        self.page.on("response", self._on_response)
+
+        await self.page.goto(url)
+
+    def _on_console(self, msg):
+        """Capture console messages"""
+        self.console_messages.append({
+            'type': msg.type,
+            'text': msg.text,
+            'location': msg.location,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    def _on_error(self, error):
+        """Capture page errors"""
+        self.console_messages.append({
+            'type': 'error',
+            'text': str(error),
+            'stack': error.stack if hasattr(error, 'stack') else None,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    def _on_response(self, response):
+        """Capture network responses"""
+        if response.status >= 400:
+            self.network_activity.append({
+                'url': response.url,
+                'status': response.status,
+                'method': response.request.method,
+                'timestamp': datetime.now().isoformat()
+            })
+
+    async def capture_snapshot(self) -> DiagnosticSnapshot:
+        """Capture complete diagnostic state"""
+        timestamp = datetime.now().isoformat()
+        screenshot_path = f"/tmp/diagnostic_{timestamp}.png"
+
+        # Capture screenshot
+        await self.page.screenshot(path=screenshot_path, full_page=True)
+
+        # Get page HTML
+        html = await self.page.content()
+
+        # Get DOM state
+        dom_state = await self.page.evaluate("""
+            () => {
+                return {
+                    title: document.title,
+                    url: window.location.href,
+                    activeElement: document.activeElement?.tagName,
+                    scrollPosition: window.scrollY,
+                    viewport: {
+                        width: window.innerWidth,
+                        height: window.innerHeight
+                    }
+                }
+            }
+        """)
+
+        # Get performance metrics
+        performance = await self.page.evaluate("""
+            () => {
+                const perf = performance.timing;
+                return {
+                    loadTime: perf.loadEventEnd - perf.navigationStart,
+                    domReady: perf.domContentLoadedEventEnd - perf.navigationStart,
+                    firstPaint: performance.getEntriesByType('paint')[0]?.startTime || 0
+                }
+            }
+        """)
+
+        # Separate errors from logs
+        console_errors = [msg for msg in self.console_messages if msg['type'] == 'error']
+        console_logs = [msg for msg in self.console_messages if msg['type'] != 'error']
+
+        return DiagnosticSnapshot(
+            timestamp=timestamp,
+            url=self.page.url,
+            screenshot_path=screenshot_path,
+            console_errors=console_errors,
+            console_logs=console_logs,
+            network_errors=self.network_activity,
+            page_html=html,
+            dom_state=dom_state,
+            performance_metrics=performance
+        )
+
+    async def test_user_flow(self, actions: List[Dict[str, Any]]) -> DiagnosticSnapshot:
+        """
+        Execute user actions and capture diagnostics
+
+        Example:
+            actions = [
+                {'action': 'click', 'selector': '.btn-view-logs'},
+                {'action': 'wait', 'duration': 1000},
+                {'action': 'type', 'selector': 'input', 'text': 'test'},
+            ]
+        """
+        for action in actions:
+            try:
+                if action['action'] == 'click':
+                    await self.page.click(action['selector'])
+                elif action['action'] == 'type':
+                    await self.page.type(action['selector'], action['text'])
+                elif action['action'] == 'wait':
+                    await self.page.wait_for_timeout(action['duration'])
+                # Add more actions as needed
+            except Exception as e:
+                # Capture state on error
+                snapshot = await self.capture_snapshot()
+                snapshot.error = str(e)
+                return snapshot
+
+        return await self.capture_snapshot()
+
+    async def close(self):
+        """Cleanup resources"""
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
+
+# Integration with workflow execution
+class DiagnosticWorkflowRunner:
+    """Run workflows with automatic diagnostic capture"""
+
+    def __init__(self):
+        self.diagnostics = AutomatedDiagnostics()
+        self.iteration_count = 0
+        self.max_iterations = 3
+
+    async def run_with_diagnostics(self, url: str, test_actions: List[Dict]):
+        """
+        Run test with automatic diagnostics
+
+        Returns:
+            - snapshot: Diagnostic snapshot
+            - should_continue: Whether to continue iterations
+            - meta_analysis: Optional meta-analysis if threshold reached
+        """
+        await self.diagnostics.start(url)
+
+        # Execute test actions
+        snapshot = await self.diagnostics.test_user_flow(test_actions)
+
+        # Check if there were errors
+        has_errors = len(snapshot.console_errors) > 0 or len(snapshot.network_errors) > 0
+
+        if has_errors:
+            self.iteration_count += 1
+
+            # Auto-trigger meta-analysis after threshold
+            if self.iteration_count >= self.max_iterations:
+                meta_analysis = await self._perform_meta_analysis(snapshot)
+                return snapshot, False, meta_analysis
+
+            return snapshot, True, None
+        else:
+            # Success! Reset counter
+            self.iteration_count = 0
+            return snapshot, False, None
+
+    async def _perform_meta_analysis(self, snapshot: DiagnosticSnapshot) -> Dict:
+        """Automatic meta-analysis trigger"""
+        return {
+            "trigger": "high_iteration_count",
+            "iterations": self.iteration_count,
+            "common_errors": self._find_common_errors(),
+            "suggestion": "Consider different approach - same error recurring",
+            "snapshot": snapshot
+        }
+
+    def _find_common_errors(self) -> List[str]:
+        """Analyze error patterns across iterations"""
+        # TODO: Implement pattern detection
+        pass
+
+    async def cleanup(self):
+        await self.diagnostics.close()
+```
+
+**Integration into AgentTeam:**
+
+```python
+# orchestration/agents/team.py
+
+class AgentTeam:
+    def __init__(self, ...):
+        self.diagnostic_runner = DiagnosticWorkflowRunner()
+
+    async def execute_with_auto_diagnostics(self, url: str, test_actions: List[Dict]):
+        """Execute workflow with automatic diagnostic capture"""
+
+        while True:
+            # Run with diagnostics
+            snapshot, should_continue, meta_analysis = \
+                await self.diagnostic_runner.run_with_diagnostics(url, test_actions)
+
+            if not should_continue:
+                if meta_analysis:
+                    # High iteration count - provide analysis
+                    print(f"⚠️ Meta-analysis triggered after {meta_analysis['iterations']} iterations")
+                    print(f"Suggestion: {meta_analysis['suggestion']}")
+                    # Optionally switch strategy
+
+                if len(snapshot.console_errors) == 0:
+                    # Success!
+                    return snapshot
+                else:
+                    # Failed after max iterations
+                    return snapshot
+
+            # Continue with next iteration using snapshot feedback
+            feedback = self._format_diagnostic_feedback(snapshot)
+            # Use feedback for next fix attempt
+```
+
+**CLI Integration:**
+
+```bash
+# New command: Test with automatic diagnostics
+agenticom test-with-diagnostics http://localhost:8081 --actions actions.json
+
+# actions.json:
+[
+  {"action": "click", "selector": ".btn-view-logs", "description": "Click view logs button"},
+  {"action": "wait", "duration": 1000},
+  {"action": "assert", "selector": ".modal", "visible": true}
+]
+```
+
+### Benefits
+- ✅ **Zero human burden for diagnostics** - fully automated
+- ✅ **Comprehensive error capture** - console, network, DOM, performance
+- ✅ **Visual evidence** - automatic screenshots on error
+- ✅ **Faster feedback** - no waiting for user to test and report
+- ✅ **Pattern detection** - auto-trigger meta-analysis after N iterations
+- ✅ **Reproducible** - captured state can be replayed
+
+### Impact on Iteration Count
+
+**Before Automated Diagnostics:**
+```
+Bug reported → AI fixes → User opens browser → User tests → User captures console →
+User takes screenshot → User reports error → AI fixes → REPEAT 5-8 times
+Time per iteration: 30 minutes
+```
+
+**After Automated Diagnostics:**
+```
+Bug reported → AI fixes → Auto-test captures all diagnostics → AI sees error →
+AI fixes → REPEAT 1-2 times (with full diagnostic context)
+Time per iteration: 30 seconds
+```
+
+**Improvement:** 60x faster feedback loop!
+
 ## Priority 1: Built-in Verification Testing
 
 ### Current State
@@ -628,10 +945,19 @@ class WorkflowProfiler:
 
 ## Implementation Roadmap
 
-### Phase 1: Foundation (Week 1-2)
+### Phase 0: Foundation - Automated Diagnostics (Week 1-2) 🎯 HIGHEST PRIORITY
 - [x] Quality gate validation (DONE)
-- [ ] Structured error system
-- [ ] Basic verification testing
+- [ ] Automated diagnostic capture (Priority 0)
+  - [ ] Browser automation with Playwright
+  - [ ] Console/network/screenshot capture
+  - [ ] Automated test-after-fix loop
+  - [ ] Auto-trigger meta-analysis after N iterations
+  - [ ] Collaborative success criteria builder
+- [ ] Structured error system (Priority 3)
+
+### Phase 1: Verification & Debugging (Week 3-4)
+- [ ] Basic verification testing (Priority 1)
+- [ ] Interactive debugging mode (Priority 2)
 
 ### Phase 2: Developer Experience (Week 3-4)
 - [ ] Interactive debugging mode
@@ -650,18 +976,36 @@ class WorkflowProfiler:
 
 ## Success Metrics
 
-| Metric | Current | Target | How to Measure |
-|--------|---------|--------|----------------|
-| Bug fix iterations | 5-8 | 1-2 | Track iterations per bug report |
-| Time to resolution | 2 days | 2 hours | Average time from bug report to fix |
-| False "Fixed!" claims | 80% | <10% | Track verification test pass rate |
-| Developer satisfaction | N/A | 8/10 | User surveys |
-| Workflow success rate | 60% | 90% | Completed vs failed workflows |
+| Metric | Current (Manual) | With Verification Protocol | With Automated Diagnostics | How to Measure |
+|--------|------------------|---------------------------|---------------------------|----------------|
+| Bug fix iterations | 5-8 | 1-2 | 1 (auto-fix loop) | Track iterations per bug |
+| Time to resolution | 2 days | 2 hours | 30 minutes | Time from bug to fix |
+| Feedback loop time | 30 min/iter | 5 min/iter | 30 sec/iter | Time per iteration |
+| False "Fixed!" claims | 80% | <10% | <1% | Verification pass rate |
+| Human diagnostic burden | 100% | 50% | 0% | Time spent on diagnostics |
+| Developer satisfaction | N/A | 8/10 | 9/10 | User surveys |
+| Workflow success rate | 60% | 80% | 95% | Completed vs failed |
 
 ## Conclusion
 
-These improvements will transform Agenticom from a workflow orchestration tool into a self-verifying, self-healing system that dramatically reduces debugging cycles and improves developer experience.
+These improvements will transform Agenticom from a workflow orchestration tool into a self-diagnosing, self-verifying, self-healing system that dramatically reduces debugging cycles and improves developer experience.
 
-The key insight: **Automate verification, not just execution.**
+### Key Insights
 
-By building verification testing, interactive debugging, and enhanced error reporting into the framework, we enable AI-human collaboration patterns that leverage the strengths of both: AI's speed and consistency in testing, human's judgment and strategic thinking.
+**Level 1:** *Automate verification, not just execution.*
+- AI tests before claiming success
+- Reduces iterations from 5-8 to 1-2
+
+**Level 2 (User Insight):** *Automate diagnostics, not just verification.* 🎯
+- AI automatically captures errors, screenshots, logs
+- AI tests immediately after each fix
+- AI triggers meta-analysis after pattern detection
+- Reduces feedback loop from 30 minutes to 30 seconds
+- **Zero human burden for diagnostics**
+
+**Level 3:** *Collaborate on criteria, automate everything else.*
+- AI proposes success criteria
+- Human authenticates through Q&A
+- All execution and verification fully automated
+
+By building automated diagnostics, verification testing, interactive debugging, and enhanced error reporting into the framework, we enable AI-human collaboration patterns that leverage the strengths of both: AI's speed and consistency in execution/testing/diagnostics, human's judgment and strategic thinking in requirements and acceptance.

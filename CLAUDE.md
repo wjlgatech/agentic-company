@@ -442,3 +442,12 @@ agenticom workflow status test-run-123
 | **Deployment** | Prepare changes | Approve & deploy |
 
 **Golden Rule:** AI automates the "verify it works" loop. Human provides the "verify it's right" judgment.
+
+**Deeper Insight (User Observation):** Even diagnostics can be automated! AI should automatically capture:
+- Browser console errors and logs (Playwright/Puppeteer)
+- Screenshots on error
+- Network activity and failures
+- Test immediately after each fix
+- Meta-analysis triggered after N iterations
+
+This reduces feedback loop from 30 minutes per iteration to 30 seconds. See AGENTICOM_IMPROVEMENTS.md Priority 0 for implementation.

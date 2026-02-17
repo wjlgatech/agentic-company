@@ -365,6 +365,40 @@ def stats(ctx, as_json):
             click.echo(f"   • {status}: {count}")
 
 
+# ============== Diagnostics ==============
+
+@cli.command()
+@click.pass_context
+def diagnostics(ctx):
+    """Check diagnostics system status"""
+    from orchestration.diagnostics import check_playwright_installation
+
+    click.echo("🔬 Diagnostics System Status")
+    click.echo("=" * 40)
+
+    if check_playwright_installation():
+        click.echo("✅ Playwright: Installed")
+        try:
+            import playwright
+            version = getattr(playwright, '__version__', 'unknown')
+            click.echo(f"   Version: {version}")
+        except Exception:
+            pass
+        click.echo("\n📋 Usage:")
+        click.echo("   Add diagnostics_config to workflow YAML")
+        click.echo("   Set enabled: true and configure options")
+        click.echo("\n📚 Documentation:")
+        click.echo("   See docs/diagnostics.md (coming in Phase 6)")
+    else:
+        click.echo("❌ Playwright: Not installed")
+        click.echo("\n📦 Install with:")
+        click.echo("   pip install 'agentic-company[diagnostics]'")
+        click.echo("\n🌐 Then install browsers:")
+        click.echo("   playwright install")
+        click.echo("\n   Or install just Chromium:")
+        click.echo("   playwright install chromium")
+
+
 # ============== Dashboard ==============
 
 @cli.command()

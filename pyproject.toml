@@ -75,8 +75,14 @@ observability = [
     "opentelemetry-instrumentation-fastapi>=0.43b0",
     "prometheus-client>=0.19.0",
 ]
+diagnostics = [
+    "playwright>=1.40.0",
+]
+test-diagnostics = [
+    "pytest-playwright>=0.4.0",
+]
 all = [
-    "agentic-company[dev,anthropic,openai,supabase,celery,postgres,observability]",
+    "agentic-company[dev,anthropic,openai,supabase,celery,postgres,observability,diagnostics]",
 ]
 
 [project.scripts]

@@ -1,0 +1,67 @@
+id: feature-dev-llm
+name: Feature Development with LLM-Powered Recovery
+description: |
+  Multi-agent feature development with AI-powered failure analysis.
+  LLM intelligently decides whether to retry, loop back, or escalate.
+
+agents:
+  - id: planner
+    name: Planner
+    role: Requirements Analysis
+    prompt: |
+      Analyze requirements and create a detailed implementation plan.
+
+  - id: developer
+    name: Developer
+    role: Implementation
+    prompt: |
+      Implement features following the plan. Address any feedback provided.
+
+  - id: verifier
+    name: Verifier
+    role: Code Verification
+    prompt: |
+      Verify code quality, correctness, and best practices.
+
+  - id: tester
+    name: Tester
+    role: Testing
+    prompt: |
+      Create comprehensive tests for the implementation.
+
+steps:
+  - id: plan
+    agent: planner
+    input: "{{task}}"
+    expects: "STATUS: done"
+
+  - id: implement
+    agent: developer
+    input: |
+      Task: {{task}}
+      Plan: {{step_outputs.plan}}
+
+      {% if implement_llm_feedback %}
+      AI Analysis: {{implement_llm_feedback}}
+      {% endif %}
+    expects: "STATUS: done"
+
+  - id: verify
+    agent: verifier
+    input: "Review: {{step_outputs.implement}}"
+    expects: "VERIFIED"
+    on_failure:
+      action: llm_decide  # LLM decides: retry, loop_back, or stop
+      use_llm_analysis: true
+      max_loops: 3
+      feedback_template: "Verification issues: {{error}}"
+
+  - id: test
+    agent: tester
+    input: "Test: {{step_outputs.implement}}"
+    expects: "STATUS: done"
+    on_failure:
+      action: llm_decide
+      use_llm_analysis: true
+      max_loops: 2
+      feedback_template: "Test failures: {{error}}"

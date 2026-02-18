@@ -219,7 +219,9 @@ class DiagnosticsIntegrator:
         # Run diagnostics once (no retry loop)
         try:
             diagnostics = await self._run_diagnostics(test_url, test_actions)
-            return diagnostics.to_dict()
+            result_dict = diagnostics.to_dict()
+            result_dict["captured"] = True
+            return result_dict
         except Exception as e:
             logger.error("Diagnostics capture failed", error=str(e), exc_info=True)
             return {

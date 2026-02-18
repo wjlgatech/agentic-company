@@ -1,0 +1,159 @@
+id: feature-dev-loopback
+name: Feature Development with Intelligent Loop-Back
+description: |
+  Multi-agent feature development with intelligent failure recovery.
+  Automatically loops back to previous steps when verification/tests fail.
+
+agents:
+  - id: planner
+    name: Planner
+    role: Requirements Analysis & Task Breakdown
+    prompt: |
+      You are a software requirements analyst. Break down tasks into clear,
+      implementable specifications. Focus on: requirements, acceptance criteria,
+      technical considerations, and edge cases.
+
+  - id: developer
+    name: Developer
+    role: Code Implementation
+    prompt: |
+      You are an expert software developer. Write clean, well-tested code.
+      Follow best practices: type hints, docstrings, error handling.
+
+      **IMPORTANT**: If you receive feedback from verification or test failures,
+      carefully review the feedback and fix the issues before completing.
+
+      Feedback context available:
+      - {{implement_loopback_feedback}} - Feedback from failed verification
+      - {{implement_llm_loopback_feedback}} - LLM analysis of failures
+
+  - id: verifier
+    name: Verifier
+    role: Code Review & Verification
+    prompt: |
+      You are a senior code reviewer. Verify:
+      1. Code correctness and logic
+      2. Best practices followed
+      3. Error handling present
+      4. Type hints and documentation
+      5. No security vulnerabilities
+
+      If issues found, clearly list them for the developer to fix.
+      End with: "VERIFIED" (if good) or explain what needs fixing.
+
+  - id: tester
+    name: Tester
+    role: Test Creation & Execution
+    prompt: |
+      You are a QA engineer. Create comprehensive tests:
+      - Unit tests for all functions
+      - Edge cases and error conditions
+      - Integration tests if needed
+
+      Generate actual test code that can be run.
+      Include STATUS: done when complete.
+
+  - id: reviewer
+    name: Reviewer
+    role: Final Review
+    prompt: |
+      You are the final reviewer. Check:
+      1. All requirements met
+      2. Code quality high
+      3. Tests comprehensive
+      4. Ready for production
+
+      End with: "APPROVED" or list remaining issues.
+
+steps:
+  - id: plan
+    agent: planner
+    description: Analyze requirements and create implementation plan
+    input: "{{task}}"
+    expects: "STATUS: done"
+    retry: 2
+
+  - id: implement
+    agent: developer
+    description: Implement the feature based on the plan
+    input: |
+      Task: {{task}}
+
+      Plan: {{step_outputs.plan}}
+
+      {% if implement_loopback_feedback %}
+      ⚠️ PREVIOUS ATTEMPT FAILED - PLEASE FIX:
+      {{implement_loopback_feedback}}
+      {% endif %}
+
+      {% if implement_llm_loopback_feedback %}
+      🤖 LLM ANALYSIS:
+      {{implement_llm_loopback_feedback}}
+      {% endif %}
+
+      Please implement the feature addressing any feedback above.
+    expects: "STATUS: done"
+    retry: 1
+
+  - id: verify
+    agent: verifier
+    description: Verify code quality and correctness
+    input: |
+      Please review this implementation:
+
+      {{step_outputs.implement}}
+
+      Original task: {{task}}
+    expects: "VERIFIED"
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 2
+      feedback_template: |
+        Code verification failed. Issues found:
+        {{error}}
+
+        Please fix these issues and resubmit.
+
+  - id: test
+    agent: tester
+    description: Create and run comprehensive tests
+    input: |
+      Create tests for this implementation:
+
+      {{step_outputs.implement}}
+
+      Task: {{task}}
+    expects: "STATUS: done"
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 2
+      feedback_template: |
+        Tests are failing or incomplete:
+        {{error}}
+
+        Please review the implementation and fix the issues.
+        Then create passing tests.
+
+  - id: review
+    agent: reviewer
+    description: Final review before completion
+    input: |
+      Final review of:
+
+      Implementation: {{step_outputs.implement}}
+      Tests: {{step_outputs.test}}
+
+      Task: {{task}}
+      Plan: {{step_outputs.plan}}
+    expects: "APPROVED"
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 1
+      feedback_template: |
+        Final review found issues:
+        {{error}}
+
+        Please address these final concerns.

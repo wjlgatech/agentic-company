@@ -1,0 +1,122 @@
+{
+  "run_id": "b3e6a1d6",
+  "artifacts": [
+    {
+      "type": "code",
+      "filename": "output_0.py",
+      "content": "# requirements.txt\nfastapi==0.104.1\nuvicorn==0.24.0\nsqlalchemy==2.0.23\npsycopg2-binary==2.9.9\npython-jose[cryptography]==3.3.0\npasslib[bcrypt]==1.7.4\npython-multipart==0.0.6\npydantic==2.5.0\npytest==7.4.3\npytest-asyncio==0.21.1\nhttpx==0.25.2\nalembic==1.13.1\npython-dotenv==1.0.0",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 0
+      },
+      "created_at": "2026-02-16T23:02:15.583861"
+    },
+    {
+      "type": "code",
+      "filename": "config.py",
+      "content": "# config.py\nimport os\nfrom typing import Optional\nfrom pydantic_settings import BaseSettings\n\nclass Settings(BaseSettings):\n    database_url: str = \"postgresql://user:password@localhost/todoapp\"\n    secret_key: str = \"your-secret-key-change-in-production\"\n    algorithm: str = \"HS256\"\n    access_token_expire_minutes: int = 30\n    \n    class Config:\n        env_file = \".env\"\n\nsettings = Settings()",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 1
+      },
+      "created_at": "2026-02-16T23:02:15.583921"
+    },
+    {
+      "type": "code",
+      "filename": "database.py",
+      "content": "# database.py\nfrom sqlalchemy import create_engine\nfrom sqlalchemy.ext.declarative import declarative_base\nfrom sqlalchemy.orm import sessionmaker\nfrom config import settings\n\nengine = create_engine(settings.database_url)\nSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)\nBase = declarative_base()\n\ndef get_db():\n    \"\"\"Database dependency for FastAPI\"\"\"\n    db = SessionLocal()\n    try:\n        yield db\n    finally:\n        db.close()",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 2
+      },
+      "created_at": "2026-02-16T23:02:15.583933"
+    },
+    {
+      "type": "code",
+      "filename": "models.py",
+      "content": "# models.py\nfrom sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey\nfrom sqlalchemy.relationship import relationship\nfrom sqlalchemy.sql import func\nfrom database import Base\n\nclass User(Base):\n    __tablename__ = \"users\"\n    \n    id = Column(Integer, primary_key=True, index=True)\n    email = Column(String(255), unique=True, index=True, nullable=False)\n    hashed_password = Column(String(255), nullable=False)\n    created_at = Column(DateTime(timezone=True), server_default=func.now())\n    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())\n    \n    todos = relationship(\"Todo\", back_populates=\"owner\", cascade=\"all, delete-orphan\")\n\nclass Todo(Base):\n    __tablename__ = \"todos\"\n    \n    id = Column(Integer, primary_key=True, index=True)\n    title = Column(String(255), nullable=False)\n    description = Column(Text, nullable=True)\n    completed = Column(Boolean, default=False)\n    created_at = Column(DateTime(timezone=True), server_default=func.now())\n    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())\n    user_id = Column(Integer, ForeignKey(\"users.id\"), nullable=False)\n    \n    owner = relationship(\"User\", back_populates=\"todos\")",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 3
+      },
+      "created_at": "2026-02-16T23:02:15.583952"
+    },
+    {
+      "type": "code",
+      "filename": "schemas.py",
+      "content": "# schemas.py\nfrom datetime import datetime\nfrom typing import Optional, List\nfrom pydantic import BaseModel, EmailStr, Field\n\n# User Schemas\nclass UserBase(BaseModel):\n    email: EmailStr\n\nclass UserCreate(UserBase):\n    password: str = Field(..., min_length=6, description=\"Password must be at least 6 characters\")\n\nclass UserLogin(BaseModel):\n    email: EmailStr\n    password: str\n\nclass UserResponse(UserBase):\n    id: int\n    created_at: datetime\n    \n    class Config:\n        from_attributes = True\n\n# Token Schemas\nclass Token(BaseModel):\n    access_token: str\n    token_type: str\n\nclass TokenData(BaseModel):\n    email: Optional[str] = None\n\n# Todo Schemas\nclass TodoBase(BaseModel):\n    title: str = Field(..., min_length=1, max_length=255)\n    description: Optional[str] = None\n    completed: bool = False\n\nclass TodoCreate(TodoBase):\n    pass\n\nclass TodoUpdate(BaseModel):\n    title: Optional[str] = Field(None, min_length=1, max_length=255)\n    description: Optional[str] = None\n    completed: Optional[bool] = None\n\nclass TodoResponse(TodoBase):\n    id: int\n    user_id: int\n    created_at: datetime\n    updated_at: datetime\n    \n    class Config:\n        from_attributes = True\n\n# Error Response Schema\nclass ErrorResponse(BaseModel):\n    detail: str\n    error_code: Optional[str] = None",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 4
+      },
+      "created_at": "2026-02-16T23:02:15.583972"
+    },
+    {
+      "type": "code",
+      "filename": "auth_service.py",
+      "content": "# auth_service.py\nfrom datetime import datetime, timedelta\nfrom typing import Optional\nfrom jose import JWTError, jwt\nfrom passlib.context import CryptContext\nfrom sqlalchemy.orm import Session\nfrom fastapi import HTTPException, status\nfrom models import User\nfrom schemas import TokenData\nfrom config import settings\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\n\ndef verify_password(plain_password: str, hashed_password: str) -> bool:\n    \"\"\"Verify a plain password against its hash\"\"\"\n    return pwd_context.verify(plain_password, hashed_password)\n\ndef get_password_hash(password: str) -> str:\n    \"\"\"Hash a password using bcrypt\"\"\"\n    return pwd_context.hash(password)\n\ndef create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:\n    \"\"\"Create JWT access token\"\"\"\n    to_encode = data.copy()\n    if expires_delta:\n        expire = datetime.utcnow() + expires_delta\n    else:\n        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)\n    \n    to_encode.update({\"exp\": expire})\n    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)\n    return encoded_jwt\n\ndef verify_token(token: str) -> TokenData:\n    \"\"\"Verify and decode JWT token\"\"\"\n    try:\n        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])\n        email: str = payload.get(\"sub\")\n        if email is None:\n            raise HTTPException(\n                status_code=status.HTTP_401_UNAUTHORIZED,\n                detail=\"Invalid authentication credentials\",\n                headers={\"WWW-Authenticate\": \"Bearer\"},\n            )\n        token_data = TokenData(email=email)\n        return token_data\n    except JWTError:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Invalid authentication credentials\",\n            headers={\"WWW-Authenticate\": \"Bearer\"},\n        )\n\ndef authenticate_user(db: Session, email: str, password: str) -> Optional[User]:\n    \"\"\"Authenticate user with email and password\"\"\"\n    user = db.query(User).filter(User.email == email).first()\n    if not user:\n        return None\n    if not verify_password(password, user.hashed_password):\n        return None\n    return user\n\ndef get_user_by_email(db: Session, email: str) -> Optional[User]:\n    \"\"\"Get user by email\"\"\"\n    return db.query(User).filter(User.email == email).first()\n\ndef create_user(db: Session, email: str, password: str) -> User:\n    \"\"\"Create new user\"\"\"\n    hashed_password = get_password_hash(password)\n    db_user = User(email=email, hashed_password=hashed_password)\n    db.add(db_user)\n    db.commit()\n    db.refresh(db_user)\n    return db_user",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 5
+      },
+      "created_at": "2026-02-16T23:02:15.584000"
+    },
+    {
+      "type": "code",
+      "filename": "auth_middleware.py",
+      "content": "# auth_middleware.py\nfrom fastapi import Depends, HTTPException, status\nfrom fastapi.security import HTTPBearer, HTTPAuthorizationCredentials\nfrom sqlalchemy.orm import Session\nfrom database import get_db\nfrom auth_service import verify_token, get_user_by_email\nfrom models import User\n\nsecurity = HTTPBearer()\n\nasync def get_current_user(\n    credentials: HTTPAuthorizationCredentials = Depends(security),\n    db: Session = Depends(get_db)\n) -> User:\n    \"\"\"Get current authenticated user from JWT token\"\"\"\n    token = credentials.credentials\n    token_data = verify_token(token)\n    \n    user = get_user_by_email(db, email=token_data.email)\n    if user is None:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"User not found\",\n            headers={\"WWW-Authenticate\": \"Bearer\"},\n        )\n    return user",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 6
+      },
+      "created_at": "2026-02-16T23:02:15.584012"
+    },
+    {
+      "type": "code",
+      "filename": "todo_service.py",
+      "content": "# todo_service.py\nfrom typing import List, Optional\nfrom sqlalchemy.orm import Session\nfrom fastapi import HTTPException, status\nfrom models import Todo, User\nfrom schemas import TodoCreate, TodoUpdate\n\ndef get_user_todos(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[Todo]:\n    \"\"\"Get all todos for a specific user\"\"\"\n    return db.query(Todo).filter(Todo.user_id == user_id).offset(skip).limit(limit).all()\n\ndef get_todo_by_id(db: Session, todo_id: int, user_id: int) -> Optional[Todo]:\n    \"\"\"Get a specific todo by ID for a user\"\"\"\n    return db.query(Todo).filter(Todo.id == todo_id, Todo.user_id == user_id).first()\n\ndef create_todo(db: Session, todo: TodoCreate, user_id: int) -> Todo:\n    \"\"\"Create a new todo for a user\"\"\"\n    db_todo = Todo(**todo.dict(), user_id=user_id)\n    db.add(db_todo)\n    db.commit()\n    db.refresh(db_todo)\n    return db_todo\n\ndef update_todo(db: Session, todo_id: int, todo_update: TodoUpdate, user_id: int) -> Optional[Todo]:\n    \"\"\"Update an existing todo\"\"\"\n    db_todo = get_todo_by_id(db, todo_id, user_id)\n    if not db_todo:\n        return None\n    \n    update_data = todo_update.dict(exclude_unset=True)\n    for field, value in update_data.items():\n        setattr(db_todo, field, value)\n    \n    db.commit()\n    db.refresh(db_todo)\n    return db_todo\n\ndef delete_todo(db: Session, todo_id: int, user_id: int) -> bool:\n    \"\"\"Delete a todo\"\"\"\n    db_todo = get_todo_by_id(db, todo_id, user_id)\n    if not db_todo:\n        return False\n    \n    db.delete(db_todo)\n    db.commit()\n    return True",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 7
+      },
+      "created_at": "2026-02-16T23:02:15.584031"
+    },
+    {
+      "type": "code",
+      "filename": "validation.py",
+      "content": "# validation.py\nfrom fastapi import HTTPException, status\nfrom pydantic import ValidationError\nfrom typing import Any, Dict\n\ndef validate_request_body(model_class: Any, data: Dict) -> Any:\n    \"\"\"Validate request body against Pydantic model\"\"\"\n    try:\n        return model_class(**data)\n    except ValidationError as e:\n        raise HTTPException(\n            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n            detail={\n                \"message\": \"Validation error\",\n                \"errors\": e.errors()\n            }\n        )\n\ndef handle_not_found(resource_name: str, resource_id: int = None) -> HTTPException:\n    \"\"\"Standard not found error response\"\"\"\n    detail = f\"{resource_name} not found\"\n    if resource_id:\n        detail += f\" with id {resource_id}\"\n    \n    return HTTPException(\n        status_code=status.HTTP_404_NOT_FOUND,\n        detail=detail\n    )\n\ndef handle_conflict(message: str) -> HTTPException:\n    \"\"\"Standard conflict error response\"\"\"\n    return HTTPException(\n        status_code=status.HTTP_409_CONFLICT,\n        detail=message\n    )",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 8
+      },
+      "created_at": "2026-02-16T23:02:15.584045"
+    },
+    {
+      "type": "code",
+      "filename": "auth_routes.py",
+      "content": "# auth_routes.py\nfrom datetime import timedelta\nfrom fastapi import APIRouter, Depends, HTTPException, status\nfrom sqlalchemy.orm import Session\nfrom database import get_db\nfrom auth_service import authenticate_user, create_user, get_user_by_email, create_access_token\nfrom auth_middleware import get_current_user\nfrom schemas import UserCreate, UserLogin, UserResponse, Token\nfrom validation import handle_conflict\nfrom config import settings\n\nrouter = APIRouter(prefix=\"/api/auth\", tags=[\"authentication\"])\n\n@router.post(\"/register\", response_model=UserResponse, status_code=status.HTTP_201_CREATED)\nasync def register(user: UserCreate, db: Session = Depends(get_db)):\n    \"\"\"Register a new user\"\"\"\n    # Check if user already exists\n    db_user = get_user_by_email(db, email=user.email)\n    if db_user:\n        raise handle_conflict(\"Email already registered\")\n    \n    # Create new user\n    new_user = create_user(db, email=user.email, password=user.password)\n    return new_user\n\n@router.post(\"/login\", response_model=Token)\nasync def login(user_credentials: UserLogin, db: Session = Depends(get_db)):\n    \"\"\"Authenticate user and return access token\"\"\"\n    user = authenticate_user(db, user_credentials.email, user_credentials.password)\n    if not user:\n        raise HTTPException(\n            status_code=status.HTTP_401_UNAUTHORIZED,\n            detail=\"Incorrect email or password\",\n            headers={\"WWW-Authenticate\": \"Bearer\"},\n        )\n    \n    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)\n    access_token = create_access_token(\n        data={\"sub\": user.email}, expires_delta=access_token_expires\n    )\n    \n    return {\"access_token\": access_token, \"token_type\": \"bearer\"}\n\n@router.post(\"/logout\", status_code=status.HTTP_200_OK)\nasync def logout(current_user = Depends(get_current_user)):\n    \"\"\"Logout user (token invalidation handled client-side)\"\"\"\n    return {\"message\": \"Successfully logged out\"}\n\n@router.get(\"/me\", response_model=UserResponse)\nasync def get_current_user_info(current_user = Depends(get_current_user)):\n    \"\"\"Get current user information\"\"\"\n    return current_user",
+      "language": "python",
+      "metadata": {
+        "extracted_from": "code_block",
+        "index": 9
+      },
+      "created_at": "2026-02-16T23:02:15.584072"
+    }
+  ],
+  "created_at": "2026-02-16T23:02:15.584100",
+  "metadata": {},
+  "stats": {
+    "count": 10,
+    "total_size_bytes": 12052,
+    "total_lines": 366
+  }
+}

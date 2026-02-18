@@ -399,6 +399,199 @@ def diagnostics(ctx):
         click.echo("   playwright install chromium")
 
 
+# ============== Phase 5: Criteria Builder ==============
+
+@cli.command("build-criteria")
+@click.argument("task")
+@click.option("--context", "-c", help="JSON context (e.g., '{\"framework\": \"React\"}')")
+@click.option("--output", "-o", default="success_criteria.json", help="Output file")
+@click.option("--non-interactive", is_flag=True, help="Skip Q&A (use initial criteria only)")
+@click.pass_context
+def build_criteria(ctx, task, context, output, non_interactive):
+    """Build success criteria interactively with AI
+
+    Example:
+        agenticom build-criteria "Build a login page" -c '{"framework": "React"}'
+    """
+    import asyncio
+    import json as json_lib
+    from orchestration.diagnostics.criteria_builder import CriteriaBuilder
+    from orchestration.integrations.unified import auto_setup_executor
+
+    try:
+        # Parse context
+        context_dict = {}
+        if context:
+            try:
+                context_dict = json_lib.loads(context)
+            except json_lib.JSONDecodeError:
+                click.echo(f"❌ Invalid JSON context: {context}", err=True)
+                return
+
+        click.echo("🤖 Building Success Criteria with AI")
+        click.echo("=" * 60)
+        click.echo(f"Task: {task}")
+        if context_dict:
+            click.echo(f"Context: {json_lib.dumps(context_dict, indent=2)}")
+        click.echo()
+
+        # Setup executor
+        click.echo("📡 Connecting to LLM...")
+        executor = auto_setup_executor()
+        click.echo("   ✅ Connected")
+        click.echo()
+
+        # Define question callback for interactive mode
+        def ask_question(question: str) -> str:
+            if non_interactive:
+                return "No response provided"
+
+            click.echo(f"❓ {question}")
+            response = click.prompt("   Your answer", type=str, default="")
+            click.echo()
+            return response
+
+        # Build criteria
+        builder = CriteriaBuilder(executor, question_callback=ask_question)
+
+        async def run():
+            return await builder.build_criteria(task, context_dict)
+
+        criteria = asyncio.run(run())
+
+        # Display results
+        click.echo("=" * 60)
+        click.echo("✅ Success Criteria Generated")
+        click.echo("=" * 60)
+        click.echo()
+
+        click.echo("📋 Criteria:")
+        for i, criterion in enumerate(criteria.criteria, 1):
+            click.echo(f"  {i}. {criterion}")
+        click.echo()
+
+        click.echo(f"📊 Confidence: {criteria.confidence:.2f}")
+        click.echo(f"❓ Questions Asked: {len(criteria.questions_asked)}")
+        click.echo(f"💬 Responses Provided: {len([r for r in criteria.human_responses if r and r != 'No response provided'])}")
+        click.echo()
+
+        # Save to file
+        with open(output, "w") as f:
+            json_lib.dump(criteria.to_dict(), f, indent=2)
+
+        click.echo(f"📝 Saved to: {output}")
+        click.echo()
+        click.echo("💡 Tip: Use these criteria in your workflow YAML under step metadata")
+
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+
+
+# ============== Phase 6: Diagnostics Testing ==============
+
+@cli.command("test-diagnostics")
+@click.argument("url")
+@click.option("--actions", "-a", type=click.Path(exists=True), help="JSON file with browser actions")
+@click.option("--headless/--headed", default=True, help="Run browser in headless mode")
+@click.option("--output-dir", "-o", default="outputs/diagnostics", help="Output directory for screenshots")
+@click.pass_context
+def test_diagnostics(ctx, url, actions, headless, output_dir):
+    """Test URL with browser automation diagnostics
+
+    Example:
+        agenticom test-diagnostics http://localhost:3000 -a login_test.json --headed
+    """
+    import asyncio
+    import json as json_lib
+    from pathlib import Path
+    from orchestration.diagnostics import DiagnosticsConfig, PlaywrightCapture, BrowserAction
+
+    try:
+        # Load actions
+        test_actions = []
+        if actions:
+            with open(actions) as f:
+                actions_data = json_lib.load(f)
+                test_actions = actions_data.get("actions", [])
+        else:
+            # Default actions: navigate and screenshot
+            test_actions = [
+                {"type": "navigate", "value": url},
+                {"type": "screenshot", "value": "page.png"},
+            ]
+
+        click.echo("🔬 Running Browser Diagnostics")
+        click.echo("=" * 60)
+        click.echo(f"URL: {url}")
+        click.echo(f"Actions: {len(test_actions)}")
+        click.echo(f"Headless: {headless}")
+        click.echo(f"Output: {output_dir}")
+        click.echo()
+
+        # Create config
+        config = DiagnosticsConfig(
+            enabled=True,
+            playwright_headless=headless,
+            capture_screenshots=True,
+            capture_console=True,
+            capture_network=True,
+            output_dir=Path(output_dir),
+        )
+
+        # Convert actions to BrowserAction objects
+        actions_list = [BrowserAction.from_dict(a) for a in test_actions]
+
+        # Run diagnostics
+        async def run():
+            capture = PlaywrightCapture(config)
+            async with capture:
+                result = await capture.execute_actions(actions_list, Path(output_dir))
+            return result
+
+        click.echo("🚀 Running browser automation...")
+        result = asyncio.run(run())
+
+        # Display results
+        click.echo()
+        click.echo("=" * 60)
+        click.echo("Results")
+        click.echo("=" * 60)
+
+        if result.success:
+            click.echo("✅ Success: True")
+        else:
+            click.echo("❌ Success: False")
+            if result.error:
+                click.echo(f"   Error: {result.error}")
+
+        click.echo(f"📊 Console logs: {len(result.console_logs)}")
+        click.echo(f"❌ Console errors: {len(result.console_errors)}")
+        click.echo(f"🌐 Network requests: {len(result.network_requests)}")
+        click.echo(f"📸 Screenshots: {len(result.screenshots)}")
+        click.echo(f"🔗 Final URL: {result.final_url}")
+        click.echo(f"⏱️  Execution time: {result.execution_time_ms:.0f}ms")
+        click.echo()
+
+        if result.screenshots:
+            click.echo("📸 Screenshots:")
+            for screenshot in result.screenshots:
+                click.echo(f"   • {screenshot}")
+            click.echo()
+
+        if result.console_errors:
+            click.echo("❌ Console Errors (first 3):")
+            for error in result.console_errors[:3]:
+                click.echo(f"   [{error.type}] {error.text[:80]}")
+            click.echo()
+
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+
+
 # ============== Dashboard ==============
 
 @cli.command()

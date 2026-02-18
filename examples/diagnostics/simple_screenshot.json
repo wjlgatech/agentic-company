@@ -1,0 +1,19 @@
+{
+  "description": "Simple test: navigate to a page and take a screenshot",
+  "url": "https://example.com",
+  "actions": [
+    {
+      "type": "navigate",
+      "value": "https://example.com"
+    },
+    {
+      "type": "wait_for_selector",
+      "selector": "h1",
+      "timeout": 5000
+    },
+    {
+      "type": "screenshot",
+      "value": "example_page.png"
+    }
+  ]
+}

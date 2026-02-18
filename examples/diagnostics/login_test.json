@@ -1,0 +1,42 @@
+{
+  "description": "Test login flow with email and password",
+  "url": "http://localhost:3000/login",
+  "actions": [
+    {
+      "type": "navigate",
+      "value": "http://localhost:3000/login"
+    },
+    {
+      "type": "wait_for_selector",
+      "selector": "#login-form",
+      "timeout": 5000
+    },
+    {
+      "type": "type",
+      "selector": "#email",
+      "value": "user@example.com"
+    },
+    {
+      "type": "type",
+      "selector": "#password",
+      "value": "password123"
+    },
+    {
+      "type": "click",
+      "selector": "#submit-button"
+    },
+    {
+      "type": "wait_for_selector",
+      "selector": "#dashboard",
+      "timeout": 5000
+    },
+    {
+      "type": "screenshot",
+      "value": "logged_in.png"
+    }
+  ],
+  "expected": {
+    "no_console_errors": true,
+    "final_url": "http://localhost:3000/dashboard"
+  }
+}

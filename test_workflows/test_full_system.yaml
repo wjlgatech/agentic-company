@@ -1,0 +1,83 @@
+id: test-full-system
+name: Complete Diagnostics System Test
+description: Test criteria builder, auto-test loop, and meta-analysis
+
+diagnostics_config:
+  enabled: true
+  max_iterations: 5
+  iteration_threshold: 2
+  playwright_headless: true
+  capture_screenshots: true
+  capture_console: true
+  capture_network: true
+
+agents:
+  - id: criteria_builder
+    name: Criteria Builder
+    role: Requirements Analysis
+    prompt: |
+      You are a requirements analyst. Based on the task, define clear,
+      measurable success criteria.
+
+  - id: tester
+    name: Automated Tester
+    role: Testing
+    prompt: |
+      You are an automated tester. You verify that implementations meet
+      the success criteria by analyzing diagnostic results.
+
+      Review the diagnostic data:
+      - Screenshots captured
+      - Console logs and errors
+      - Network requests
+      - Page load time
+      - Element presence
+
+      Report: PASS or FAIL with specific reasons.
+
+steps:
+  - id: define_criteria
+    agent: criteria_builder
+    input: |
+      Define 3-5 measurable success criteria for testing: {{task}}
+
+      Consider:
+      - Functional requirements (what should work)
+      - Non-functional requirements (performance, UX)
+      - Error handling
+      - Cross-browser compatibility
+
+    expects: "Criteria:"
+
+  - id: run_test
+    agent: tester
+    input: |
+      Test against these criteria:
+      {{step_outputs.define_criteria}}
+
+      Analyze the diagnostic results and report if the site meets all criteria.
+
+      Diagnostics available:
+      - Success: {{diagnostics.success}}
+      - Final URL: {{diagnostics.final_url}}
+      - Screenshots: {{diagnostics.screenshots}}
+      - Console errors: {{diagnostics.console_errors}}
+      - Network requests: {{diagnostics.network_requests}}
+      - Execution time: {{diagnostics.execution_time_ms}}ms
+
+      Format your response as:
+      VERDICT: PASS or FAIL
+      REASON: Brief explanation
+      RECOMMENDATIONS: Any improvements needed
+
+    metadata:
+      diagnostics_enabled: true
+      test_url: "https://example.com"
+      test_actions:
+        - type: navigate
+          value: "https://example.com"
+        - type: wait_for_selector
+          selector: "h1"
+          timeout: 5000
+        - type: screenshot
+          value: "test_result.png"

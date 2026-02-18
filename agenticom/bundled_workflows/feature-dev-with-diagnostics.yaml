@@ -1,0 +1,440 @@
+# Feature Development Workflow with Automated Diagnostics
+# 5 agents + AI-powered automated testing with browser diagnostics
+
+id: feature-dev-with-diagnostics
+name: Feature Development Team (with Diagnostics)
+description: |
+  Plan, build, verify, test, and review code with cross-agent verification.
+  Enhanced with automated browser testing and AI-powered meta-analysis.
+
+  NEW FEATURES:
+  - Automated browser testing after each implementation
+  - Auto-retry until tests pass (up to 10 attempts)
+  - AI meta-analysis after 3 failures (suggests alternative approaches)
+  - Screenshot, console log, and network capture
+  - 60x faster feedback loop (30 min → 30 sec per iteration)
+
+version: "2.0"
+tags: [development, coding, testing, review, diagnostics, automation]
+
+# ============================================================================
+# DIAGNOSTICS CONFIGURATION
+# ============================================================================
+diagnostics_config:
+  enabled: true
+  playwright_headless: true              # Set to false for debugging
+  browser_type: "chromium"               # chromium, firefox, or webkit
+
+  # Performance
+  timeout_ms: 30000                      # 30 seconds max per test
+
+  # Capture settings
+  capture_screenshots: true              # Screenshot on each action
+  capture_console: true                  # Capture console.log/error
+  capture_network: true                  # Track network requests
+  screenshot_on_error: true              # Auto-screenshot on failure
+
+  # Auto-retry configuration
+  max_iterations: 10                     # Max retry attempts
+  iteration_threshold: 3                 # Trigger meta-analysis after N failures
+
+  # Output
+  output_dir: "outputs/diagnostics"     # Screenshot/log directory
+
+# ============================================================================
+# AGENTS
+# ============================================================================
+agents:
+  - id: criteria_builder
+    name: Criteria Builder
+    role: Success Criteria Definition
+    prompt: |
+      You are a requirements analyst specializing in defining measurable success criteria.
+
+      YOUR JOB:
+      1. Analyze the feature request
+      2. Define 3-5 clear, measurable success criteria
+      3. Consider functional, non-functional, and UX requirements
+      4. Make criteria testable with browser automation
+
+      OUTPUT FORMAT:
+      ## Success Criteria:
+      1. [Criterion 1 - specific and measurable]
+      2. [Criterion 2 - specific and measurable]
+      3. [Criterion 3 - specific and measurable]
+
+      ## Test Actions Required:
+      - [Action 1: e.g., Navigate to /login]
+      - [Action 2: e.g., Enter credentials]
+      - [Action 3: e.g., Verify redirect to dashboard]
+
+  - id: planner
+    name: Planner
+    role: Requirements Analysis & Task Breakdown
+    prompt: |
+      You are a senior technical planner.
+
+      YOUR JOB:
+      1. Analyze the feature request
+      2. Break it into implementable tasks
+      3. Define acceptance criteria for each task
+      4. Identify dependencies and risks
+
+      OUTPUT FORMAT:
+      ## Feature: {name}
+      ## Tasks:
+      1. Task name - description - acceptance criteria
+      2. ...
+      ## Dependencies: ...
+      ## Risks: ...
+
+  - id: developer
+    name: Developer
+    role: Implementation & Code Writing
+    prompt: |
+      You are a senior developer.
+
+      CODING STANDARDS:
+      - Follow existing patterns in the codebase
+      - Add type hints (Python) or types (TypeScript)
+      - Include docstrings/comments for complex logic
+      - Handle edge cases
+      - No TODO comments - complete the implementation
+
+      IMPORTANT: Your code will be tested automatically with browser automation.
+      Make sure it actually works, not just compiles.
+
+      OUTPUT: Complete, working code ready for automated testing.
+
+  - id: verifier
+    name: Verifier
+    role: Cross-Verification Against Spec
+    prompt: |
+      You are a verification specialist.
+
+      YOUR JOB:
+      The developer doesn't mark their own homework.
+      Check every implementation against the acceptance criteria.
+
+      YOU HAVE ACCESS TO:
+      - Automated test results (screenshots, console logs, network activity)
+      - Diagnostic data from browser automation
+
+      VERIFICATION CHECKLIST:
+      1. Does the code meet ALL acceptance criteria?
+      2. Do the automated tests pass?
+      3. Are there console errors in the diagnostics?
+      4. Does the browser automation succeed?
+      5. Are there any edge cases not handled?
+
+      OUTPUT: VERIFIED or list of issues to fix.
+
+  - id: tester
+    name: Tester
+    role: Test Creation & Execution
+    prompt: |
+      You are a QA engineer.
+
+      TEST COVERAGE:
+      - Unit tests for all new functions
+      - Integration tests for API endpoints
+      - Edge case tests
+      - Error handling tests
+
+      OUTPUT: Complete test suite with all tests passing.
+
+  - id: reviewer
+    name: Reviewer
+    role: Code Review & Quality Assurance
+    prompt: |
+      You are a senior code reviewer.
+
+      REVIEW CRITERIA:
+      1. Code quality and readability
+      2. Performance considerations
+      3. Security best practices
+      4. Documentation completeness
+      5. Test coverage adequacy
+      6. Automated test results (from diagnostics)
+
+      OUTPUT: APPROVED or list of required changes.
+
+# ============================================================================
+# WORKFLOW STEPS
+# ============================================================================
+steps:
+  # Step 0: Build Success Criteria (NEW)
+  - id: build_criteria
+    agent: criteria_builder
+    description: Define measurable success criteria with AI
+    input: |
+      FEATURE REQUEST:
+      {{task}}
+
+      Define 3-5 measurable success criteria for this feature.
+      Focus on criteria that can be tested with browser automation.
+
+      Consider:
+      - Functional requirements (what should work)
+      - Non-functional requirements (performance, UX)
+      - Error handling
+      - Accessibility
+
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
+    expects: "STATUS: done"
+    retry: 2
+
+  # Step 1: Plan
+  - id: plan
+    agent: planner
+    description: Break down the feature into tasks
+    input: |
+      FEATURE REQUEST:
+      {{task}}
+
+      SUCCESS CRITERIA:
+      {{step_outputs.build_criteria}}
+
+      Analyze this feature request and create a detailed implementation plan.
+      Ensure the plan addresses all success criteria.
+
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
+    expects: "STATUS: done"
+    retry: 2
+
+  # Step 2: Implement (WITH AUTOMATED TESTING)
+  - id: implement
+    agent: developer
+    description: Write code with automated browser testing
+    input: |
+      IMPLEMENTATION PLAN:
+      {{step_outputs.plan}}
+
+      SUCCESS CRITERIA:
+      {{step_outputs.build_criteria}}
+
+      Implement all tasks according to the plan.
+      Follow the acceptance criteria exactly.
+
+      YOUR CODE WILL BE TESTED AUTOMATICALLY:
+      - Browser automation will test the implementation
+      - Screenshots and console logs will be captured
+      - Network activity will be monitored
+
+      Make sure your code actually works, not just compiles!
+
+      IMPORTANT: Include filename comments in your code blocks.
+      For example: # auth_service.py at the top of the file.
+
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
+    expects: "STATUS: done"
+    retry: 10  # Allow up to 10 auto-retry attempts
+    artifacts_required: true
+
+    # AUTOMATED DIAGNOSTICS (NEW)
+    metadata:
+      diagnostics_enabled: true
+
+      # Test configuration (customize per feature)
+      test_url: "http://localhost:3000"
+
+      # Browser actions to test the implementation
+      # Customize these based on your feature!
+      test_actions:
+        - type: navigate
+          value: "http://localhost:3000"
+
+        - type: wait_for_selector
+          selector: "body"
+          timeout: 5000
+
+        - type: screenshot
+          value: "implementation_loaded.png"
+
+        # Add more actions as needed:
+        # - type: click
+        #   selector: "#button-id"
+        #
+        # - type: type
+        #   selector: "#input-id"
+        #   value: "test input"
+        #
+        # - type: wait_for_selector
+        #   selector: "#result"
+        #   timeout: 5000
+
+  # Step 3: Verify (WITH DIAGNOSTIC DATA)
+  - id: verify
+    agent: verifier
+    description: Cross-verify implementation with automated test results
+    input: |
+      ORIGINAL PLAN:
+      {{step_outputs.plan}}
+
+      SUCCESS CRITERIA:
+      {{step_outputs.build_criteria}}
+
+      IMPLEMENTATION:
+      {{step_outputs.implement}}
+
+      AUTOMATED TEST RESULTS:
+      - Test Success: {{diagnostics.success}}
+      - Final URL: {{diagnostics.final_url}}
+      - Console Errors: {{diagnostics.console_errors}}
+      - Screenshots: {{diagnostics.screenshots}}
+      - Network Requests: {{diagnostics.network_requests}}
+      - Execution Time: {{diagnostics.execution_time_ms}}ms
+
+      META-ANALYSIS (if available):
+      {{meta_analysis.pattern_detected}}
+      {{meta_analysis.root_cause_hypothesis}}
+      {{meta_analysis.suggested_approaches}}
+
+      Verify the implementation meets ALL acceptance criteria.
+      Use the automated test results to inform your verification.
+
+      IMPORTANT: You MUST include exactly the word VERIFIED in your response
+      if all criteria are met. If not, list the issues clearly.
+    expects: "VERIFIED"
+    retry: 1
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 2
+      feedback_template: |
+        ⚠️ VERIFICATION FAILED - Acceptance Criteria Not Met
+
+        The verifier found issues with the implementation:
+        {{error}}
+
+        AUTOMATED TEST RESULTS:
+        - Success: {{diagnostics.success}}
+        - Console Errors: {{diagnostics.console_errors}}
+        - Screenshots: {{diagnostics.screenshots}}
+
+        VERIFICATION FEEDBACK:
+        {{step_outputs.verify}}
+
+        INSTRUCTIONS:
+        Fix the identified issues and ensure all acceptance criteria are met.
+        This is attempt {{loop_count}} of {{max_loops}}.
+
+  # Step 4: Test
+  - id: test
+    agent: tester
+    description: Create and run tests
+    input: |
+      IMPLEMENTATION:
+      {{step_outputs.implement}}
+
+      AUTOMATED TEST RESULTS:
+      {{diagnostics}}
+
+      Create comprehensive tests for this implementation.
+      The automated browser tests have already run - add unit/integration tests.
+
+      Include filename comments for test files.
+      All tests must pass.
+
+      IMPORTANT: You MUST end your response with exactly this line:
+      STATUS: done
+    expects: "STATUS: done"
+    retry: 2
+    artifacts_required: true
+    execute: "python -m pytest -v"
+
+  # Step 5: Review
+  - id: review
+    agent: reviewer
+    description: Final code review with diagnostic data
+    input: |
+      IMPLEMENTATION:
+      {{step_outputs.implement}}
+
+      VERIFICATION:
+      {{step_outputs.verify}}
+
+      TESTS:
+      {{step_outputs.test}}
+
+      AUTOMATED DIAGNOSTICS:
+      - Browser Tests: {{diagnostics.success}}
+      - Console Errors: {{diagnostics.console_errors}}
+      - Performance: {{diagnostics.execution_time_ms}}ms
+      - Iterations: {{iterations_total}}
+
+      Perform final code review and assess production readiness.
+
+      CRITICAL EVALUATION CRITERIA:
+      1. Is this code production-ready? (not just "good enough")
+      2. Are ALL core features fully implemented? (not partially)
+      3. Does it meet security and quality standards?
+      4. Do the automated tests pass consistently?
+      5. Is the implementation complete or just a skeleton?
+
+      RESPONSE FORMAT:
+      - If production-ready: Include "APPROVED FOR PRODUCTION" in your response
+      - If not ready: Clearly state "MAJOR REWORK REQUIRED" or "NOT APPROVED"
+        and list ALL missing critical components
+
+      Be honest and thorough - partial implementations are NOT acceptable.
+    expects: "APPROVED"
+    retry: 1
+    on_failure:
+      action: loop_back
+      to_step: implement
+      max_loops: 2
+      feedback_template: |
+        ⚠️ CODE REVIEW FAILED - Quality Gate Not Met
+
+        The reviewer identified critical issues with the implementation:
+        {{error}}
+
+        AUTOMATED TEST SUMMARY:
+        - Iterations Required: {{iterations_total}}
+        - Final Test Result: {{diagnostics.success}}
+
+        REVIEW FEEDBACK:
+        {{step_outputs.review}}
+
+        INSTRUCTIONS FOR RE-IMPLEMENTATION:
+        1. Address ALL issues identified in the review
+        2. Implement ALL missing core features (not just stubs)
+        3. Ensure production-grade quality (not prototype quality)
+        4. Fix any issues revealed by automated testing
+        5. Make this a COMPLETE implementation, not a partial one
+
+        This is attempt {{loop_count}} of {{max_loops}}.
+        Make it count - implement everything properly this time.
+
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+#
+# Example 1: Build a login page
+# agenticom workflow run feature-dev-with-diagnostics "Build a login page with email and password"
+#
+# Example 2: Add a search feature
+# agenticom workflow run feature-dev-with-diagnostics "Add a search bar with autocomplete to the dashboard"
+#
+# Example 3: Customize test actions
+# Edit the test_actions in the implement step metadata to match your feature's UI
+#
+# ============================================================================
+# WHAT HAPPENS AUTOMATICALLY
+# ============================================================================
+#
+# After each implementation attempt:
+# 1. Browser launches and navigates to your URL
+# 2. Executes your test actions (click, type, wait, etc.)
+# 3. Captures screenshots at each step
+# 4. Records console logs and errors
+# 5. Tracks network requests
+# 6. If test fails: Auto-retries with feedback (up to 10 times)
+# 7. After 3 failures: AI meta-analysis suggests alternative approaches
+# 8. When tests pass: Continues to verification
+#
+# Result: 60x faster feedback loop (30 min → 30 sec per iteration)

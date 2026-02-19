@@ -15,30 +15,27 @@ Run with: python tests/stress_test_real_examples.py
 
 import asyncio
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Any
+from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from orchestration.tools.mcp_bridge import MCPToolBridge, ToolStatus
-from orchestration.tools.registry import MCPRegistry
-from orchestration.workflows.parser import WorkflowParser
+from orchestration.tools.mcp_bridge import MCPToolBridge
 
 
 def print_header(text: str) -> None:
     """Print a formatted header."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  {text}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
 
 def print_section(text: str) -> None:
     """Print a section header."""
-    print(f"\n{'─'*50}")
+    print(f"\n{'─' * 50}")
     print(f"  {text}")
-    print(f"{'─'*50}\n")
+    print(f"{'─' * 50}\n")
 
 
 def print_result(result: dict, indent: int = 2) -> None:
@@ -67,7 +64,9 @@ def print_result(result: dict, indent: int = 2) -> None:
         print(f"{prefix}⏳ WAITING FOR CONNECTION")
         print(f"{prefix}   Tool: {result.get('tool', 'unknown')}")
         print(f"{prefix}   Server: {result.get('server', 'unknown')}")
-        print(f"{prefix}   Action: {result.get('action_required', 'Connect MCP server')}")
+        print(
+            f"{prefix}   Action: {result.get('action_required', 'Connect MCP server')}"
+        )
         if "suggestion" in result:
             print(f"{prefix}   Suggestion: {result['suggestion'][:80]}...")
         if "partial_result" in result:
@@ -107,8 +106,7 @@ async def test_example_1_real_estate():
     # Step 1: Social Media Intelligence - Find pain points
     print_section("Step 1: Social Intelligence - Pain Points & Opportunities")
     result = await bridge.execute(
-        "social_api",
-        topic="luxury real estate Miami international buyers frustrations"
+        "social_api", topic="luxury real estate Miami international buyers frustrations"
     )
     print_result(result)
     results["total"] += 1
@@ -126,8 +124,7 @@ async def test_example_1_real_estate():
     for competitor in competitors:
         print(f"\n  Analyzing: {competitor}")
         result = await bridge.execute(
-            "competitor_analysis",
-            domain=f"{competitor.lower().replace(' ', '')}.com"
+            "competitor_analysis", domain=f"{competitor.lower().replace(' ', '')}.com"
         )
         print_result(result, indent=4)
         results["total"] += 1
@@ -142,7 +139,7 @@ async def test_example_1_real_estate():
     print_section("Step 3: Market Research - Trends & Insights")
     result = await bridge.execute(
         "web_search",
-        query="Miami luxury real estate market 2024 2025 international buyers trends"
+        query="Miami luxury real estate market 2024 2025 international buyers trends",
     )
     print_result(result)
     results["total"] += 1
@@ -155,10 +152,7 @@ async def test_example_1_real_estate():
 
     # Step 4: Data Analysis
     print_section("Step 4: Data Analysis - Market Metrics")
-    result = await bridge.execute(
-        "data_analysis",
-        dataset="miami_real_estate_metrics"
-    )
+    result = await bridge.execute("data_analysis", dataset="miami_real_estate_metrics")
     print_result(result)
     results["total"] += 1
     if result.get("success"):
@@ -197,7 +191,7 @@ async def test_example_2_biomedical_research():
     print_section("Step 1: Literature Search - CAR-T Resistance Mechanisms")
     result = await bridge.execute(
         "literature_search",
-        query="CAR-T cell therapy resistance solid tumors 2020-2024"
+        query="CAR-T cell therapy resistance solid tumors 2020-2024",
     )
     print_result(result)
     results["total"] += 1
@@ -212,7 +206,7 @@ async def test_example_2_biomedical_research():
     print_section("Step 2: Literature Search - Tumor Microenvironment")
     result = await bridge.execute(
         "literature_search",
-        query="tumor microenvironment CAR-T immunosuppression 2022-2024"
+        query="tumor microenvironment CAR-T immunosuppression 2022-2024",
     )
     print_result(result)
     results["total"] += 1
@@ -226,8 +220,7 @@ async def test_example_2_biomedical_research():
     # Step 3: Web Search - Latest developments
     print_section("Step 3: Web Search - Latest Clinical Trials")
     result = await bridge.execute(
-        "web_search",
-        query="CAR-T solid tumor clinical trials 2024 results"
+        "web_search", query="CAR-T solid tumor clinical trials 2024 results"
     )
     print_result(result)
     results["total"] += 1
@@ -241,8 +234,7 @@ async def test_example_2_biomedical_research():
     # Step 4: Literature Search - Novel approaches
     print_section("Step 4: Literature Search - Novel Approaches")
     result = await bridge.execute(
-        "literature_search",
-        query="armored CAR-T fourth generation solid tumors"
+        "literature_search", query="armored CAR-T fourth generation solid tumors"
     )
     print_result(result)
     results["total"] += 1
@@ -281,8 +273,7 @@ async def test_example_3_startup_validation():
     # Step 1: Market Research - Target market
     print_section("Step 1: Market Research - Freelance Consulting Market")
     result = await bridge.execute(
-        "market_research",
-        company="freelance consulting AI automation market"
+        "market_research", company="freelance consulting AI automation market"
     )
     print_result(result)
     results["total"] += 1
@@ -304,10 +295,7 @@ async def test_example_3_startup_validation():
 
     for name, domain in competitors:
         print(f"\n  Analyzing: {name}")
-        result = await bridge.execute(
-            "competitor_analysis",
-            domain=domain
-        )
+        result = await bridge.execute("competitor_analysis", domain=domain)
         print_result(result, indent=4)
         results["total"] += 1
         if result.get("success"):
@@ -321,7 +309,7 @@ async def test_example_3_startup_validation():
     print_section("Step 3: Web Search - Problem Validation")
     result = await bridge.execute(
         "web_search",
-        query="freelance consultant pain points invoicing scope of work manual process"
+        query="freelance consultant pain points invoicing scope of work manual process",
     )
     print_result(result)
     results["total"] += 1
@@ -335,8 +323,7 @@ async def test_example_3_startup_validation():
     # Step 4: Web Search - Market size
     print_section("Step 4: Web Search - Market Size")
     result = await bridge.execute(
-        "web_search",
-        query="freelance consulting market size 2024 2025 growth TAM SAM"
+        "web_search", query="freelance consulting market size 2024 2025 growth TAM SAM"
     )
     print_result(result)
     results["total"] += 1
@@ -384,6 +371,7 @@ async def main():
         except Exception as e:
             print(f"\n❌ Error in {name}: {e}")
             import traceback
+
             traceback.print_exc()
 
     # Summary

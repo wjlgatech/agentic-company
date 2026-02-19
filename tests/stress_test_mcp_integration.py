@@ -14,22 +14,22 @@ Run with: python tests/stress_test_mcp_integration.py
 
 import asyncio
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from orchestration.workflows.parser import WorkflowParser
-from orchestration.tools.mcp_bridge import MCPToolBridge, get_bridge
+from orchestration.tools.mcp_bridge import MCPToolBridge
 from orchestration.tools.registry import MCPRegistry
+from orchestration.workflows.parser import WorkflowParser
 
 
 def print_header(text: str) -> None:
     """Print a formatted header."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {text}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 def print_section(text: str) -> None:
@@ -59,7 +59,7 @@ async def stress_test_mcp_integration():
         registry = MCPRegistry()
         categories = registry.list_categories()
 
-        print(f"✓ Registry initialized")
+        print("✓ Registry initialized")
         print(f"  Categories: {len(categories)}")
         print(f"  Sample: {', '.join(categories[:5])}...")
 
@@ -95,14 +95,14 @@ async def stress_test_mcp_integration():
 
         report = bridge.get_resolution_report(marketing_tools)
 
-        print(f"✓ Tools resolved")
+        print("✓ Tools resolved")
         print(f"  Total: {report['summary']['total']}")
         print(f"  Resolved: {report['summary']['resolved']}")
         print(f"  Mocked: {report['summary']['mocked']}")
         print(f"  Unresolved: {report['summary']['unresolved']}")
 
         # Should resolve or mock at least 6 tools
-        available = report['summary']['resolved'] + report['summary']['mocked']
+        available = report["summary"]["resolved"] + report["summary"]["mocked"]
         assert available >= 6, f"Expected at least 6 available tools, got {available}"
         results["tests_passed"] += 1
         print("✅ PASSED")
@@ -130,13 +130,13 @@ async def stress_test_mcp_integration():
 
         report = bridge.get_resolution_report(research_tools)
 
-        print(f"✓ Research tools resolved")
+        print("✓ Research tools resolved")
         for item in report["resolved"]:
             print(f"  → {item['name']}: {item.get('server', 'N/A')}")
         for item in report["mocked"]:
             print(f"  → {item['name']}: (mocked)")
 
-        available = report['summary']['resolved'] + report['summary']['mocked']
+        available = report["summary"]["resolved"] + report["summary"]["mocked"]
         assert available >= 2, f"Expected at least 2 available tools, got {available}"
         results["tests_passed"] += 1
         print("✅ PASSED")
@@ -158,7 +158,7 @@ async def stress_test_mcp_integration():
 
         result = await bridge.execute("web_search", query="luxury real estate Miami")
 
-        print(f"✓ Web search executed")
+        print("✓ Web search executed")
         print(f"  Success: {result['success']}")
         print(f"  Results: {len(result['data']['results'])} items")
         print(f"  Sample: {result['data']['results'][0]['title'][:50]}...")
@@ -185,10 +185,10 @@ async def stress_test_mcp_integration():
 
         result = await bridge.execute(
             "literature_search",
-            query="CAR-T cell therapy resistance solid tumors 2020-2024"
+            query="CAR-T cell therapy resistance solid tumors 2020-2024",
         )
 
-        print(f"✓ Literature search executed")
+        print("✓ Literature search executed")
         print(f"  Success: {result['success']}")
         print(f"  Articles: {len(result['data']['articles'])}")
 
@@ -218,7 +218,7 @@ async def stress_test_mcp_integration():
 
         result = await bridge.execute("social_api", topic="AI startups funding")
 
-        print(f"✓ Social API executed")
+        print("✓ Social API executed")
         print(f"  Success: {result['success']}")
         print(f"  Posts: {len(result['data']['posts'])}")
         print(f"  Metrics: sentiment={result['data']['metrics']['sentiment_score']}")
@@ -246,7 +246,7 @@ async def stress_test_mcp_integration():
 
         result = await bridge.execute("market_research", company="Anthropic")
 
-        print(f"✓ Market research executed")
+        print("✓ Market research executed")
         print(f"  Success: {result['success']}")
         print(f"  Company: {result['data']['profile']['name']}")
         print(f"  Revenue: {result['data']['metrics']['annual_revenue']}")
@@ -281,11 +281,12 @@ async def stress_test_mcp_integration():
         ]
 
         import time
+
         start = time.time()
         concurrent_results = await asyncio.gather(*tasks)
         elapsed = time.time() - start
 
-        print(f"✓ Concurrent execution completed")
+        print("✓ Concurrent execution completed")
         print(f"  Tasks: {len(concurrent_results)}")
         print(f"  Time: {elapsed:.3f}s")
         print(f"  All succeeded: {all(r['success'] for r in concurrent_results)}")
@@ -357,7 +358,9 @@ async def stress_test_mcp_integration():
 
         # Step 2: Competitor Analysis
         print("  Step 2: Competitor Analysis")
-        competitors = await bridge.execute("web_search", query="Douglas Elliman Miami real estate")
+        competitors = await bridge.execute(
+            "web_search", query="Douglas Elliman Miami real estate"
+        )
         assert competitors["success"]
 
         # Step 3: Market Research
@@ -370,9 +373,9 @@ async def stress_test_mcp_integration():
         analysis = await bridge.execute("data_analysis", dataset="market_trends")
         assert analysis["success"]
 
-        print(f"✓ Pipeline completed")
-        print(f"  Steps executed: 4/4")
-        print(f"  All successful: True")
+        print("✓ Pipeline completed")
+        print("  Steps executed: 4/4")
+        print("  All successful: True")
 
         results["tests_passed"] += 1
         print("✅ PASSED")
@@ -394,7 +397,7 @@ async def stress_test_mcp_integration():
     print(f"Tests Failed: {results['tests_failed']}")
 
     if results["errors"]:
-        print(f"\nErrors:")
+        print("\nErrors:")
         for error in results["errors"]:
             print(f"  ✗ {error}")
 

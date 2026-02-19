@@ -7,9 +7,8 @@ Supports:
 3. Intelligent LLM-powered recovery
 """
 
-from typing import Optional, Tuple
-from .workflows import StepDefinition, FailureAction
 from .state import WorkflowRun
+from .workflows import FailureAction, StepDefinition
 
 
 class FailureHandler:
@@ -28,8 +27,8 @@ class FailureHandler:
         step: StepDefinition,
         run: WorkflowRun,
         error_message: str,
-        workflow_steps: list[StepDefinition]
-    ) -> Tuple[str, Optional[int]]:
+        workflow_steps: list[StepDefinition],
+    ) -> tuple[str, int | None]:
         """Handle a step failure based on its on_failure configuration.
 
         Args:
@@ -58,13 +57,17 @@ class FailureHandler:
 
         # Use LLM to analyze and decide if configured
         if failure_action.use_llm_analysis and self.llm_executor:
-            return self._llm_decide_recovery(step, run, error_message, workflow_steps, failure_action)
+            return self._llm_decide_recovery(
+                step, run, error_message, workflow_steps, failure_action
+            )
 
         # Otherwise use configured action
         if failure_action.action == "retry":
             return self._handle_retry(step, run, error_message, failure_action)
         elif failure_action.action == "loop_back":
-            return self._handle_loop_back(step, run, error_message, workflow_steps, failure_action)
+            return self._handle_loop_back(
+                step, run, error_message, workflow_steps, failure_action
+            )
         elif failure_action.action == "escalate":
             return self._handle_escalate(step, run, error_message, failure_action)
         else:
@@ -75,8 +78,8 @@ class FailureHandler:
         step: StepDefinition,
         run: WorkflowRun,
         error_message: str,
-        failure_action: FailureAction
-    ) -> Tuple[str, Optional[int]]:
+        failure_action: FailureAction,
+    ) -> tuple[str, int | None]:
         """Handle simple retry with feedback."""
         # Increment loop count
         loop_key = f"{step.id}_loops"
@@ -84,12 +87,14 @@ class FailureHandler:
 
         # Add feedback to context
         feedback = self._build_feedback(error_message, failure_action.feedback_template)
-        run.feedback_history.append({
-            "step_id": step.id,
-            "error": error_message,
-            "feedback": feedback,
-            "loop_count": run.loop_counts[loop_key]
-        })
+        run.feedback_history.append(
+            {
+                "step_id": step.id,
+                "error": error_message,
+                "feedback": feedback,
+                "loop_count": run.loop_counts[loop_key],
+            }
+        )
 
         # Store feedback in context for next attempt
         run.context[f"{step.id}_feedback"] = feedback
@@ -103,8 +108,8 @@ class FailureHandler:
         run: WorkflowRun,
         error_message: str,
         workflow_steps: list[StepDefinition],
-        failure_action: FailureAction
-    ) -> Tuple[str, Optional[int]]:
+        failure_action: FailureAction,
+    ) -> tuple[str, int | None]:
         """Handle loop-back to a previous step."""
         if not failure_action.to_step:
             return "stop", None
@@ -125,14 +130,16 @@ class FailureHandler:
 
         # Add feedback
         feedback = self._build_feedback(error_message, failure_action.feedback_template)
-        run.feedback_history.append({
-            "step_id": step.id,
-            "action": "loop_back",
-            "to_step": failure_action.to_step,
-            "error": error_message,
-            "feedback": feedback,
-            "loop_count": run.loop_counts[loop_key]
-        })
+        run.feedback_history.append(
+            {
+                "step_id": step.id,
+                "action": "loop_back",
+                "to_step": failure_action.to_step,
+                "error": error_message,
+                "feedback": feedback,
+                "loop_count": run.loop_counts[loop_key],
+            }
+        )
 
         # Store feedback for target step
         run.context[f"{failure_action.to_step}_loopback_feedback"] = feedback
@@ -145,8 +152,8 @@ class FailureHandler:
         step: StepDefinition,
         run: WorkflowRun,
         error_message: str,
-        failure_action: FailureAction
-    ) -> Tuple[str, Optional[int]]:
+        failure_action: FailureAction,
+    ) -> tuple[str, int | None]:
         """Handle escalation to a different agent."""
         # Store escalation info in context
         run.context["escalated_from"] = step.id
@@ -163,8 +170,8 @@ class FailureHandler:
         run: WorkflowRun,
         error_message: str,
         workflow_steps: list[StepDefinition],
-        failure_action: FailureAction
-    ) -> Tuple[str, Optional[int]]:
+        failure_action: FailureAction,
+    ) -> tuple[str, int | None]:
         """Use LLM to intelligently decide recovery strategy."""
         if not self.llm_executor:
             return "stop", None
@@ -178,7 +185,7 @@ class FailureHandler:
 **Context:**
 - Task: {run.task}
 - Current step: {step.id}
-- Available steps: {', '.join(s.id for s in workflow_steps)}
+- Available steps: {", ".join(s.id for s in workflow_steps)}
 - Previous failures: {len(run.feedback_history)}
 
 **Available Recovery Options:**
@@ -211,19 +218,19 @@ REASONING: <brief explanation>
             to_step = None
             feedback = error_message
 
-            for line in response.split('\n'):
-                if line.startswith('ACTION:'):
-                    action_str = line.split(':', 1)[1].strip().upper()
+            for line in response.split("\n"):
+                if line.startswith("ACTION:"):
+                    action_str = line.split(":", 1)[1].strip().upper()
                     if action_str == "RETRY":
                         action = "retry"
                     elif action_str == "LOOP_BACK":
                         action = "loop_back"
                     elif action_str == "STOP":
                         action = "stop"
-                elif line.startswith('TO_STEP:'):
-                    to_step = line.split(':', 1)[1].strip()
-                elif line.startswith('FEEDBACK:'):
-                    feedback = line.split(':', 1)[1].strip()
+                elif line.startswith("TO_STEP:"):
+                    to_step = line.split(":", 1)[1].strip()
+                elif line.startswith("FEEDBACK:"):
+                    feedback = line.split(":", 1)[1].strip()
 
             # Execute the decided action
             if action == "retry":
@@ -242,11 +249,11 @@ REASONING: <brief explanation>
 
             return "stop", None
 
-        except Exception as e:
+        except Exception:
             # LLM analysis failed, fall back to configured action
             return failure_action.action, None
 
-    def _build_feedback(self, error_message: str, template: Optional[str]) -> str:
+    def _build_feedback(self, error_message: str, template: str | None) -> str:
         """Build feedback message from template."""
         if not template:
             return f"Previous attempt failed with error: {error_message}. Please review and try again."

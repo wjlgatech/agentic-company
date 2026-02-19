@@ -10,12 +10,13 @@ User decisions codified:
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Any
 from enum import Enum
+from typing import Any
 
 
 class AlertSeverity(str, Enum):
     """Alert severity levels."""
+
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -42,15 +43,15 @@ class MemorySystemConfig:
 
     # Similarity threshold adjustments by workflow cluster
     # Some clusters may benefit from different thresholds
-    cluster_threshold_adjustments: Dict[str, float] = None
+    cluster_threshold_adjustments: dict[str, float] = None
 
     def __post_init__(self):
         """Initialize default values for fields."""
         if self.cluster_threshold_adjustments is None:
             self.cluster_threshold_adjustments = {
-                "code": 0.0,      # Use base threshold (0.80)
+                "code": 0.0,  # Use base threshold (0.80)
                 "content": -0.05,  # Slightly lower (0.75) - content is more diverse
-                "analysis": 0.0,   # Use base threshold (0.80)
+                "analysis": 0.0,  # Use base threshold (0.80)
             }
 
         if self.tunable_parameters is None:
@@ -61,9 +62,9 @@ class MemorySystemConfig:
 
         if self.alert_recipients is None:
             self.alert_recipients = {
-                "critical": ["eng", "product"],    # Both teams for critical issues
-                "warning": ["eng"],                # Eng only for warnings
-                "info": ["eng"],                   # Eng only for info
+                "critical": ["eng", "product"],  # Both teams for critical issues
+                "warning": ["eng"],  # Eng only for warnings
+                "info": ["eng"],  # Eng only for info
             }
 
         if self.alert_thresholds is None:
@@ -72,41 +73,31 @@ class MemorySystemConfig:
                 "critical": {
                     # Q1: 5% tolerance - if worse than this, critical
                     "improvement_below": -self.max_acceptable_degradation_pct,
-
                     # Retrieval completely broken
                     "avg_relevance_below": 0.50,
-
                     # Unacceptable latency
                     "p95_latency_above_ms": 2000.0,
-
                     # Error spike
                     "error_rate_increase_pct": 0.50,  # 50% increase
                 },
-
                 # WARNING ALERTS (plan intervention)
                 "warning": {
                     # Q3: Below 5% target for 2 weeks
                     "improvement_below_target": self.target_improvement_pct,
                     "duration_weeks": 2,
-
                     # Relevance degrading
                     "avg_relevance_below": 0.60,
-
                     # Latency concerns
                     "p95_latency_above_ms": self.max_retrieval_latency_ms,
-
                     # Coverage too low (expected with high threshold, but monitor)
                     "coverage_below": 0.35,
-
                     # User dissatisfaction
                     "satisfaction_below": 3.0,  # out of 5
                 },
-
                 # INFO ALERTS (FYI)
                 "info": {
                     # Good performance to celebrate
                     "improvement_above": 0.10,  # 10% improvement!
-
                     # Memory bloat
                     "bloat_ratio_below": 0.50,
                 },
@@ -114,9 +105,9 @@ class MemorySystemConfig:
 
         if self.ab_test_traffic_split is None:
             self.ab_test_traffic_split = {
-                "control": 0.40,      # 40% on current parameters
-                "variant_a": 0.30,    # 30% on test variant A
-                "variant_b": 0.30,    # 30% on test variant B
+                "control": 0.40,  # 40% on current parameters
+                "variant_a": 0.30,  # 30% on test variant A
+                "variant_b": 0.30,  # 30% on test variant B
             }
 
     def get_threshold_for_cluster(self, cluster: str) -> float:
@@ -164,17 +155,17 @@ class MemorySystemConfig:
     auto_tune_enabled: bool = True
 
     # Parameters that can be auto-tuned
-    tunable_parameters: List[str] = None
+    tunable_parameters: list[str] = None
 
     # =========================================================================
     # ALERTING & MONITORING
     # =========================================================================
 
     # Q4: Alerts to both eng + product teams
-    alert_recipients: Dict[str, List[str]] = None
+    alert_recipients: dict[str, list[str]] = None
 
     # Alert thresholds based on Q1 and Q3
-    alert_thresholds: Dict[str, Dict[str, Any]] = None
+    alert_thresholds: dict[str, dict[str, Any]] = None
 
     # How often to check metrics and send alerts
     alert_check_interval_hours: int = 6  # 4 times per day
@@ -212,7 +203,7 @@ class MemorySystemConfig:
     ab_test_significance_threshold: float = 0.05
 
     # Traffic split for A/B tests
-    ab_test_traffic_split: Dict[str, float] = None
+    ab_test_traffic_split: dict[str, float] = None
 
 
 # =============================================================================
@@ -247,6 +238,7 @@ def reset_memory_config():
 # ALERTING SYSTEM
 # =============================================================================
 
+
 class MemoryAlert:
     """Alert about memory system health."""
 
@@ -255,7 +247,7 @@ class MemoryAlert:
         severity: AlertSeverity,
         title: str,
         message: str,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
         recommended_action: str,
     ):
         self.severity = severity
@@ -265,7 +257,7 @@ class MemoryAlert:
         self.recommended_action = recommended_action
         self.timestamp = None  # Set when sent
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize alert."""
         return {
             "severity": self.severity.value,
@@ -282,9 +274,9 @@ class AlertManager:
 
     def __init__(self, config: MemorySystemConfig):
         self.config = config
-        self.sent_alerts: List[MemoryAlert] = []
+        self.sent_alerts: list[MemoryAlert] = []
 
-    def check_and_send_alerts(self, metrics: Dict[str, Any]):
+    def check_and_send_alerts(self, metrics: dict[str, Any]):
         """
         Check metrics against thresholds and send alerts if needed.
 
@@ -297,62 +289,87 @@ class AlertManager:
         critical = self.config.alert_thresholds["critical"]
 
         # Q1: 5% tolerance - critical if worse
-        improvement = metrics.get("lagging_indicators", {}).get("success_rates", {}).get("improvement", 0)
+        improvement = (
+            metrics.get("lagging_indicators", {})
+            .get("success_rates", {})
+            .get("improvement", 0)
+        )
         if improvement < critical["improvement_below"]:
-            alerts.append(MemoryAlert(
-                severity=AlertSeverity.CRITICAL,
-                title="Memory Degrading Workflow Success",
-                message=f"Workflows with lessons are {abs(improvement)*100:.1f}% WORSE than without. This exceeds the 5% tolerance threshold.",
-                metrics={"improvement": improvement},
-                recommended_action="DISABLE MEMORY IMMEDIATELY and investigate. Potential causes: (1) Bad lessons recently approved, (2) Retrieval algorithm broken, (3) Lessons being applied incorrectly.",
-            ))
+            alerts.append(
+                MemoryAlert(
+                    severity=AlertSeverity.CRITICAL,
+                    title="Memory Degrading Workflow Success",
+                    message=f"Workflows with lessons are {abs(improvement) * 100:.1f}% WORSE than without. This exceeds the 5% tolerance threshold.",
+                    metrics={"improvement": improvement},
+                    recommended_action="DISABLE MEMORY IMMEDIATELY and investigate. Potential causes: (1) Bad lessons recently approved, (2) Retrieval algorithm broken, (3) Lessons being applied incorrectly.",
+                )
+            )
 
         # Check retrieval relevance
-        relevance = metrics.get("leading_indicators", {}).get("retrieval_relevance", {}).get("avg_relevance", 1.0)
+        relevance = (
+            metrics.get("leading_indicators", {})
+            .get("retrieval_relevance", {})
+            .get("avg_relevance", 1.0)
+        )
         if relevance < critical["avg_relevance_below"]:
-            alerts.append(MemoryAlert(
-                severity=AlertSeverity.CRITICAL,
-                title="Retrieval Relevance Critically Low",
-                message=f"Average retrieval relevance is {relevance:.2f}, below critical threshold of {critical['avg_relevance_below']}. Retrieved lessons are not relevant to queries.",
-                metrics={"avg_relevance": relevance},
-                recommended_action="Stop lesson approval. Audit retrieval algorithm. Consider raising similarity threshold or improving embeddings.",
-            ))
+            alerts.append(
+                MemoryAlert(
+                    severity=AlertSeverity.CRITICAL,
+                    title="Retrieval Relevance Critically Low",
+                    message=f"Average retrieval relevance is {relevance:.2f}, below critical threshold of {critical['avg_relevance_below']}. Retrieved lessons are not relevant to queries.",
+                    metrics={"avg_relevance": relevance},
+                    recommended_action="Stop lesson approval. Audit retrieval algorithm. Consider raising similarity threshold or improving embeddings.",
+                )
+            )
 
         # Check latency
-        latency = metrics.get("leading_indicators", {}).get("retrieval_latency", {}).get("p95_ms", 0)
+        latency = (
+            metrics.get("leading_indicators", {})
+            .get("retrieval_latency", {})
+            .get("p95_ms", 0)
+        )
         if latency > critical["p95_latency_above_ms"]:
-            alerts.append(MemoryAlert(
-                severity=AlertSeverity.CRITICAL,
-                title="Retrieval Latency Unacceptable",
-                message=f"P95 latency is {latency:.0f}ms, above critical threshold of {critical['p95_latency_above_ms']:.0f}ms. Memory is slowing down workflows significantly.",
-                metrics={"p95_latency_ms": latency},
-                recommended_action="Disable memory temporarily. Optimize vector search (add indexes), implement caching, or reduce memory size.",
-            ))
+            alerts.append(
+                MemoryAlert(
+                    severity=AlertSeverity.CRITICAL,
+                    title="Retrieval Latency Unacceptable",
+                    message=f"P95 latency is {latency:.0f}ms, above critical threshold of {critical['p95_latency_above_ms']:.0f}ms. Memory is slowing down workflows significantly.",
+                    metrics={"p95_latency_ms": latency},
+                    recommended_action="Disable memory temporarily. Optimize vector search (add indexes), implement caching, or reduce memory size.",
+                )
+            )
 
         # Check warning conditions
         warning = self.config.alert_thresholds["warning"]
 
         # Q3: 5% target - warning if below target for 2 weeks
         if 0 <= improvement < warning["improvement_below_target"]:
-            alerts.append(MemoryAlert(
-                severity=AlertSeverity.WARNING,
-                title="Improvement Below 5% Target",
-                message=f"Workflow improvement with lessons is {improvement*100:.1f}%, below target of {warning['improvement_below_target']*100:.0f}%. Memory is helping, but not meeting goals.",
-                metrics={"improvement": improvement, "target": warning["improvement_below_target"]},
-                recommended_action="Review lesson quality. Extract better lessons from top-performing workflows. Consider lowering similarity threshold slightly to increase coverage.",
-            ))
+            alerts.append(
+                MemoryAlert(
+                    severity=AlertSeverity.WARNING,
+                    title="Improvement Below 5% Target",
+                    message=f"Workflow improvement with lessons is {improvement * 100:.1f}%, below target of {warning['improvement_below_target'] * 100:.0f}%. Memory is helping, but not meeting goals.",
+                    metrics={
+                        "improvement": improvement,
+                        "target": warning["improvement_below_target"],
+                    },
+                    recommended_action="Review lesson quality. Extract better lessons from top-performing workflows. Consider lowering similarity threshold slightly to increase coverage.",
+                )
+            )
 
         # Check info conditions (positive alerts)
         info = self.config.alert_thresholds["info"]
 
         if improvement > info["improvement_above"]:
-            alerts.append(MemoryAlert(
-                severity=AlertSeverity.INFO,
-                title="Excellent Memory Performance! 🎉",
-                message=f"Workflow improvement with lessons is {improvement*100:.1f}%, well above target! Memory system is delivering strong value.",
-                metrics={"improvement": improvement},
-                recommended_action="Continue monitoring. Document what's working well. Consider expanding lesson coverage to other domains.",
-            ))
+            alerts.append(
+                MemoryAlert(
+                    severity=AlertSeverity.INFO,
+                    title="Excellent Memory Performance! 🎉",
+                    message=f"Workflow improvement with lessons is {improvement * 100:.1f}%, well above target! Memory system is delivering strong value.",
+                    metrics={"improvement": improvement},
+                    recommended_action="Continue monitoring. Document what's working well. Consider expanding lesson coverage to other domains.",
+                )
+            )
 
         # Send alerts to appropriate teams
         for alert in alerts:
@@ -367,6 +384,7 @@ class AlertManager:
         Q4: Both eng + product teams for critical, eng only for warning/info
         """
         import datetime
+
         alert.timestamp = datetime.datetime.now().isoformat()
 
         recipients = self.config.alert_recipients.get(alert.severity.value, ["eng"])
@@ -377,29 +395,32 @@ class AlertManager:
         # - Email
         # - Internal dashboard
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"🚨 MEMORY SYSTEM ALERT - {alert.severity.value.upper()}")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         print(f"Recipients: {', '.join(recipients)}")
         print(f"Title: {alert.title}")
         print(f"Message: {alert.message}")
-        print(f"\nMetrics:")
+        print("\nMetrics:")
         for key, value in alert.metrics.items():
             print(f"  - {key}: {value}")
-        print(f"\nRecommended Action:")
+        print("\nRecommended Action:")
         print(f"  {alert.recommended_action}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         self.sent_alerts.append(alert)
 
-    def get_recent_alerts(self, hours: int = 24) -> List[MemoryAlert]:
+    def get_recent_alerts(self, hours: int = 24) -> list[MemoryAlert]:
         """Get alerts from the last N hours."""
         import datetime
+
         cutoff = datetime.datetime.now() - datetime.timedelta(hours=hours)
 
         return [
-            alert for alert in self.sent_alerts
-            if alert.timestamp and datetime.datetime.fromisoformat(alert.timestamp) > cutoff
+            alert
+            for alert in self.sent_alerts
+            if alert.timestamp
+            and datetime.datetime.fromisoformat(alert.timestamp) > cutoff
         ]
 
 

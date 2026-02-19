@@ -5,23 +5,21 @@ Provides HTTP endpoints for workflow management, health checks, and metrics.
 Includes a user-friendly web dashboard at the root URL.
 """
 
-import asyncio
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from orchestration._version import __version__
+from orchestration.approval import ApprovalRequest, HumanApprovalGate
 from orchestration.config import get_config, validate_config
-from orchestration.observability import get_observability
 from orchestration.memory import LocalMemoryStore
-from orchestration.approval import ApprovalRequest, ApprovalStatus, HumanApprovalGate
+from orchestration.observability import get_observability
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -52,6 +50,7 @@ obs = get_observability()
 
 # ============== Models ==============
 
+
 class HealthResponse(BaseModel):
     status: str
     version: str
@@ -62,7 +61,7 @@ class HealthResponse(BaseModel):
 class WorkflowRequest(BaseModel):
     workflow_name: str
     input_data: str
-    config: Optional[dict[str, Any]] = None
+    config: dict[str, Any] | None = None
 
 
 class WorkflowResponse(BaseModel):
@@ -70,13 +69,13 @@ class WorkflowResponse(BaseModel):
     workflow_name: str
     status: str
     created_at: str
-    result: Optional[Any] = None
+    result: Any | None = None
 
 
 class MemoryStoreRequest(BaseModel):
     content: str
-    tags: Optional[list[str]] = None
-    metadata: Optional[dict[str, Any]] = None
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class MemorySearchRequest(BaseModel):
@@ -91,6 +90,7 @@ class ApprovalDecision(BaseModel):
 
 
 # ============== Dashboard & Static Files ==============
+
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def serve_dashboard():
@@ -110,6 +110,7 @@ async def serve_dashboard():
 
 # ============== Health Endpoints ==============
 
+
 @app.get("/api/health", tags=["Health"])
 async def api_health_check():
     """Check backend status for dashboard."""
@@ -128,19 +129,20 @@ async def api_health_check():
 
 # ============== Chat Endpoint ==============
 
+
 class ChatRequest(BaseModel):
     message: str
-    session_id: Optional[str] = None
-    backend: Optional[str] = "auto"
+    session_id: str | None = None
+    backend: str | None = "auto"
 
 
 class ChatResponse(BaseModel):
     response: str
     backend_used: str
     session_id: str
-    suggestions: Optional[list[str]] = None
+    suggestions: list[str] | None = None
     workflow_ready: bool = False
-    workflow_config: Optional[dict] = None
+    workflow_config: dict | None = None
 
 
 # In-memory conversation state (in production, use Redis)
@@ -150,29 +152,47 @@ conversation_sessions: dict[str, dict] = {}
 TEAM_TEMPLATES = {
     "marketing": {
         "name": "Viral Marketing Team",
-        "agents": ["SocialIntelAgent", "CompetitorAnalyst", "ContentCreator", "CommunityManager", "CampaignLead"],
-        "description": "Automates pain point discovery, competitor analysis, content creation, and community engagement"
+        "agents": [
+            "SocialIntelAgent",
+            "CompetitorAnalyst",
+            "ContentCreator",
+            "CommunityManager",
+            "CampaignLead",
+        ],
+        "description": "Automates pain point discovery, competitor analysis, content creation, and community engagement",
     },
     "development": {
         "name": "Feature Development Team",
         "agents": ["Planner", "Developer", "Verifier", "Tester", "Reviewer"],
-        "description": "Plans, builds, tests, and reviews code with cross-verification"
+        "description": "Plans, builds, tests, and reviews code with cross-verification",
     },
     "research": {
         "name": "Research & Analysis Team",
-        "agents": ["Researcher", "DataAnalyst", "Synthesizer", "FactChecker", "ReportWriter"],
-        "description": "Deep research, data analysis, and comprehensive report generation"
+        "agents": [
+            "Researcher",
+            "DataAnalyst",
+            "Synthesizer",
+            "FactChecker",
+            "ReportWriter",
+        ],
+        "description": "Deep research, data analysis, and comprehensive report generation",
     },
     "customer": {
         "name": "Customer Success Team",
-        "agents": ["TicketTriager", "SupportAgent", "EscalationManager", "FeedbackAnalyzer", "KnowledgeWriter"],
-        "description": "Handles support tickets, analyzes feedback, updates documentation"
+        "agents": [
+            "TicketTriager",
+            "SupportAgent",
+            "EscalationManager",
+            "FeedbackAnalyzer",
+            "KnowledgeWriter",
+        ],
+        "description": "Handles support tickets, analyzes feedback, updates documentation",
     },
     "content": {
         "name": "Content Production Team",
         "agents": ["IdeaGenerator", "Writer", "Editor", "SEOOptimizer", "Publisher"],
-        "description": "Creates, edits, optimizes, and publishes content at scale"
-    }
+        "description": "Creates, edits, optimizes, and publishes content at scale",
+    },
 }
 
 
@@ -191,9 +211,8 @@ CONVERSATION_FLOW = {
 
 Just type a number or describe what you need!""",
         "suggestions": ["1", "2", "3", "4", "5", "Tell me more about marketing"],
-        "next_step": "team_type"
+        "next_step": "team_type",
     },
-
     "team_type_marketing": {
         "message": """🎯 Great choice! Marketing teams are powerful for growth.
 
@@ -213,9 +232,8 @@ Just type a number or describe what you need!""",
 Example: "I'm building an AI coding assistant for React developers. Competitors are Copilot and Cursor."
 """,
         "suggestions": ["Skip - use defaults", "Show me an example prompt"],
-        "next_step": "marketing_details"
+        "next_step": "marketing_details",
     },
-
     "marketing_details": {
         "message": """📝 Perfect! Let me understand your goals better.
 
@@ -231,9 +249,8 @@ Example: "I'm building an AI coding assistant for React developers. Competitors 
 And how long is your campaign? (e.g., "30 days", "3 months")
 """,
         "suggestions": ["1, 3, 5 for 30 days", "All of them for 90 days"],
-        "next_step": "marketing_platforms"
+        "next_step": "marketing_platforms",
     },
-
     "marketing_platforms": {
         "message": """🌐 Which platforms should we focus on?
 
@@ -251,9 +268,8 @@ And how long is your campaign? (e.g., "30 days", "3 months")
 Example: "Twitter, Reddit, and Hacker News"
 """,
         "suggestions": ["Twitter, Reddit, HN", "All platforms", "Just Twitter"],
-        "next_step": "generate_workflow"
+        "next_step": "generate_workflow",
     },
-
     "generate_workflow": {
         "message": """🚀 Excellent! I have everything I need.
 
@@ -284,14 +300,15 @@ daily_workflow:
 3️⃣ **Start Over** - Begin fresh with different settings
 """,
         "suggestions": ["Generate Full Workflow", "Customize Agents", "Start Over"],
-        "next_step": "finalize"
-    }
+        "next_step": "finalize",
+    },
 }
 
 
-def get_conversation_response(session: dict, user_message: str) -> tuple[str, list[str], bool, Optional[dict]]:
+def get_conversation_response(
+    session: dict, user_message: str
+) -> tuple[str, list[str], bool, dict | None]:
     """Process user message and return conversational response."""
-    import uuid
 
     step = session.get("step", "start")
     context = session.get("context", {})
@@ -299,16 +316,21 @@ def get_conversation_response(session: dict, user_message: str) -> tuple[str, li
 
     # Handle step transitions
     if step == "start" or step == "team_type":
-        if any(x in message_lower for x in ["1", "marketing", "viral", "growth", "social"]):
+        if any(
+            x in message_lower for x in ["1", "marketing", "viral", "growth", "social"]
+        ):
             session["step"] = "marketing_details"
             session["context"]["team_type"] = "marketing"
             flow = CONVERSATION_FLOW["team_type_marketing"]
             return flow["message"], flow["suggestions"], False, None
 
-        elif any(x in message_lower for x in ["2", "development", "dev", "code", "build"]):
+        elif any(
+            x in message_lower for x in ["2", "development", "dev", "code", "build"]
+        ):
             session["step"] = "dev_details"
             session["context"]["team_type"] = "development"
-            return """🔧 Great! Let's build a Development Team.
+            return (
+                """🔧 Great! Let's build a Development Team.
 
 **Tell me about your project:**
 1. What are you building? (e.g., "REST API", "React app", "CLI tool")
@@ -316,12 +338,17 @@ def get_conversation_response(session: dict, user_message: str) -> tuple[str, li
 3. What stage? (greenfield, refactor, bug fixes)
 
 Example: "Building a FastAPI backend with PostgreSQL, need help with new features"
-""", ["Show example workflow", "Use defaults"], False, None
+""",
+                ["Show example workflow", "Use defaults"],
+                False,
+                None,
+            )
 
         elif any(x in message_lower for x in ["3", "research", "analysis", "data"]):
             session["step"] = "research_details"
             session["context"]["team_type"] = "research"
-            return """🔬 Research Team - excellent choice!
+            return (
+                """🔬 Research Team - excellent choice!
 
 **What kind of research do you need?**
 1. Market research & competitive analysis
@@ -331,18 +358,27 @@ Example: "Building a FastAPI backend with PostgreSQL, need help with new feature
 5. Academic/scientific literature review
 
 Example: "I need to research the AI agent landscape and write a comprehensive report"
-""", ["Market research", "Technical research", "Data analysis"], False, None
+""",
+                ["Market research", "Technical research", "Data analysis"],
+                False,
+                None,
+            )
 
         else:
             # Default to asking for clarification
-            return """I didn't quite catch that. Let me help you choose:
+            return (
+                """I didn't quite catch that. Let me help you choose:
 
 **What type of team do you need?**
 • Type **"marketing"** for viral growth campaigns
 • Type **"dev"** for code development
 • Type **"research"** for deep analysis
 • Or just describe what you're trying to accomplish!
-""", ["marketing", "dev", "research", "I need help with..."], False, None
+""",
+                ["marketing", "dev", "research", "I need help with..."],
+                False,
+                None,
+            )
 
     elif step == "marketing_details":
         # Extract product/competitor info from message
@@ -362,7 +398,8 @@ Example: "I need to research the AI agent landscape and write a comprehensive re
         product = context.get("product_description", "your product")
         platforms = context.get("platforms", "Twitter, Reddit")
 
-        return f"""🚀 Perfect! Here's your customized Marketing Team:
+        return (
+            f"""🚀 Perfect! Here's your customized Marketing Team:
 
 **Campaign Overview:**
 • Product: {product[:100]}...
@@ -383,16 +420,23 @@ Example: "I need to research the AI agent landscape and write a comprehensive re
 2️⃣ **See Example Output** - Preview what agents produce
 3️⃣ **Customize Prompts** - Fine-tune agent behaviors
 4️⃣ **Start Campaign** - Launch immediately
-""", ["Generate Code", "See Example Output", "Start Campaign"], True, {
-            "team_type": "marketing",
-            "product": product,
-            "platforms": platforms,
-        }
+""",
+            ["Generate Code", "See Example Output", "Start Campaign"],
+            True,
+            {
+                "team_type": "marketing",
+                "product": product,
+                "platforms": platforms,
+            },
+        )
 
     elif step == "generate_workflow":
-        if any(x in message_lower for x in ["generate", "code", "yes", "launch", "start"]):
+        if any(
+            x in message_lower for x in ["generate", "code", "yes", "launch", "start"]
+        ):
             # Return the workflow configuration
-            return """✅ **Your Marketing Team is ready!**
+            return (
+                """✅ **Your Marketing Team is ready!**
 
 I've generated the complete workflow. Here's what you get:
 
@@ -418,13 +462,25 @@ agentic workflow run marketing-campaign
 5. Execute daily: content + engagement + metrics
 
 Would you like me to explain any specific agent in detail?
-""", ["Explain SocialIntelAgent", "Explain ContentCreator", "Show sample output"], True, {
-                "ready": True,
-                "files": ["workflows/marketing-campaign.yaml", "examples/marketing_team.py"]
-            }
+""",
+                [
+                    "Explain SocialIntelAgent",
+                    "Explain ContentCreator",
+                    "Show sample output",
+                ],
+                True,
+                {
+                    "ready": True,
+                    "files": [
+                        "workflows/marketing-campaign.yaml",
+                        "examples/marketing_team.py",
+                    ],
+                },
+            )
 
     # Default fallback
-    return """I'm here to help! You can:
+    return (
+        """I'm here to help! You can:
 
 • **Start fresh**: Type "start" or "new team"
 • **Marketing team**: Type "marketing"
@@ -432,7 +488,11 @@ Would you like me to explain any specific agent in detail?
 • **Ask questions**: "How does the ContentCreator work?"
 
 What would you like to do?
-""", ["Start fresh", "marketing", "dev", "Help"], False, None
+""",
+        ["Start fresh", "marketing", "dev", "Help"],
+        False,
+        None,
+    )
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
@@ -447,7 +507,7 @@ async def chat_with_ai(request: ChatRequest):
         conversation_sessions[session_id] = {
             "step": "start",
             "context": {},
-            "history": []
+            "history": [],
         }
 
     session = conversation_sessions[session_id]
@@ -461,14 +521,14 @@ async def chat_with_ai(request: ChatRequest):
             backend_used="conversation_builder",
             session_id=session_id,
             suggestions=flow["suggestions"],
-            workflow_ready=False
+            workflow_ready=False,
         )
 
     # Process user message
     session["history"].append({"role": "user", "content": request.message})
 
-    response_text, suggestions, workflow_ready, workflow_config = get_conversation_response(
-        session, request.message
+    response_text, suggestions, workflow_ready, workflow_config = (
+        get_conversation_response(session, request.message)
     )
 
     session["history"].append({"role": "assistant", "content": response_text})
@@ -479,11 +539,12 @@ async def chat_with_ai(request: ChatRequest):
         session_id=session_id,
         suggestions=suggestions,
         workflow_ready=workflow_ready,
-        workflow_config=workflow_config
+        workflow_config=workflow_config,
     )
 
 
 # ============== Config Endpoint ==============
+
 
 class ApiKeyRequest(BaseModel):
     provider: str  # "anthropic" or "openai"
@@ -560,14 +621,31 @@ async def readiness_probe() -> dict[str, Any]:
 
 # ============== Workflow Endpoints ==============
 
+
 @app.get("/workflows", tags=["Workflows"])
 async def list_workflows() -> dict[str, Any]:
     """List available workflows."""
     workflows = [
-        {"name": "content-research", "description": "Research and analyze content", "status": "active"},
-        {"name": "content-creation", "description": "Create new content", "status": "active"},
-        {"name": "review-optimize", "description": "Review and optimize content", "status": "active"},
-        {"name": "data-processing", "description": "Process and transform data", "status": "active"},
+        {
+            "name": "content-research",
+            "description": "Research and analyze content",
+            "status": "active",
+        },
+        {
+            "name": "content-creation",
+            "description": "Create new content",
+            "status": "active",
+        },
+        {
+            "name": "review-optimize",
+            "description": "Review and optimize content",
+            "status": "active",
+        },
+        {
+            "name": "data-processing",
+            "description": "Process and transform data",
+            "status": "active",
+        },
     ]
     return {"workflows": workflows, "count": len(workflows)}
 
@@ -612,6 +690,7 @@ async def get_workflow_status(workflow_id: str) -> dict[str, Any]:
 
 
 # ============== Memory Endpoints ==============
+
 
 @app.post("/memory/store", tags=["Memory"])
 async def store_memory(request: MemoryStoreRequest) -> dict[str, str]:
@@ -675,6 +754,7 @@ async def delete_memory_entry(entry_id: str) -> dict[str, str]:
 
 # ============== Approval Endpoints ==============
 
+
 @app.get("/approvals", tags=["Approvals"])
 async def list_pending_approvals() -> dict[str, Any]:
     """List all pending approval requests."""
@@ -711,20 +791,29 @@ async def get_approval_status(request_id: str) -> dict[str, Any]:
 
 
 @app.post("/approvals/{request_id}/decide", tags=["Approvals"])
-async def decide_approval(request_id: str, decision: ApprovalDecision) -> dict[str, Any]:
+async def decide_approval(
+    request_id: str, decision: ApprovalDecision
+) -> dict[str, Any]:
     """Approve or reject a request."""
     if decision.approved:
-        result = await approval_gate.approve(request_id, decision.decided_by, decision.reason)
+        result = await approval_gate.approve(
+            request_id, decision.decided_by, decision.reason
+        )
     else:
-        result = await approval_gate.reject(request_id, decision.decided_by, decision.reason)
+        result = await approval_gate.reject(
+            request_id, decision.decided_by, decision.reason
+        )
 
     if not result:
-        raise HTTPException(status_code=404, detail="Approval request not found or already decided")
+        raise HTTPException(
+            status_code=404, detail="Approval request not found or already decided"
+        )
 
     return result.to_dict()
 
 
 # ============== Metrics Endpoints ==============
+
 
 @app.get("/metrics", tags=["Metrics"])
 async def get_metrics() -> dict[str, Any]:
@@ -739,15 +828,21 @@ async def get_prometheus_metrics() -> str:
     lines = []
 
     for name, value in metrics["counters"].items():
-        clean_name = name.replace("{", "_").replace("}", "_").replace(",", "_").replace("=", "_")
+        clean_name = (
+            name.replace("{", "_").replace("}", "_").replace(",", "_").replace("=", "_")
+        )
         lines.append(f"agentic_{clean_name} {value}")
 
     for name, value in metrics["gauges"].items():
-        clean_name = name.replace("{", "_").replace("}", "_").replace(",", "_").replace("=", "_")
+        clean_name = (
+            name.replace("{", "_").replace("}", "_").replace(",", "_").replace("=", "_")
+        )
         lines.append(f"agentic_{clean_name} {value}")
 
     for name, stats in metrics["histograms"].items():
-        clean_name = name.replace("{", "_").replace("}", "_").replace(",", "_").replace("=", "_")
+        clean_name = (
+            name.replace("{", "_").replace("}", "_").replace(",", "_").replace("=", "_")
+        )
         lines.append(f"agentic_{clean_name}_count {stats['count']}")
         lines.append(f"agentic_{clean_name}_sum {stats['sum']}")
         lines.append(f"agentic_{clean_name}_avg {stats['avg']}")
@@ -756,6 +851,7 @@ async def get_prometheus_metrics() -> str:
 
 
 # ============== Config Endpoints ==============
+
 
 @app.get("/config", tags=["Config"])
 async def get_config_endpoint() -> dict[str, Any]:
@@ -799,7 +895,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 async def broadcast_update(event_type: str, data: dict[str, Any]) -> None:
     """Broadcast an update to all connected clients."""
-    message = {"type": event_type, "data": data, "timestamp": datetime.now().isoformat()}
+    message = {
+        "type": event_type,
+        "data": data,
+        "timestamp": datetime.now().isoformat(),
+    }
     for client in connected_clients:
         try:
             await client.send_json(message)

@@ -5,16 +5,18 @@ Provides the foundation for specialized agents with role-based behavior,
 guardrail integration, and fresh context management.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Any, Callable, Awaitable
-from datetime import datetime
 import uuid
+from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class AgentRole(Enum):
     """Standard agent roles for multi-agent workflows"""
+
     PLANNER = "planner"
     DEVELOPER = "developer"
     VERIFIER = "verifier"
@@ -29,6 +31,7 @@ class AgentRole(Enum):
 @dataclass
 class AgentConfig:
     """Configuration for an agent instance"""
+
     role: AgentRole
     name: str
     persona: str = ""
@@ -43,6 +46,7 @@ class AgentConfig:
 @dataclass
 class AgentContext:
     """Fresh context for each agent execution"""
+
     task_id: str
     step_id: str
     input_data: Any
@@ -55,12 +59,13 @@ class AgentContext:
 @dataclass
 class AgentResult:
     """Result from agent execution"""
+
     agent_id: str
     agent_role: AgentRole
     step_id: str
     output: Any
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
     duration_ms: float = 0
     tokens_used: int = 0
     artifacts: list = field(default_factory=list)  # List of Artifact objects
@@ -84,7 +89,7 @@ class Agent(ABC):
         self.name = config.name
         self.persona = config.persona
         self._guardrail_pipeline = None
-        self._executor: Optional[Callable[[str, AgentContext], Awaitable[str]]] = None
+        self._executor: Callable[[str, AgentContext], Awaitable[str]] | None = None
 
     @property
     def system_prompt(self) -> str:
@@ -99,7 +104,7 @@ class Agent(ABC):
         self._executor = executor
 
     @property
-    def executor(self) -> Optional[Callable[[str, AgentContext], Awaitable[str]]]:
+    def executor(self) -> Callable[[str, AgentContext], Awaitable[str]] | None:
         """Get the current executor (None if not set)"""
         return self._executor
 
@@ -113,10 +118,7 @@ class Agent(ABC):
         self._guardrail_pipeline = guardrail_pipeline
 
     async def execute(
-        self,
-        task: str,
-        context: Optional[AgentContext] = None,
-        fresh_context: bool = True
+        self, task: str, context: AgentContext | None = None, fresh_context: bool = True
     ) -> AgentResult:
         """
         Execute a task with fresh context.
@@ -130,14 +132,13 @@ class Agent(ABC):
             AgentResult with output and metadata
         """
         import time
+
         start_time = time.time()
 
         # Create fresh context if needed
         if context is None or fresh_context:
             context = AgentContext(
-                task_id=str(uuid.uuid4()),
-                step_id=str(uuid.uuid4()),
-                input_data=task
+                task_id=str(uuid.uuid4()), step_id=str(uuid.uuid4()), input_data=task
             )
 
         try:
@@ -153,7 +154,7 @@ class Agent(ABC):
                         output=None,
                         success=False,
                         error=f"Input guardrail failed: {failed[0].reason}",
-                        duration_ms=(time.time() - start_time) * 1000
+                        duration_ms=(time.time() - start_time) * 1000,
                     )
 
             # Execute the task
@@ -171,7 +172,7 @@ class Agent(ABC):
                         output=output,
                         success=False,
                         error=f"Output guardrail failed: {failed[0].reason}",
-                        duration_ms=(time.time() - start_time) * 1000
+                        duration_ms=(time.time() - start_time) * 1000,
                     )
 
             return AgentResult(
@@ -180,7 +181,7 @@ class Agent(ABC):
                 step_id=context.step_id,
                 output=output,
                 success=True,
-                duration_ms=(time.time() - start_time) * 1000
+                duration_ms=(time.time() - start_time) * 1000,
             )
 
         except Exception as e:
@@ -191,7 +192,7 @@ class Agent(ABC):
                 output=None,
                 success=False,
                 error=str(e),
-                duration_ms=(time.time() - start_time) * 1000
+                duration_ms=(time.time() - start_time) * 1000,
             )
 
     @abstractmethod
@@ -203,7 +204,7 @@ class Agent(ABC):
         """
         pass
 
-    async def verify(self, result: AgentResult, criteria: str) -> 'VerificationResult':
+    async def verify(self, result: AgentResult, criteria: str) -> "VerificationResult":
         """
         Verify another agent's output against acceptance criteria.
 
@@ -229,19 +230,23 @@ class Agent(ABC):
         context = AgentContext(
             task_id=result.step_id,
             step_id=f"verify-{result.step_id}",
-            input_data=verification_prompt
+            input_data=verification_prompt,
         )
 
         verify_result = await self.execute(verification_prompt, context)
 
-        passed = verify_result.success and str(verify_result.output).strip().upper().startswith("PASS")
+        passed = verify_result.success and str(
+            verify_result.output
+        ).strip().upper().startswith("PASS")
 
         return VerificationResult(
             verifier_id=self.id,
             verified_result=result,
             passed=passed,
-            reasoning=str(verify_result.output) if verify_result.success else verify_result.error,
-            criteria=criteria
+            reasoning=str(verify_result.output)
+            if verify_result.success
+            else verify_result.error,
+            criteria=criteria,
         )
 
     def __repr__(self) -> str:
@@ -251,6 +256,7 @@ class Agent(ABC):
 @dataclass
 class VerificationResult:
     """Result from cross-verification"""
+
     verifier_id: str
     verified_result: AgentResult
     passed: bool
@@ -269,9 +275,9 @@ class MockAgent(Agent):
     def __init__(
         self,
         config: AgentConfig,
-        mock_output: Optional[Any] = None,
+        mock_output: Any | None = None,
         should_fail: bool = False,
-        fail_message: str = "Mock failure"
+        fail_message: str = "Mock failure",
     ):
         super().__init__(config)
         self.mock_output = mock_output

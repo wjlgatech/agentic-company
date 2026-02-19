@@ -17,8 +17,8 @@ Based on Anthropic's prompt engineering techniques:
 import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Awaitable, Any
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -26,27 +26,30 @@ logger = logging.getLogger(__name__)
 
 class PromptStyle(Enum):
     """Style of prompt to generate."""
-    AGENT = "agent"           # For AI agent system prompts
-    TASK = "task"             # For specific task prompts
-    ANALYSIS = "analysis"     # For analytical/research tasks
-    CREATIVE = "creative"     # For creative writing tasks
-    CODING = "coding"         # For code generation tasks
+
+    AGENT = "agent"  # For AI agent system prompts
+    TASK = "task"  # For specific task prompts
+    ANALYSIS = "analysis"  # For analytical/research tasks
+    CREATIVE = "creative"  # For creative writing tasks
+    CODING = "coding"  # For code generation tasks
 
 
 @dataclass
 class PromptConfig:
     """Configuration for prompt generation."""
+
     style: PromptStyle = PromptStyle.AGENT
-    include_cot: bool = True        # Chain-of-thought reasoning
-    include_examples: bool = False   # Few-shot examples
+    include_cot: bool = True  # Chain-of-thought reasoning
+    include_examples: bool = False  # Few-shot examples
     include_guardrails: bool = True  # Safety guidelines
-    max_length: int = 2000          # Max prompt length
+    max_length: int = 2000  # Max prompt length
     target_model: str = "claude-sonnet-4-5-20250514"
 
 
 @dataclass
 class ImprovedPrompt:
     """Result of prompt improvement."""
+
     original: str
     improved: str
     improvements: list[str] = field(default_factory=list)
@@ -59,7 +62,7 @@ class ImprovedPrompt:
 # METAPROMPT - The prompt that generates better prompts
 # ============================================================================
 
-METAPROMPT = '''You are an expert prompt engineer. Your task is to transform a basic prompt
+METAPROMPT = """You are an expert prompt engineer. Your task is to transform a basic prompt
 or task description into a highly effective, production-ready prompt.
 
 Apply these prompt engineering best practices:
@@ -96,9 +99,9 @@ Respond with JSON in this format:
     "confidence": 0.95,
     "reasoning": "Brief explanation of key changes"
 }}
-'''
+"""
 
-AGENT_SYSTEM_PROMPT_TEMPLATE = '''You are {role_name}, a specialized AI agent.
+AGENT_SYSTEM_PROMPT_TEMPLATE = """You are {role_name}, a specialized AI agent.
 
 ## Role & Expertise
 {role_description}
@@ -114,7 +117,7 @@ AGENT_SYSTEM_PROMPT_TEMPLATE = '''You are {role_name}, a specialized AI agent.
 
 ## Guardrails
 {guardrails}
-'''
+"""
 
 
 class PromptEngineer:
@@ -144,9 +147,9 @@ class PromptEngineer:
 
     def __init__(
         self,
-        executor: Optional[Callable[[str], Awaitable[str]]] = None,
+        executor: Callable[[str], Awaitable[str]] | None = None,
         use_api: bool = False,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         """
         Initialize the Prompt Engineer.
@@ -165,7 +168,7 @@ class PromptEngineer:
         prompt: str,
         style: PromptStyle = PromptStyle.AGENT,
         context: str = "",
-        config: Optional[PromptConfig] = None,
+        config: PromptConfig | None = None,
     ) -> ImprovedPrompt:
         """
         Improve a prompt using prompt engineering best practices.
@@ -230,7 +233,9 @@ class PromptEngineer:
                 else:
                     logger.warning(f"Prompt API failed: {response.status_code}")
                     # Fallback to metaprompt
-                    return await self._improve_via_metaprompt(prompt, style, context, config)
+                    return await self._improve_via_metaprompt(
+                        prompt, style, context, config
+                    )
 
         except Exception as e:
             logger.error(f"Prompt API error: {e}")
@@ -287,7 +292,7 @@ class PromptEngineer:
             pass
 
         # Try to extract JSON from markdown code block
-        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(1))
@@ -295,7 +300,9 @@ class PromptEngineer:
                 pass
 
         # Try to find JSON object anywhere
-        json_match = re.search(r'\{[^{}]*"improved_prompt"[^{}]*\}', response, re.DOTALL)
+        json_match = re.search(
+            r'\{[^{}]*"improved_prompt"[^{}]*\}', response, re.DOTALL
+        )
         if json_match:
             try:
                 return json.loads(json_match.group(0))
@@ -317,7 +324,9 @@ class PromptEngineer:
         improved = prompt
 
         # 1. Add role setting if missing
-        if not any(phrase in prompt.lower() for phrase in ["you are", "your role", "as a"]):
+        if not any(
+            phrase in prompt.lower() for phrase in ["you are", "your role", "as a"]
+        ):
             role_prefix = self._get_role_prefix(style)
             improved = f"{role_prefix}\n\n{improved}"
             improvements.append("Added role setting")
@@ -328,7 +337,9 @@ class PromptEngineer:
             improvements.append("Added section structure")
 
         # 3. Add output format guidance
-        if not any(phrase in prompt.lower() for phrase in ["respond with", "output", "format"]):
+        if not any(
+            phrase in prompt.lower() for phrase in ["respond with", "output", "format"]
+        ):
             format_guidance = self._get_format_guidance(style)
             improved = f"{improved}\n\n{format_guidance}"
             improvements.append("Added output format guidance")
@@ -337,7 +348,7 @@ class PromptEngineer:
         if config.include_cot and "step by step" not in prompt.lower():
             improved = improved.replace(
                 "## Output",
-                "## Approach\nThink through the problem step by step before providing your final answer.\n\n## Output"
+                "## Approach\nThink through the problem step by step before providing your final answer.\n\n## Output",
             )
             if "## Approach" in improved:
                 improvements.append("Added chain-of-thought guidance")
@@ -371,11 +382,31 @@ class PromptEngineer:
     def _add_structure(self, prompt: str, style: PromptStyle) -> str:
         """Add section structure to prompt."""
         sections = {
-            PromptStyle.AGENT: ["## Role", "## Responsibilities", "## Guidelines", "## Output"],
+            PromptStyle.AGENT: [
+                "## Role",
+                "## Responsibilities",
+                "## Guidelines",
+                "## Output",
+            ],
             PromptStyle.TASK: ["## Task", "## Context", "## Requirements", "## Output"],
-            PromptStyle.ANALYSIS: ["## Objective", "## Data", "## Analysis Approach", "## Deliverables"],
-            PromptStyle.CREATIVE: ["## Brief", "## Tone & Style", "## Requirements", "## Output"],
-            PromptStyle.CODING: ["## Task", "## Requirements", "## Constraints", "## Output"],
+            PromptStyle.ANALYSIS: [
+                "## Objective",
+                "## Data",
+                "## Analysis Approach",
+                "## Deliverables",
+            ],
+            PromptStyle.CREATIVE: [
+                "## Brief",
+                "## Tone & Style",
+                "## Requirements",
+                "## Output",
+            ],
+            PromptStyle.CODING: [
+                "## Task",
+                "## Requirements",
+                "## Constraints",
+                "## Output",
+            ],
         }
 
         # Simple heuristic: wrap content in first section
@@ -397,11 +428,16 @@ class PromptEngineer:
         """Get appropriate guardrails for style."""
         base = "## Guardrails\n"
         guardrails = {
-            PromptStyle.AGENT: base + "- Stay within your defined role and expertise\n- Ask for clarification when requirements are ambiguous\n- Acknowledge limitations when appropriate",
-            PromptStyle.TASK: base + "- Focus on the specific task at hand\n- Provide accurate information only\n- Clarify assumptions made",
-            PromptStyle.ANALYSIS: base + "- Base conclusions on available evidence\n- Acknowledge data limitations\n- Distinguish facts from interpretations",
-            PromptStyle.CREATIVE: base + "- Maintain appropriate tone and style\n- Avoid sensitive or controversial content\n- Respect intellectual property",
-            PromptStyle.CODING: base + "- Follow security best practices\n- Write maintainable, readable code\n- Handle edge cases and errors",
+            PromptStyle.AGENT: base
+            + "- Stay within your defined role and expertise\n- Ask for clarification when requirements are ambiguous\n- Acknowledge limitations when appropriate",
+            PromptStyle.TASK: base
+            + "- Focus on the specific task at hand\n- Provide accurate information only\n- Clarify assumptions made",
+            PromptStyle.ANALYSIS: base
+            + "- Base conclusions on available evidence\n- Acknowledge data limitations\n- Distinguish facts from interpretations",
+            PromptStyle.CREATIVE: base
+            + "- Maintain appropriate tone and style\n- Avoid sensitive or controversial content\n- Respect intellectual property",
+            PromptStyle.CODING: base
+            + "- Follow security best practices\n- Write maintainable, readable code\n- Handle edge cases and errors",
         }
         return guardrails.get(style, guardrails[PromptStyle.TASK])
 
@@ -429,7 +465,9 @@ class PromptEngineer:
             Complete system prompt for the agent
         """
         expertise = expertise or []
-        expertise_str = ", ".join(expertise) if expertise else "relevant domain knowledge"
+        expertise_str = (
+            ", ".join(expertise) if expertise else "relevant domain knowledge"
+        )
 
         basic_prompt = f"""
 Role: {role}
@@ -441,7 +479,7 @@ Tone: {tone}
         result = await self.improve(
             basic_prompt,
             style=PromptStyle.AGENT,
-            context=f"This is for a multi-agent workflow system. The agent needs to work autonomously and produce high-quality outputs.",
+            context="This is for a multi-agent workflow system. The agent needs to work autonomously and produce high-quality outputs.",
         )
 
         return result.improved
@@ -479,8 +517,9 @@ Tone: {tone}
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
+
 def get_prompt_engineer(
-    executor: Optional[Callable[[str], Awaitable[str]]] = None,
+    executor: Callable[[str], Awaitable[str]] | None = None,
 ) -> PromptEngineer:
     """Get a prompt engineer instance."""
     return PromptEngineer(executor=executor)
@@ -489,7 +528,7 @@ def get_prompt_engineer(
 async def improve_prompt(
     prompt: str,
     style: PromptStyle = PromptStyle.AGENT,
-    executor: Optional[Callable[[str], Awaitable[str]]] = None,
+    executor: Callable[[str], Awaitable[str]] | None = None,
 ) -> str:
     """Quick function to improve a prompt."""
     engineer = PromptEngineer(executor=executor)

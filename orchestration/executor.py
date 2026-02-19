@@ -11,24 +11,26 @@ Provides controlled command execution with:
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable, Awaitable, Dict, List
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionPolicy(Enum):
     """Policy for command execution"""
-    AUTO_APPROVE = "auto"         # Execute without approval
+
+    AUTO_APPROVE = "auto"  # Execute without approval
     REQUIRE_APPROVAL = "approve"  # Require human approval
-    DENY = "deny"                 # Always deny
+    DENY = "deny"  # Always deny
 
 
 @dataclass
 class ExecutionResult:
     """Result from command execution"""
+
     command: str
     stdout: str
     stderr: str
@@ -45,35 +47,39 @@ class ExecutionResult:
     def to_dict(self) -> dict:
         """Convert to dictionary"""
         return {
-            'command': self.command,
-            'stdout': self.stdout,
-            'stderr': self.stderr,
-            'exit_code': self.exit_code,
-            'duration_ms': self.duration_ms,
-            'cwd': self.cwd,
-            'success': self.success(),
-            'approved': self.approved,
-            'policy': self.policy.value,
+            "command": self.command,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
+            "exit_code": self.exit_code,
+            "duration_ms": self.duration_ms,
+            "cwd": self.cwd,
+            "success": self.success(),
+            "approved": self.approved,
+            "policy": self.policy.value,
         }
 
 
 class SecurityError(Exception):
     """Raised when command violates security policy"""
+
     pass
 
 
 class ApprovalDenied(Exception):
     """Raised when user denies approval"""
+
     pass
 
 
 class ApprovalRequired(Exception):
     """Raised when approval is needed but no callback provided"""
+
     pass
 
 
 class ExecutionTimeout(Exception):
     """Raised when command times out"""
+
     pass
 
 
@@ -88,53 +94,48 @@ class SafeExecutor:
     # Default whitelist of safe commands
     DEFAULT_SAFE_COMMANDS = {
         # Testing
-        'pytest': ExecutionPolicy.AUTO_APPROVE,
-        'python -m pytest': ExecutionPolicy.AUTO_APPROVE,
-        'python3 -m pytest': ExecutionPolicy.AUTO_APPROVE,
-        'npm test': ExecutionPolicy.AUTO_APPROVE,
-        'yarn test': ExecutionPolicy.AUTO_APPROVE,
-        'make test': ExecutionPolicy.AUTO_APPROVE,
-        'cargo test': ExecutionPolicy.AUTO_APPROVE,
-        'go test': ExecutionPolicy.AUTO_APPROVE,
-        'python -m unittest': ExecutionPolicy.AUTO_APPROVE,
-
+        "pytest": ExecutionPolicy.AUTO_APPROVE,
+        "python -m pytest": ExecutionPolicy.AUTO_APPROVE,
+        "python3 -m pytest": ExecutionPolicy.AUTO_APPROVE,
+        "npm test": ExecutionPolicy.AUTO_APPROVE,
+        "yarn test": ExecutionPolicy.AUTO_APPROVE,
+        "make test": ExecutionPolicy.AUTO_APPROVE,
+        "cargo test": ExecutionPolicy.AUTO_APPROVE,
+        "go test": ExecutionPolicy.AUTO_APPROVE,
+        "python -m unittest": ExecutionPolicy.AUTO_APPROVE,
         # Linting/Formatting
-        'ruff check': ExecutionPolicy.AUTO_APPROVE,
-        'black': ExecutionPolicy.AUTO_APPROVE,
-        'mypy': ExecutionPolicy.AUTO_APPROVE,
-        'eslint': ExecutionPolicy.AUTO_APPROVE,
-        'prettier': ExecutionPolicy.AUTO_APPROVE,
-
+        "ruff check": ExecutionPolicy.AUTO_APPROVE,
+        "black": ExecutionPolicy.AUTO_APPROVE,
+        "mypy": ExecutionPolicy.AUTO_APPROVE,
+        "eslint": ExecutionPolicy.AUTO_APPROVE,
+        "prettier": ExecutionPolicy.AUTO_APPROVE,
         # Type checking
-        'tsc --noEmit': ExecutionPolicy.AUTO_APPROVE,
-
+        "tsc --noEmit": ExecutionPolicy.AUTO_APPROVE,
         # Require approval for installation
-        'pip install': ExecutionPolicy.REQUIRE_APPROVAL,
-        'pip3 install': ExecutionPolicy.REQUIRE_APPROVAL,
-        'npm install': ExecutionPolicy.REQUIRE_APPROVAL,
-        'yarn install': ExecutionPolicy.REQUIRE_APPROVAL,
-        'cargo install': ExecutionPolicy.REQUIRE_APPROVAL,
-
+        "pip install": ExecutionPolicy.REQUIRE_APPROVAL,
+        "pip3 install": ExecutionPolicy.REQUIRE_APPROVAL,
+        "npm install": ExecutionPolicy.REQUIRE_APPROVAL,
+        "yarn install": ExecutionPolicy.REQUIRE_APPROVAL,
+        "cargo install": ExecutionPolicy.REQUIRE_APPROVAL,
         # Require approval for build operations
-        'make': ExecutionPolicy.REQUIRE_APPROVAL,
-        'make build': ExecutionPolicy.REQUIRE_APPROVAL,
-        'npm run build': ExecutionPolicy.REQUIRE_APPROVAL,
-        'cargo build': ExecutionPolicy.REQUIRE_APPROVAL,
-
+        "make": ExecutionPolicy.REQUIRE_APPROVAL,
+        "make build": ExecutionPolicy.REQUIRE_APPROVAL,
+        "npm run build": ExecutionPolicy.REQUIRE_APPROVAL,
+        "cargo build": ExecutionPolicy.REQUIRE_APPROVAL,
         # Deny dangerous operations
-        'rm -rf': ExecutionPolicy.DENY,
-        'rm -fr': ExecutionPolicy.DENY,
-        'dd': ExecutionPolicy.DENY,
-        'mkfs': ExecutionPolicy.DENY,
-        'format': ExecutionPolicy.DENY,
+        "rm -rf": ExecutionPolicy.DENY,
+        "rm -fr": ExecutionPolicy.DENY,
+        "dd": ExecutionPolicy.DENY,
+        "mkfs": ExecutionPolicy.DENY,
+        "format": ExecutionPolicy.DENY,
     }
 
     def __init__(
         self,
-        approval_callback: Optional[Callable[[str, str], Awaitable[bool]]] = None,
+        approval_callback: Callable[[str, str], Awaitable[bool]] | None = None,
         timeout: int = 60,
         max_output_size: int = 1_000_000,
-        custom_commands: Optional[Dict[str, ExecutionPolicy]] = None,
+        custom_commands: dict[str, ExecutionPolicy] | None = None,
     ):
         """
         Initialize safe executor.
@@ -154,14 +155,14 @@ class SafeExecutor:
         if custom_commands:
             self.safe_commands.update(custom_commands)
 
-        self.execution_history: List[ExecutionResult] = []
+        self.execution_history: list[ExecutionResult] = []
 
     async def execute(
         self,
         command: str,
         cwd: Path,
-        env: Optional[Dict[str, str]] = None,
-        timeout: Optional[int] = None,
+        env: dict[str, str] | None = None,
+        timeout: int | None = None,
     ) -> ExecutionResult:
         """
         Execute command with safety checks.
@@ -205,7 +206,9 @@ class SafeExecutor:
                     logger.warning(error_msg)
                     raise ApprovalDenied(error_msg)
             else:
-                error_msg = f"Command requires approval but no callback provided: {command}"
+                error_msg = (
+                    f"Command requires approval but no callback provided: {command}"
+                )
                 logger.error(error_msg)
                 raise ApprovalRequired(error_msg)
 
@@ -229,8 +232,12 @@ class SafeExecutor:
             duration_ms = (time.time() - start_time) * 1000
 
             # Truncate output if too large
-            stdout = stdout_bytes.decode('utf-8', errors='replace')[:self.max_output_size]
-            stderr = stderr_bytes.decode('utf-8', errors='replace')[:self.max_output_size]
+            stdout = stdout_bytes.decode("utf-8", errors="replace")[
+                : self.max_output_size
+            ]
+            stderr = stderr_bytes.decode("utf-8", errors="replace")[
+                : self.max_output_size
+            ]
 
             result = ExecutionResult(
                 command=command,
@@ -271,7 +278,7 @@ class SafeExecutor:
             try:
                 process.kill()
                 await process.wait()
-            except:
+            except Exception:
                 pass
 
             raise ExecutionTimeout(error_msg)
@@ -300,20 +307,20 @@ class SafeExecutor:
         # Check if command starts with a whitelisted prefix
         # This allows "pytest tests/" to match "pytest"
         for safe_cmd, policy in self.safe_commands.items():
-            if command.startswith(safe_cmd + ' ') or command == safe_cmd:
+            if command.startswith(safe_cmd + " ") or command == safe_cmd:
                 return policy
 
         # Check for dangerous patterns
         dangerous_patterns = [
-            'rm -rf',
-            'rm -fr',
-            'dd if=',
-            '> /dev/',
-            'mkfs',
-            'format',
-            'del /s',
-            'chmod 777',
-            'chown -R',
+            "rm -rf",
+            "rm -fr",
+            "dd if=",
+            "> /dev/",
+            "mkfs",
+            "format",
+            "del /s",
+            "chmod 777",
+            "chown -R",
         ]
 
         for pattern in dangerous_patterns:
@@ -336,7 +343,7 @@ class SafeExecutor:
         self.safe_commands[command] = policy
         logger.info(f"Added command policy: {command} -> {policy.value}")
 
-    def get_history(self) -> List[ExecutionResult]:
+    def get_history(self) -> list[ExecutionResult]:
         """Get execution history"""
         return self.execution_history.copy()
 
@@ -344,22 +351,22 @@ class SafeExecutor:
         """Clear execution history"""
         self.execution_history.clear()
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get execution statistics"""
         total = len(self.execution_history)
         if total == 0:
-            return {'total': 0}
+            return {"total": 0}
 
         successful = sum(1 for r in self.execution_history if r.success())
         failed = total - successful
         avg_duration = sum(r.duration_ms for r in self.execution_history) / total
 
         return {
-            'total': total,
-            'successful': successful,
-            'failed': failed,
-            'success_rate': successful / total if total > 0 else 0,
-            'avg_duration_ms': avg_duration,
+            "total": total,
+            "successful": successful,
+            "failed": failed,
+            "success_rate": successful / total if total > 0 else 0,
+            "avg_duration_ms": avg_duration,
         }
 
 

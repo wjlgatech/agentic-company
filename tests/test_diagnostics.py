@@ -1,9 +1,9 @@
 """Unit tests for diagnostics module (Phase 1 - mocked Playwright)."""
 
-import pytest
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from orchestration.diagnostics import (
     DiagnosticsConfig,
@@ -19,9 +19,7 @@ from orchestration.diagnostics.capture import (
 )
 from orchestration.diagnostics.iteration_monitor import (
     IterationMonitor,
-    IterationRecord,
 )
-
 
 # ============== Config Tests ==============
 
@@ -395,14 +393,18 @@ def test_check_playwright_installation():
 
 def test_require_playwright_when_not_installed():
     """Test require_playwright() raises error when not installed."""
-    with patch("orchestration.diagnostics.check_playwright_installation", return_value=False):
+    with patch(
+        "orchestration.diagnostics.check_playwright_installation", return_value=False
+    ):
         with pytest.raises(ImportError, match="Playwright is required"):
             require_playwright()
 
 
 def test_require_playwright_when_installed():
     """Test require_playwright() succeeds when installed."""
-    with patch("orchestration.diagnostics.check_playwright_installation", return_value=True):
+    with patch(
+        "orchestration.diagnostics.check_playwright_installation", return_value=True
+    ):
         # Should not raise
         require_playwright()
 
@@ -414,13 +416,13 @@ def test_require_playwright_when_installed():
 
 @pytest.mark.skipif(
     not check_playwright_installation(),
-    reason="Playwright not installed (optional for unit tests)"
+    reason="Playwright not installed (optional for unit tests)",
 )
 @pytest.mark.asyncio
 async def test_playwright_capture_context_manager():
     """Test PlaywrightCapture async context manager with mocked Playwright."""
     # Only import and patch if playwright is available
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import patch
 
     with patch("playwright.async_api.async_playwright") as mock_playwright:
         # Mock Playwright API
@@ -454,12 +456,12 @@ async def test_playwright_capture_context_manager():
 
 @pytest.mark.skipif(
     not check_playwright_installation(),
-    reason="Playwright not installed (optional for unit tests)"
+    reason="Playwright not installed (optional for unit tests)",
 )
 @pytest.mark.asyncio
 async def test_playwright_capture_execute_navigate():
     """Test PlaywrightCapture execute NAVIGATE action with mocked Playwright."""
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import patch
 
     with patch("playwright.async_api.async_playwright") as mock_playwright:
         # Setup mocks
@@ -496,12 +498,12 @@ async def test_playwright_capture_execute_navigate():
 
 @pytest.mark.skipif(
     not check_playwright_installation(),
-    reason="Playwright not installed (optional for unit tests)"
+    reason="Playwright not installed (optional for unit tests)",
 )
 @pytest.mark.asyncio
 async def test_playwright_capture_error_screenshot():
     """Test PlaywrightCapture captures screenshot on error with mocked Playwright."""
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import patch
 
     with patch("playwright.async_api.async_playwright") as mock_playwright:
         # Setup mocks

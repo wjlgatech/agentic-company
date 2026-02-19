@@ -9,24 +9,24 @@ These tests verify:
 """
 
 import asyncio
-import pytest
 from pathlib import Path
 
-from orchestration.tools.registry import MCPRegistry, RegistryEntry, get_registry
+import pytest
+
 from orchestration.tools.mcp_bridge import (
-    MCPToolBridge,
     MCPTool,
-    ToolMapping,
+    MCPToolBridge,
     ToolStatus,
+    execute_tool,
     get_bridge,
     resolve_workflow_tools,
-    execute_tool,
 )
-
+from orchestration.tools.registry import MCPRegistry
 
 # =============================================================================
 # Registry Tests
 # =============================================================================
+
 
 class TestMCPRegistry:
     """Tests for MCP Registry."""
@@ -92,6 +92,7 @@ class TestMCPRegistry:
 # Tool Resolution Tests
 # =============================================================================
 
+
 class TestToolResolution:
     """Tests for tool resolution."""
 
@@ -105,18 +106,24 @@ class TestToolResolution:
         assert tool.declared_name == "web_search"
         assert tool.server_name in ["Ahrefs", "Similarweb"]
         # With graceful mode and fallbacks, status can be FALLBACK, WAITING, etc.
-        assert tool.status in [ToolStatus.RESOLVED, ToolStatus.UNAVAILABLE,
-                               ToolStatus.FALLBACK, ToolStatus.WAITING]
+        assert tool.status in [
+            ToolStatus.RESOLVED,
+            ToolStatus.UNAVAILABLE,
+            ToolStatus.FALLBACK,
+            ToolStatus.WAITING,
+        ]
 
     def test_resolve_workflow_tools(self):
         """Bridge should resolve multiple tools from workflow."""
         bridge = MCPToolBridge()
 
-        tools = bridge.resolve_workflow_tools([
-            "web_search",
-            "literature_search",
-            "social_api",
-        ])
+        tools = bridge.resolve_workflow_tools(
+            [
+                "web_search",
+                "literature_search",
+                "social_api",
+            ]
+        )
 
         assert len(tools) == 3
         assert all(isinstance(t, MCPTool) for t in tools)
@@ -134,11 +141,13 @@ class TestToolResolution:
         """Bridge should generate resolution report."""
         bridge = MCPToolBridge(use_mocks=True)
 
-        report = bridge.get_resolution_report([
-            "web_search",
-            "literature_search",
-            "nonexistent_tool",
-        ])
+        report = bridge.get_resolution_report(
+            [
+                "web_search",
+                "literature_search",
+                "nonexistent_tool",
+            ]
+        )
 
         assert "resolved" in report
         assert "mocked" in report
@@ -150,6 +159,7 @@ class TestToolResolution:
 # =============================================================================
 # Tool Execution Tests (Mock Mode)
 # =============================================================================
+
 
 class TestToolExecution:
     """Tests for tool execution in mock mode."""
@@ -217,6 +227,7 @@ class TestToolExecution:
 # Workflow Integration Tests
 # =============================================================================
 
+
 class TestWorkflowIntegration:
     """Tests for workflow integration."""
 
@@ -261,19 +272,23 @@ class TestWorkflowIntegration:
         # Should resolve at least 2 core tools (via resolved, fallback, or mocked)
         # The rest will be in waiting state for MCP connection
         total_available = (
-            report["summary"]["resolved"] +
-            report["summary"].get("fallback", 0) +
-            report["summary"]["mocked"]
+            report["summary"]["resolved"]
+            + report["summary"].get("fallback", 0)
+            + report["summary"]["mocked"]
         )
-        assert total_available >= 2, f"Expected at least 2 available tools, got {total_available}"
+        assert total_available >= 2, (
+            f"Expected at least 2 available tools, got {total_available}"
+        )
 
         # Ensure graceful handling - all tools should be accounted for
         total_accounted = (
-            total_available +
-            report["summary"].get("waiting", 0) +
-            report["summary"]["unresolved"]
+            total_available
+            + report["summary"].get("waiting", 0)
+            + report["summary"]["unresolved"]
         )
-        assert total_accounted == len(marketing_tools), "All tools should be accounted for"
+        assert total_accounted == len(marketing_tools), (
+            "All tools should be accounted for"
+        )
 
     @pytest.mark.asyncio
     async def test_execute_marketing_workflow_tools(self):
@@ -281,15 +296,21 @@ class TestWorkflowIntegration:
         bridge = MCPToolBridge(use_mocks=True)
 
         # Step 1: Social intelligence
-        social_result = await bridge.execute("social_api", topic="luxury real estate Miami")
+        social_result = await bridge.execute(
+            "social_api", topic="luxury real estate Miami"
+        )
         assert social_result["success"] is True
 
         # Step 2: Competitor analysis
-        competitor_result = await bridge.execute("web_search", query="Douglas Elliman Miami")
+        competitor_result = await bridge.execute(
+            "web_search", query="Douglas Elliman Miami"
+        )
         assert competitor_result["success"] is True
 
         # Step 3: Market research
-        market_result = await bridge.execute("market_research", company="Compass Real Estate")
+        market_result = await bridge.execute(
+            "market_research", company="Compass Real Estate"
+        )
         assert market_result["success"] is True
 
     @pytest.mark.asyncio
@@ -300,7 +321,7 @@ class TestWorkflowIntegration:
         # Literature search
         lit_result = await bridge.execute(
             "literature_search",
-            query="CAR-T cell therapy resistance solid tumors 2020-2024"
+            query="CAR-T cell therapy resistance solid tumors 2020-2024",
         )
         assert lit_result["success"] is True
         assert "articles" in lit_result["data"]
@@ -315,6 +336,7 @@ class TestWorkflowIntegration:
 # =============================================================================
 # Convenience Function Tests
 # =============================================================================
+
 
 class TestConvenienceFunctions:
     """Tests for module-level convenience functions."""
@@ -343,6 +365,7 @@ class TestConvenienceFunctions:
 # Stress Tests
 # =============================================================================
 
+
 class TestStress:
     """Stress tests for MCP bridge."""
 
@@ -369,18 +392,20 @@ class TestStress:
         bridge = MCPToolBridge(use_mocks=True)
 
         # Resolve many tools
-        tools = bridge.resolve_workflow_tools([
-            "web_search",
-            "literature_search",
-            "social_api",
-            "market_research",
-            "competitor_analysis",
-            "data_analysis",
-            "crm",
-            "analytics",
-            "reporting",
-            "messaging",
-        ])
+        tools = bridge.resolve_workflow_tools(
+            [
+                "web_search",
+                "literature_search",
+                "social_api",
+                "market_research",
+                "competitor_analysis",
+                "data_analysis",
+                "crm",
+                "analytics",
+                "reporting",
+                "messaging",
+            ]
+        )
 
         assert len(tools) == 10
 

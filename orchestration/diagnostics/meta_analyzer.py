@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 import structlog
 
@@ -25,11 +25,11 @@ class MetaAnalysis:
 
     pattern_detected: str
     root_cause_hypothesis: str
-    suggested_approaches: List[str] = field(default_factory=list)
+    suggested_approaches: list[str] = field(default_factory=list)
     confidence: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "pattern_detected": self.pattern_detected,
@@ -69,9 +69,7 @@ class MetaAnalyzer:
         """
         self.executor = executor
 
-    async def analyze_failures(
-        self, iterations: List[IterationRecord]
-    ) -> MetaAnalysis:
+    async def analyze_failures(self, iterations: list[IterationRecord]) -> MetaAnalysis:
         """Analyze repeated failures and suggest alternatives.
 
         Args:
@@ -184,12 +182,16 @@ Focus on actionable insights. Be specific about what to change and why."""
                 analysis_data = json.loads(json_text)
             except json.JSONDecodeError:
                 # Fallback: try to parse the whole response
-                logger.warning("Failed to parse JSON from LLM response, attempting fallback")
+                logger.warning(
+                    "Failed to parse JSON from LLM response, attempting fallback"
+                )
                 analysis_data = json.loads(result_text)
 
             # Extract fields with defaults
             pattern = analysis_data.get("pattern_detected", "Unknown pattern")
-            root_cause = analysis_data.get("root_cause_hypothesis", "Unknown root cause")
+            root_cause = analysis_data.get(
+                "root_cause_hypothesis", "Unknown root cause"
+            )
             approaches = analysis_data.get("suggested_approaches", [])
             confidence = float(analysis_data.get("confidence", 0.5))
             reasoning = analysis_data.get("reasoning", "")
@@ -201,7 +203,7 @@ Focus on actionable insights. Be specific about what to change and why."""
                 "Meta-analysis completed",
                 pattern=pattern[:100],
                 confidence=confidence,
-                approaches_count=len(approaches)
+                approaches_count=len(approaches),
             )
 
             return MetaAnalysis(
@@ -239,7 +241,7 @@ Focus on actionable insights. Be specific about what to change and why."""
                 },
             )
 
-    def _format_iterations(self, iterations: List[IterationRecord]) -> str:
+    def _format_iterations(self, iterations: list[IterationRecord]) -> str:
         """Format iteration history for LLM prompt.
 
         Args:
@@ -256,7 +258,9 @@ Focus on actionable insights. Be specific about what to change and why."""
             lines.append(f"  Test result: {'PASS' if record.test_result else 'FAIL'}")
 
             if record.diagnostics:
-                lines.append(f"  Console errors: {len(record.diagnostics.console_errors)}")
+                lines.append(
+                    f"  Console errors: {len(record.diagnostics.console_errors)}"
+                )
                 if record.diagnostics.console_errors:
                     for error in record.diagnostics.console_errors[:3]:  # First 3
                         lines.append(f"    - {error.text[:100]}")

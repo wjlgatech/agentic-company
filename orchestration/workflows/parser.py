@@ -6,24 +6,25 @@ Parse workflow definitions from YAML files into executable AgentTeam instances.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Any
+
 import yaml
 
-from orchestration.agents.base import AgentRole, AgentConfig
+from orchestration.agents.base import AgentRole
+from orchestration.agents.specialized import create_agent
 from orchestration.agents.team import (
     AgentTeam,
     TeamConfig,
     WorkflowStep,
 )
-from orchestration.agents.specialized import create_agent
 
 
 @dataclass
 class AgentDefinition:
     """Agent definition from YAML"""
+
     role: str
-    name: Optional[str] = None
-    persona: Optional[str] = None
+    name: str | None = None
+    persona: str | None = None
     guardrails: list[str] = field(default_factory=list)
     workspace_files: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
@@ -32,22 +33,24 @@ class AgentDefinition:
 @dataclass
 class StepDefinition:
     """Step definition from YAML"""
+
     id: str
     agent: str  # Role name
     input: str
     expects: str = ""
-    verified_by: Optional[str] = None
+    verified_by: str | None = None
     requires_approval: bool = False
     max_retries: int = 3
     timeout_seconds: int = 300
     on_fail: str = "retry"
-    execute: Optional[str] = None  # Command to execute after step
+    execute: str | None = None  # Command to execute after step
     artifacts_required: bool = False  # Require artifacts to be created
 
 
 @dataclass
 class WorkflowDefinition:
     """Complete workflow definition from YAML"""
+
     id: str
     name: str
     description: str = ""
@@ -111,56 +114,48 @@ class WorkflowParser:
         "writer": AgentRole.WRITER,
         "analyst": AgentRole.ANALYST,
         "custom": AgentRole.CUSTOM,
-
         # Marketing workflow roles
         "social-intel": AgentRole.RESEARCHER,
         "competitor-analyst": AgentRole.ANALYST,
         "content-creator": AgentRole.WRITER,
         "community-manager": AgentRole.WRITER,
         "campaign-lead": AgentRole.PLANNER,
-
         # M&A Due Diligence roles
         "financial-analyst": AgentRole.ANALYST,
         "legal-reviewer": AgentRole.REVIEWER,
         "market-analyst": AgentRole.ANALYST,
         "technical-assessor": AgentRole.VERIFIER,
         "deal-lead": AgentRole.PLANNER,
-
         # Compliance Audit roles
         "compliance-scanner": AgentRole.ANALYST,
         "gap-analyst": AgentRole.ANALYST,
         "risk-assessor": AgentRole.ANALYST,
         "remediation-planner": AgentRole.PLANNER,
         "audit-documenter": AgentRole.WRITER,
-
         # Patent Landscape roles
         "patent-searcher": AgentRole.RESEARCHER,
         "claim-analyst": AgentRole.ANALYST,
         "landscape-mapper": AgentRole.ANALYST,
         "fto-assessor": AgentRole.ANALYST,
         "ip-strategist": AgentRole.PLANNER,
-
         # Security Assessment roles
         "threat-modeler": AgentRole.ANALYST,
         "vuln-scanner": AgentRole.ANALYST,
         "risk-analyst": AgentRole.ANALYST,
         "remediation-engineer": AgentRole.DEVELOPER,
         "security-architect": AgentRole.PLANNER,
-
         # Churn Analysis roles
         "data-analyst": AgentRole.ANALYST,
         "customer-researcher": AgentRole.RESEARCHER,
         "segment-strategist": AgentRole.PLANNER,
         "retention-strategist": AgentRole.PLANNER,
         "executive-advisor": AgentRole.PLANNER,
-
         # Grant Proposal roles
         "requirements-analyst": AgentRole.ANALYST,
         "research-synthesizer": AgentRole.RESEARCHER,
         "proposal-architect": AgentRole.PLANNER,
         "budget-specialist": AgentRole.ANALYST,
         "proposal-writer": AgentRole.WRITER,
-
         # Incident Post-Mortem roles
         "timeline-analyst": AgentRole.ANALYST,
         "rca-specialist": AgentRole.ANALYST,
@@ -225,58 +220,62 @@ class WorkflowParser:
 
     def parse_file(self, file_path: Path) -> WorkflowDefinition:
         """Parse YAML file into WorkflowDefinition"""
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             return self.parse(f.read())
 
     def _parse_dict(self, data: dict) -> WorkflowDefinition:
         """Parse dictionary into WorkflowDefinition"""
         # Parse agents
         agents = []
-        for agent_data in data.get('agents', []):
+        for agent_data in data.get("agents", []):
             # Use 'id' for role mapping (e.g., "planner", "developer")
             # Fall back to 'role' for backward compatibility with simple formats
-            role_key = agent_data.get('id') or agent_data.get('role')
+            role_key = agent_data.get("id") or agent_data.get("role")
 
             # Use 'prompt' for persona, fall back to 'persona' field
             # The 'role' field in bundled YAMLs is a description, append it to persona
-            persona = agent_data.get('prompt') or agent_data.get('persona') or ''
-            role_desc = agent_data.get('role', '')
+            persona = agent_data.get("prompt") or agent_data.get("persona") or ""
+            role_desc = agent_data.get("role", "")
             if role_desc and role_desc != role_key:
                 persona = f"Role: {role_desc}\n\n{persona}".strip()
 
-            agents.append(AgentDefinition(
-                role=role_key,
-                name=agent_data.get('name'),
-                persona=persona,
-                guardrails=agent_data.get('guardrails', []),
-                workspace_files=agent_data.get('workspace_files', []),
-                tools=agent_data.get('tools', []),
-            ))
+            agents.append(
+                AgentDefinition(
+                    role=role_key,
+                    name=agent_data.get("name"),
+                    persona=persona,
+                    guardrails=agent_data.get("guardrails", []),
+                    workspace_files=agent_data.get("workspace_files", []),
+                    tools=agent_data.get("tools", []),
+                )
+            )
 
         # Parse steps
         steps = []
-        for step_data in data.get('steps', []):
-            steps.append(StepDefinition(
-                id=step_data.get('id'),
-                agent=step_data.get('agent'),
-                input=step_data.get('input'),
-                expects=step_data.get('expects', ''),
-                verified_by=step_data.get('verified_by'),
-                requires_approval=step_data.get('requires_approval', False),
-                max_retries=step_data.get('max_retries', 3),
-                timeout_seconds=step_data.get('timeout_seconds', 300),
-                on_fail=step_data.get('on_fail', 'retry'),
-            ))
+        for step_data in data.get("steps", []):
+            steps.append(
+                StepDefinition(
+                    id=step_data.get("id"),
+                    agent=step_data.get("agent"),
+                    input=step_data.get("input"),
+                    expects=step_data.get("expects", ""),
+                    verified_by=step_data.get("verified_by"),
+                    requires_approval=step_data.get("requires_approval", False),
+                    max_retries=step_data.get("max_retries", 3),
+                    timeout_seconds=step_data.get("timeout_seconds", 300),
+                    on_fail=step_data.get("on_fail", "retry"),
+                )
+            )
 
         return WorkflowDefinition(
-            id=data.get('id'),
-            name=data.get('name', data.get('id')),
-            description=data.get('description', ''),
+            id=data.get("id"),
+            name=data.get("name", data.get("id")),
+            description=data.get("description", ""),
             agents=agents,
             steps=steps,
-            guardrails=data.get('guardrails', []),
-            timeout_seconds=data.get('timeout_seconds', 3600),
-            metadata=data.get('metadata', {}),
+            guardrails=data.get("guardrails", []),
+            timeout_seconds=data.get("timeout_seconds", 3600),
+            metadata=data.get("metadata", {}),
         )
 
     def to_team(self, definition: WorkflowDefinition) -> AgentTeam:
@@ -472,41 +471,43 @@ def workflow_to_yaml(team: AgentTeam) -> str:
         YAML string representation
     """
     data = {
-        'id': team.config.name.lower().replace(' ', '-'),
-        'name': team.config.name,
-        'description': team.config.description,
-        'timeout_seconds': team.config.timeout_seconds,
-        'agents': [],
-        'steps': [],
+        "id": team.config.name.lower().replace(" ", "-"),
+        "name": team.config.name,
+        "description": team.config.description,
+        "timeout_seconds": team.config.timeout_seconds,
+        "agents": [],
+        "steps": [],
     }
 
     # Export agents
     for role, agent in team.agents.items():
-        data['agents'].append({
-            'role': role.value,
-            'name': agent.name,
-            'persona': agent.persona if agent.persona else None,
-            'guardrails': agent.config.guardrails,
-        })
+        data["agents"].append(
+            {
+                "role": role.value,
+                "name": agent.name,
+                "persona": agent.persona if agent.persona else None,
+                "guardrails": agent.config.guardrails,
+            }
+        )
 
     # Export steps
     for step in team.steps:
         step_data = {
-            'id': step.id,
-            'agent': step.agent_role.value,
-            'input': step.input_template,
+            "id": step.id,
+            "agent": step.agent_role.value,
+            "input": step.input_template,
         }
         if step.expects:
-            step_data['expects'] = step.expects
+            step_data["expects"] = step.expects
         if step.verified_by:
-            step_data['verified_by'] = step.verified_by.value
+            step_data["verified_by"] = step.verified_by.value
         if step.requires_approval:
-            step_data['requires_approval'] = True
+            step_data["requires_approval"] = True
         if step.max_retries != 3:
-            step_data['max_retries'] = step.max_retries
-        if step.on_fail != 'retry':
-            step_data['on_fail'] = step.on_fail
+            step_data["max_retries"] = step.max_retries
+        if step.on_fail != "retry":
+            step_data["on_fail"] = step.on_fail
 
-        data['steps'].append(step_data)
+        data["steps"].append(step_data)
 
     return yaml.dump(data, default_flow_style=False, sort_keys=False)

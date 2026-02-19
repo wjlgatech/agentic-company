@@ -12,16 +12,16 @@ Supports:
 """
 
 import subprocess
-import sys
-import os
-import httpx
-from typing import Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
+import httpx
 
 
 @dataclass
 class OllamaConfig:
     """Configuration for Ollama/local LLM"""
+
     model: str = "llama3.2"  # Default model
     base_url: str = "http://localhost:11434"  # Ollama default
     max_tokens: int = 4096
@@ -31,11 +31,11 @@ class OllamaConfig:
 
 # Popular local models
 RECOMMENDED_MODELS = {
-    "fast": "llama3.2:1b",       # Fast, small, good for simple tasks
-    "balanced": "llama3.2",      # Good balance of speed and quality
-    "quality": "llama3.1:8b",    # High quality, slower
-    "coding": "codellama:7b",    # Specialized for code
-    "tiny": "tinyllama",         # Ultra-fast, minimal resources
+    "fast": "llama3.2:1b",  # Fast, small, good for simple tasks
+    "balanced": "llama3.2",  # Good balance of speed and quality
+    "quality": "llama3.1:8b",  # High quality, slower
+    "coding": "codellama:7b",  # Specialized for code
+    "tiny": "tinyllama",  # Ultra-fast, minimal resources
 }
 
 
@@ -52,10 +52,7 @@ def is_ollama_installed() -> bool:
     """Check if Ollama CLI is installed"""
     try:
         result = subprocess.run(
-            ["ollama", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["ollama", "--version"], capture_output=True, text=True, timeout=5
         )
         return result.returncode == 0
     except Exception:
@@ -126,7 +123,7 @@ class OllamaExecutor:
         - LocalAI (use base_url="http://localhost:8080/v1")
     """
 
-    def __init__(self, config: Optional[OllamaConfig] = None):
+    def __init__(self, config: OllamaConfig | None = None):
         self.config = config or OllamaConfig()
         self._client = None
 
@@ -152,7 +149,7 @@ class OllamaExecutor:
 
         if not any(model_name in m for m in available):
             print(f"⚠️ Model '{self.config.model}' not found locally.")
-            print(f"📥 Pulling model... (one-time download)")
+            print("📥 Pulling model... (one-time download)")
             if not pull_model(self.config.model):
                 raise RuntimeError(
                     f"Failed to pull model '{self.config.model}'.\n"
@@ -172,6 +169,7 @@ class OllamaExecutor:
             The LLM response text
         """
         import asyncio
+
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._execute_sync, prompt)
 
@@ -190,9 +188,9 @@ class OllamaExecutor:
                 "options": {
                     "temperature": self.config.temperature,
                     "num_predict": self.config.max_tokens,
-                }
+                },
             },
-            timeout=self.config.timeout
+            timeout=self.config.timeout,
         )
 
         if response.status_code != 200:
@@ -220,10 +218,7 @@ class LMStudioExecutor(OllamaExecutor):
     """
 
     def __init__(self, model: str = "local-model"):
-        config = OllamaConfig(
-            model=model,
-            base_url="http://localhost:1234/v1"
-        )
+        config = OllamaConfig(model=model, base_url="http://localhost:1234/v1")
         super().__init__(config)
 
     def _execute_sync(self, prompt: str) -> str:
@@ -236,7 +231,7 @@ class LMStudioExecutor(OllamaExecutor):
                 "temperature": self.config.temperature,
                 "max_tokens": self.config.max_tokens,
             },
-            timeout=self.config.timeout
+            timeout=self.config.timeout,
         )
 
         if response.status_code != 200:
@@ -246,9 +241,7 @@ class LMStudioExecutor(OllamaExecutor):
 
 
 def create_ollama_executor(
-    model: str = "llama3.2",
-    base_url: str = "http://localhost:11434",
-    **kwargs
+    model: str = "llama3.2", base_url: str = "http://localhost:11434", **kwargs
 ) -> OllamaExecutor:
     """
     Factory function to create Ollama executor.

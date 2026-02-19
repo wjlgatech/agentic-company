@@ -1,11 +1,12 @@
 """Integration layer for diagnostics with AgentTeam (Phase 3)."""
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import structlog
 
-from .capture import BrowserAction, DiagnosticCapture, PlaywrightCapture, ActionType
+from .capture import BrowserAction, DiagnosticCapture, PlaywrightCapture
 from .config import DiagnosticsConfig
 from .iteration_monitor import IterationMonitor
 from .meta_analyzer import MetaAnalyzer
@@ -102,7 +103,7 @@ class DiagnosticsIntegrator:
             if not test_url or not test_actions:
                 logger.warning(
                     "No test_url or test_actions in step metadata, skipping diagnostics",
-                    step_id=step.id
+                    step_id=step.id,
                 )
                 # No test configured, return result as-is
                 result.metadata["diagnostics"] = {
@@ -115,7 +116,9 @@ class DiagnosticsIntegrator:
             try:
                 diagnostics = await self._run_diagnostics(test_url, test_actions)
             except Exception as e:
-                logger.error("Diagnostics failed", step_id=step.id, error=str(e), exc_info=True)
+                logger.error(
+                    "Diagnostics failed", step_id=step.id, error=str(e), exc_info=True
+                )
                 diagnostics = DiagnosticCapture(
                     success=False,
                     error=f"Diagnostics execution failed: {str(e)}",
@@ -124,7 +127,9 @@ class DiagnosticsIntegrator:
             # Record iteration
             self.monitor.record_iteration(
                 error=diagnostics.error if not diagnostics.success else None,
-                fix_attempted=result.agent_result.output[:200] if hasattr(result, 'agent_result') else "N/A",
+                fix_attempted=result.agent_result.output[:200]
+                if hasattr(result, "agent_result")
+                else "N/A",
                 test_result=diagnostics.success,
                 diagnostics=diagnostics,
             )
@@ -143,7 +148,7 @@ class DiagnosticsIntegrator:
                     "Tests passed!",
                     step_id=step.id,
                     iteration=iteration,
-                    final_url=diagnostics.final_url
+                    final_url=diagnostics.final_url,
                 )
                 return result
 
@@ -153,7 +158,7 @@ class DiagnosticsIntegrator:
                     "Meta-analysis threshold reached",
                     step_id=step.id,
                     iterations=iteration,
-                    threshold=self.config.iteration_threshold
+                    threshold=self.config.iteration_threshold,
                 )
 
                 # Run meta-analysis
@@ -167,7 +172,9 @@ class DiagnosticsIntegrator:
                         "suggestions": analysis.suggested_approaches,
                         "confidence": analysis.confidence,
                     }
-                    logger.info("Meta-analysis completed", pattern=analysis.pattern_detected)
+                    logger.info(
+                        "Meta-analysis completed", pattern=analysis.pattern_detected
+                    )
                 except Exception as e:
                     logger.error("Meta-analysis failed", error=str(e), exc_info=True)
 
@@ -176,22 +183,22 @@ class DiagnosticsIntegrator:
                 "Test failed, retrying",
                 step_id=step.id,
                 iteration=iteration,
-                error=diagnostics.error[:100] if diagnostics.error else "Unknown"
+                error=diagnostics.error[:100] if diagnostics.error else "Unknown",
             )
 
         # Max iterations reached
         logger.error(
             "Max iterations reached without success",
             step_id=step.id,
-            max_iterations=self.config.max_iterations
+            max_iterations=self.config.max_iterations,
         )
 
-        result.metadata["diagnostics_note"] = f"Max iterations ({self.config.max_iterations}) reached"
+        result.metadata["diagnostics_note"] = (
+            f"Max iterations ({self.config.max_iterations}) reached"
+        )
         return result
 
-    async def capture_step_diagnostics(
-        self, step: Any, result: Any
-    ) -> Dict[str, Any]:
+    async def capture_step_diagnostics(self, step: Any, result: Any) -> dict[str, Any]:
         """Capture diagnostics for a completed step.
 
         This is a simpler interface for Phase 2 compatibility.
@@ -230,7 +237,7 @@ class DiagnosticsIntegrator:
             }
 
     async def _run_diagnostics(
-        self, test_url: str, test_actions: List[Dict[str, Any]]
+        self, test_url: str, test_actions: list[dict[str, Any]]
     ) -> DiagnosticCapture:
         """Run browser test and capture diagnostics.
 
@@ -241,7 +248,9 @@ class DiagnosticsIntegrator:
         Returns:
             DiagnosticCapture with results
         """
-        logger.info("Running browser diagnostics", url=test_url, actions_count=len(test_actions))
+        logger.info(
+            "Running browser diagnostics", url=test_url, actions_count=len(test_actions)
+        )
 
         # Convert dict actions to BrowserAction objects
         actions = []
@@ -270,7 +279,7 @@ class DiagnosticsIntegrator:
                     success=result.success,
                     console_errors=len(result.console_errors),
                     screenshots=len(result.screenshots),
-                    final_url=result.final_url
+                    final_url=result.final_url,
                 )
                 return result
         except Exception as e:

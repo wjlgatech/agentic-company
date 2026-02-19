@@ -1,21 +1,18 @@
 """Integration tests for diagnostics with AgentTeam (Phase 2)."""
 
 import pytest
-from pathlib import Path
-from datetime import datetime
 
+from orchestration.agents.base import Agent, AgentConfig, AgentResult, AgentRole
+from orchestration.agents.team import (
+    AgentTeam,
+    StepStatus,
+    TeamConfig,
+    WorkflowStep,
+)
 from orchestration.diagnostics import (
     DiagnosticsConfig,
     check_playwright_installation,
 )
-from orchestration.agents.team import (
-    AgentTeam,
-    TeamConfig,
-    WorkflowStep,
-    StepStatus,
-)
-from orchestration.agents.base import Agent, AgentConfig, AgentRole, AgentResult
-
 
 # ============== Fixtures ==============
 
@@ -81,8 +78,9 @@ def mock_agent(mock_executor):
 
 def test_step_result_has_metadata_field():
     """Test that StepResult dataclass has metadata field."""
-    from orchestration.agents.team import StepResult
     from dataclasses import fields
+
+    from orchestration.agents.team import StepResult
 
     # Get fields of StepResult
     step_result_fields = {f.name: f for f in fields(StepResult)}
@@ -254,7 +252,7 @@ async def test_diagnostics_integrator_initializes(mock_agent):
     try:
         from orchestration.integrations.unified import auto_setup_executor
 
-        executor = auto_setup_executor()
+        auto_setup_executor()
 
         team = AgentTeam(config)
 
@@ -290,7 +288,7 @@ async def test_step_with_diagnostics_enabled(mock_agent):
 
         step = WorkflowStep(
             id="test_step",
-        name="Test Step",
+            name="Test Step",
             agent_role=AgentRole.DEVELOPER,
             input_template="Test task",
             metadata={

@@ -7,10 +7,11 @@ Supports automatic, manual, and hybrid approval strategies.
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 class ApprovalStatus(str, Enum):
@@ -35,9 +36,9 @@ class ApprovalRequest:
     metadata: dict[str, Any] = field(default_factory=dict)
     status: ApprovalStatus = ApprovalStatus.PENDING
     created_at: datetime = field(default_factory=datetime.now)
-    expires_at: Optional[datetime] = None
-    decided_at: Optional[datetime] = None
-    decided_by: Optional[str] = None
+    expires_at: datetime | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
     reason: str = ""
 
     def is_pending(self) -> bool:
@@ -87,7 +88,7 @@ class ApprovalGate(ABC):
         pass
 
     @abstractmethod
-    async def check_status(self, request_id: str) -> Optional[ApprovalRequest]:
+    async def check_status(self, request_id: str) -> ApprovalRequest | None:
         """Check the status of an approval request."""
         pass
 
@@ -104,7 +105,7 @@ class AutoApprovalGate(ApprovalGate):
 
     def __init__(
         self,
-        rules: Optional[list[Callable[[ApprovalRequest], bool]]] = None,
+        rules: list[Callable[[ApprovalRequest], bool]] | None = None,
         default_approve: bool = True,
     ):
         self.rules = rules or []
@@ -133,7 +134,7 @@ class AutoApprovalGate(ApprovalGate):
         self.requests[request.id] = request
         return request
 
-    async def check_status(self, request_id: str) -> Optional[ApprovalRequest]:
+    async def check_status(self, request_id: str) -> ApprovalRequest | None:
         return self.requests.get(request_id)
 
     async def list_pending(self) -> list[ApprovalRequest]:
@@ -148,7 +149,7 @@ class HumanApprovalGate(ApprovalGate):
     def __init__(
         self,
         timeout_seconds: int = 3600,
-        notification_callback: Optional[Callable[[ApprovalRequest], None]] = None,
+        notification_callback: Callable[[ApprovalRequest], None] | None = None,
     ):
         self.timeout_seconds = timeout_seconds
         self.notification_callback = notification_callback
@@ -165,7 +166,7 @@ class HumanApprovalGate(ApprovalGate):
 
         return request
 
-    async def check_status(self, request_id: str) -> Optional[ApprovalRequest]:
+    async def check_status(self, request_id: str) -> ApprovalRequest | None:
         """Check status of request."""
         request = self.requests.get(request_id)
         if request and request.is_pending() and request.is_expired():
@@ -183,7 +184,9 @@ class HumanApprovalGate(ApprovalGate):
                     pending.append(request)
         return pending
 
-    async def approve(self, request_id: str, by: str, reason: str = "") -> Optional[ApprovalRequest]:
+    async def approve(
+        self, request_id: str, by: str, reason: str = ""
+    ) -> ApprovalRequest | None:
         """Approve a pending request."""
         request = self.requests.get(request_id)
         if request and request.is_pending():
@@ -191,7 +194,9 @@ class HumanApprovalGate(ApprovalGate):
             return request
         return None
 
-    async def reject(self, request_id: str, by: str, reason: str = "") -> Optional[ApprovalRequest]:
+    async def reject(
+        self, request_id: str, by: str, reason: str = ""
+    ) -> ApprovalRequest | None:
         """Reject a pending request."""
         request = self.requests.get(request_id)
         if request and request.is_pending():
@@ -225,8 +230,8 @@ class HybridApprovalGate(ApprovalGate):
         self,
         risk_scorer: Callable[[ApprovalRequest], float],
         risk_threshold: float = 0.5,
-        auto_gate: Optional[AutoApprovalGate] = None,
-        human_gate: Optional[HumanApprovalGate] = None,
+        auto_gate: AutoApprovalGate | None = None,
+        human_gate: HumanApprovalGate | None = None,
     ):
         self.risk_scorer = risk_scorer
         self.risk_threshold = risk_threshold
@@ -243,7 +248,7 @@ class HybridApprovalGate(ApprovalGate):
         else:
             return await self.human_gate.request_approval(request)
 
-    async def check_status(self, request_id: str) -> Optional[ApprovalRequest]:
+    async def check_status(self, request_id: str) -> ApprovalRequest | None:
         """Check status in both gates."""
         result = await self.auto_gate.check_status(request_id)
         if result:
@@ -276,7 +281,7 @@ class ApprovalQueue:
 
     def get_history(
         self,
-        status: Optional[ApprovalStatus] = None,
+        status: ApprovalStatus | None = None,
         limit: int = 100,
     ) -> list[ApprovalRequest]:
         """Get request history, optionally filtered by status."""

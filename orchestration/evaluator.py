@@ -5,9 +5,10 @@ Provides rule-based and LLM-based evaluation with optimization loops.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 @dataclass
@@ -32,7 +33,7 @@ class BaseEvaluator(ABC):
     name: str = "base"
 
     @abstractmethod
-    def evaluate(self, content: str, context: Optional[dict] = None) -> EvaluationResult:
+    def evaluate(self, content: str, context: dict | None = None) -> EvaluationResult:
         """Evaluate content and return result."""
         pass
 
@@ -46,9 +47,9 @@ class RuleBasedEvaluator(BaseEvaluator):
         self,
         min_length: int = 100,
         max_length: int = 10000,
-        required_elements: Optional[list[str]] = None,
-        forbidden_elements: Optional[list[str]] = None,
-        custom_rules: Optional[list[Callable[[str], tuple[bool, str]]]] = None,
+        required_elements: list[str] | None = None,
+        forbidden_elements: list[str] | None = None,
+        custom_rules: list[Callable[[str], tuple[bool, str]]] | None = None,
     ):
         self.min_length = min_length
         self.max_length = max_length
@@ -56,7 +57,7 @@ class RuleBasedEvaluator(BaseEvaluator):
         self.forbidden_elements = forbidden_elements or []
         self.custom_rules = custom_rules or []
 
-    def evaluate(self, content: str, context: Optional[dict] = None) -> EvaluationResult:
+    def evaluate(self, content: str, context: dict | None = None) -> EvaluationResult:
         """Evaluate content against rules."""
         issues = []
         suggestions = []
@@ -68,7 +69,9 @@ class RuleBasedEvaluator(BaseEvaluator):
         # Length check
         if len(content) < self.min_length:
             issues.append(f"Content too short ({len(content)} < {self.min_length})")
-            suggestions.append(f"Add more content to reach at least {self.min_length} characters")
+            suggestions.append(
+                f"Add more content to reach at least {self.min_length} characters"
+            )
         elif len(content) > self.max_length:
             issues.append(f"Content too long ({len(content)} > {self.max_length})")
             suggestions.append(f"Reduce content to under {self.max_length} characters")
@@ -77,8 +80,7 @@ class RuleBasedEvaluator(BaseEvaluator):
 
         # Required elements
         missing_elements = [
-            elem for elem in self.required_elements
-            if elem.lower() not in content_lower
+            elem for elem in self.required_elements if elem.lower() not in content_lower
         ]
         if missing_elements:
             issues.append(f"Missing required elements: {missing_elements}")
@@ -88,8 +90,7 @@ class RuleBasedEvaluator(BaseEvaluator):
 
         # Forbidden elements
         found_forbidden = [
-            elem for elem in self.forbidden_elements
-            if elem.lower() in content_lower
+            elem for elem in self.forbidden_elements if elem.lower() in content_lower
         ]
         if found_forbidden:
             issues.append(f"Contains forbidden elements: {found_forbidden}")
@@ -136,8 +137,8 @@ class LLMEvaluator(BaseEvaluator):
 
     def __init__(
         self,
-        criteria: Optional[list[str]] = None,
-        llm_client: Optional[Any] = None,
+        criteria: list[str] | None = None,
+        llm_client: Any | None = None,
         model: str = "claude-sonnet-4-20250514",
         threshold: float = 0.7,
     ):
@@ -151,7 +152,7 @@ class LLMEvaluator(BaseEvaluator):
         self.model = model
         self.threshold = threshold
 
-    def evaluate(self, content: str, context: Optional[dict] = None) -> EvaluationResult:
+    def evaluate(self, content: str, context: dict | None = None) -> EvaluationResult:
         """Evaluate content using LLM."""
         # If no LLM client, fall back to heuristic evaluation
         if self.llm_client is None:
@@ -159,24 +160,7 @@ class LLMEvaluator(BaseEvaluator):
 
         try:
             # Build evaluation prompt
-            criteria_list = "\n".join(f"- {c}" for c in self.criteria)
-            prompt = f"""Evaluate the following content on these criteria:
-{criteria_list}
-
-For each criterion, provide a score from 0 to 10.
-Then provide overall feedback and suggestions for improvement.
-
-Content:
-{content}
-
-Respond in JSON format:
-{{
-    "scores": {{"criterion": score, ...}},
-    "overall_score": float (0-1),
-    "feedback": "string",
-    "suggestions": ["suggestion1", ...]
-}}
-"""
+            "\n".join(f"- {c}" for c in self.criteria)
             # This would call the actual LLM
             # response = self.llm_client.generate(prompt)
             # For now, use heuristic
@@ -191,14 +175,18 @@ Respond in JSON format:
                 suggestions=["Try again or use rule-based evaluation"],
             )
 
-    def _heuristic_evaluate(self, content: str, context: Optional[dict] = None) -> EvaluationResult:
+    def _heuristic_evaluate(
+        self, content: str, context: dict | None = None
+    ) -> EvaluationResult:
         """Heuristic evaluation when LLM is not available."""
         scores = {}
         suggestions = []
 
         # Clarity: sentence structure
         sentences = content.split(".")
-        avg_sentence_len = sum(len(s.split()) for s in sentences) / max(len(sentences), 1)
+        avg_sentence_len = sum(len(s.split()) for s in sentences) / max(
+            len(sentences), 1
+        )
         scores["clarity"] = min(1.0, 1.0 - abs(15 - avg_sentence_len) / 30)
         if avg_sentence_len > 25:
             suggestions.append("Consider shorter sentences for clarity")
@@ -242,7 +230,7 @@ class EvaluatorOptimizer:
         evaluator: BaseEvaluator,
         max_iterations: int = 3,
         target_score: float = 0.8,
-        optimizer_func: Optional[Callable[[str, EvaluationResult], str]] = None,
+        optimizer_func: Callable[[str, EvaluationResult], str] | None = None,
     ):
         self.evaluator = evaluator
         self.max_iterations = max_iterations
@@ -252,7 +240,7 @@ class EvaluatorOptimizer:
     def optimize(
         self,
         content: str,
-        context: Optional[dict] = None,
+        context: dict | None = None,
     ) -> tuple[str, list[EvaluationResult]]:
         """Run optimization loop to improve content."""
         results = []
@@ -272,7 +260,9 @@ class EvaluatorOptimizer:
 
         return current_content, results
 
-    def evaluate_only(self, content: str, context: Optional[dict] = None) -> EvaluationResult:
+    def evaluate_only(
+        self, content: str, context: dict | None = None
+    ) -> EvaluationResult:
         """Run evaluation without optimization."""
         return self.evaluator.evaluate(content, context)
 
@@ -285,7 +275,7 @@ class CompositeEvaluator(BaseEvaluator):
     def __init__(
         self,
         evaluators: list[BaseEvaluator],
-        weights: Optional[list[float]] = None,
+        weights: list[float] | None = None,
         strategy: str = "weighted_average",  # weighted_average, all_pass, any_pass
     ):
         self.evaluators = evaluators
@@ -296,7 +286,7 @@ class CompositeEvaluator(BaseEvaluator):
         total = sum(self.weights)
         self.weights = [w / total for w in self.weights]
 
-    def evaluate(self, content: str, context: Optional[dict] = None) -> EvaluationResult:
+    def evaluate(self, content: str, context: dict | None = None) -> EvaluationResult:
         """Evaluate using all evaluators."""
         results = []
         for evaluator in self.evaluators:
@@ -304,12 +294,10 @@ class CompositeEvaluator(BaseEvaluator):
             results.append(result)
 
         if self.strategy == "weighted_average":
-            weighted_score = sum(
-                r.score * w for r, w in zip(results, self.weights)
-            )
+            weighted_score = sum(r.score * w for r, w in zip(results, self.weights, strict=False))
             passed = weighted_score >= 0.7
         elif self.strategy == "all_pass":
-            weighted_score = sum(r.score * w for r, w in zip(results, self.weights))
+            weighted_score = sum(r.score * w for r, w in zip(results, self.weights, strict=False))
             passed = all(r.passed for r in results)
         else:  # any_pass
             weighted_score = max(r.score for r in results)
@@ -328,7 +316,11 @@ class CompositeEvaluator(BaseEvaluator):
             suggestions=all_suggestions,
             details={
                 "individual_results": [
-                    {"evaluator": r.evaluator_name, "score": r.score, "passed": r.passed}
+                    {
+                        "evaluator": r.evaluator_name,
+                        "score": r.score,
+                        "passed": r.passed,
+                    }
                     for r in results
                 ]
             },

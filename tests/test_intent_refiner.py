@@ -8,16 +8,15 @@ Tests the Progressive Intent Refinement (PIR) pipeline:
 4. GENERATE - Prompt generation
 """
 
-import pytest
 from orchestration.tools.intent_refiner import (
-    IntentRefiner,
-    IntentClassification,
-    TaskType,
     Complexity,
     Domain,
-    refine_intent,
-    get_clarification_questions,
+    IntentClassification,
+    IntentRefiner,
+    TaskType,
     generate_system_prompt,
+    get_clarification_questions,
+    refine_intent,
 )
 
 
@@ -114,7 +113,9 @@ class TestIntentClassification:
     def test_confidence_scoring(self):
         """Should have higher confidence with more signals."""
         vague = self.refiner.parse("help me")
-        specific = self.refiner.parse("analyze our customer churn data and create retention strategy")
+        specific = self.refiner.parse(
+            "analyze our customer churn data and create retention strategy"
+        )
 
         assert specific.confidence > vague.confidence
 
@@ -143,8 +144,7 @@ class TestClarificationQuestions:
 
         vague_questions = self.refiner.get_questions("help", vague_classification)
         specific_questions = self.refiner.get_questions(
-            "create a detailed financial report for Q4 sales",
-            specific_classification
+            "create a detailed financial report for Q4 sales", specific_classification
         )
 
         assert len(vague_questions) >= len(specific_questions)
@@ -253,7 +253,11 @@ class TestPromptGeneration:
         prompt = result["prompt"]
 
         # Updated to match new section structure with specific context
-        assert "## Specific Situation" in prompt or "## Working Assumptions" in prompt or "context" in prompt.lower()
+        assert (
+            "## Specific Situation" in prompt
+            or "## Working Assumptions" in prompt
+            or "context" in prompt.lower()
+        )
         assert "## Your Task" in prompt or "## Task" in prompt or "Task" in prompt
         assert "## Guardrails" in prompt or "Guardrails" in prompt
 
@@ -262,8 +266,14 @@ class TestPromptGeneration:
         tech_result = refine_intent("debug this code")
         business_result = refine_intent("analyze revenue growth")
 
-        assert "engineer" in tech_result["prompt"].lower() or "technical" in tech_result["prompt"].lower()
-        assert "business" in business_result["prompt"].lower() or "strategist" in business_result["prompt"].lower()
+        assert (
+            "engineer" in tech_result["prompt"].lower()
+            or "technical" in tech_result["prompt"].lower()
+        )
+        assert (
+            "business" in business_result["prompt"].lower()
+            or "strategist" in business_result["prompt"].lower()
+        )
 
     def test_prompt_includes_success_criteria(self):
         """Prompt should include success criteria."""
@@ -274,13 +284,13 @@ class TestPromptGeneration:
 
     def test_answers_influence_prompt(self):
         """User answers should influence generated prompt."""
-        without_answers = generate_system_prompt("write a report")
+        generate_system_prompt("write a report")
         with_answers = generate_system_prompt(
             "write a report",
             answers={
                 "audience": "C-level executives",
                 "success": "Clear, actionable recommendations",
-            }
+            },
         )
 
         # With answers should be more specific
@@ -308,7 +318,9 @@ class TestParaphrase:
         classification = self.refiner.parse("help with marketing")
         model = self.refiner.build_model("help with marketing", classification)
 
-        paraphrase = self.refiner.paraphrase("help with marketing", classification, model)
+        paraphrase = self.refiner.paraphrase(
+            "help with marketing", classification, model
+        )
 
         assert "assumed" in paraphrase.lower()
 
@@ -358,7 +370,7 @@ class TestFullPipeline:
                 "goal": "Help leadership make Q1 budget decisions",
                 "audience": "Executive team",
                 "success": "Clear data visualization with recommendations",
-            }
+            },
         )
 
         # Answers should influence the output

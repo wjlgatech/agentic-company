@@ -12,7 +12,13 @@ Following the antfarm pattern:
 __version__ = "1.0.0"
 
 from .core import AgenticomCore
-from .workflows import WorkflowRunner, WorkflowDefinition
 from .state import StateManager
+from .workflows import WorkflowDefinition, WorkflowRunner
 
-__all__ = ["AgenticomCore", "WorkflowRunner", "WorkflowDefinition", "StateManager", "__version__"]
+__all__ = [
+    "AgenticomCore",
+    "WorkflowRunner",
+    "WorkflowDefinition",
+    "StateManager",
+    "__version__",
+]

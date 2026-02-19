@@ -5,26 +5,28 @@ Provides seamless integration with OpenClaw for LLM execution.
 Handles automatic installation if OpenClaw is not present.
 """
 
+import os
 import subprocess
 import sys
-import os
-from typing import Optional, Any
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class OpenClawConfig:
     """Configuration for OpenClaw"""
+
     model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 4096
     temperature: float = 0.7
-    api_key: Optional[str] = None  # Uses ANTHROPIC_API_KEY env var if not set
+    api_key: str | None = None  # Uses ANTHROPIC_API_KEY env var if not set
 
 
 def is_openclaw_installed() -> bool:
     """Check if OpenClaw is installed"""
     try:
         import anthropic
+
         return True
     except ImportError:
         return False
@@ -62,7 +64,7 @@ class OpenClawExecutor:
         result = await executor.execute("Write a Python function")
     """
 
-    def __init__(self, config: Optional[OpenClawConfig] = None):
+    def __init__(self, config: OpenClawConfig | None = None):
         self.config = config or OpenClawConfig()
         self._client = None
         self._ensure_installed()
@@ -120,9 +122,7 @@ class OpenClawExecutor:
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             temperature=self.config.temperature,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}],
         )
 
         return message.content[0].text
@@ -144,9 +144,7 @@ class OpenClawExecutor:
 
 
 def create_openclaw_executor(
-    model: str = "claude-sonnet-4-20250514",
-    api_key: Optional[str] = None,
-    **kwargs
+    model: str = "claude-sonnet-4-20250514", api_key: str | None = None, **kwargs
 ) -> OpenClawExecutor:
     """
     Factory function to create OpenClaw executor.
@@ -159,9 +157,5 @@ def create_openclaw_executor(
     Returns:
         Configured OpenClawExecutor
     """
-    config = OpenClawConfig(
-        model=model,
-        api_key=api_key,
-        **kwargs
-    )
+    config = OpenClawConfig(model=model, api_key=api_key, **kwargs)
     return OpenClawExecutor(config)

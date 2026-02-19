@@ -6,8 +6,8 @@ substituted with actual step outputs, causing agents to work in isolation.
 """
 
 import pytest
-from orchestration.agents.team import AgentTeam, TeamConfig, WorkflowStep, StepResult
-from orchestration.agents.base import AgentRole
+
+from orchestration.agents.team import AgentTeam, TeamConfig
 
 
 class TestTemplatePreprocessing:
@@ -85,7 +85,7 @@ class TestTemplatePreprocessing:
 
     def test_preserves_plain_braces(self):
         """Should preserve single braces that aren't template variables."""
-        template = "JSON example: {\"key\": \"value\"}"
+        template = 'JSON example: {"key": "value"}'
         result = self.team._preprocess_template(template)
         # Single braces should remain unchanged
         assert '{"key": "value"}' in result
@@ -110,9 +110,7 @@ class TestTemplateFormatting:
         processed = self.team._preprocess_template(template)
 
         # Simulate step outputs
-        outputs = {
-            "plan": "1. Build login page\n2. Add validation\n3. Connect to API"
-        }
+        outputs = {"plan": "1. Build login page\n2. Add validation\n3. Connect to API"}
 
         result = processed.format(**outputs)
         assert "1. Build login page" in result
@@ -129,7 +127,7 @@ class TestTemplateFormatting:
 
         outputs = {
             "implement": "def login(): pass",
-            "test": "def test_login(): assert True"
+            "test": "def test_login(): assert True",
         }
 
         result = processed.format(**outputs)
@@ -161,19 +159,16 @@ class TestRegressionPrevention:
         template = "Review this code: {{step_outputs.implement}}"
         processed = team._preprocess_template(template)
 
-        outputs = {
-            "implement": "def hello():\n    print('Hello World')"
-        }
+        outputs = {"implement": "def hello():\n    print('Hello World')"}
 
         result = processed.format(**outputs)
 
         # CRITICAL ASSERTIONS
-        assert "step_outputs" not in result.lower(), \
+        assert "step_outputs" not in result.lower(), (
             "BUG: Literal 'step_outputs' should never appear in formatted output"
-        assert "{{" not in result, \
-            "BUG: Template markers {{ should be substituted"
-        assert "}}" not in result, \
-            "BUG: Template markers }} should be substituted"
+        )
+        assert "{{" not in result, "BUG: Template markers {{ should be substituted"
+        assert "}}" not in result, "BUG: Template markers }} should be substituted"
 
         # Should contain actual code
         assert "def hello():" in result
@@ -194,7 +189,7 @@ class TestRegressionPrevention:
         # Simulate step 1 output
         outputs = {
             "task": "build login",
-            "plan": "Step 1: Create form\nStep 2: Add validation"
+            "plan": "Step 1: Create form\nStep 2: Add validation",
         }
 
         # Step 2: Implement (depends on plan)
@@ -269,9 +264,7 @@ class TestEdgeCases:
         template = "Analysis: {{step_outputs.analysis}}"
         processed = self.team._preprocess_template(template)
 
-        outputs = {
-            "analysis": "Success rate: 85% (p < 0.05)\nCI: [0.82, 0.88]"
-        }
+        outputs = {"analysis": "Success rate: 85% (p < 0.05)\nCI: [0.82, 0.88]"}
 
         result = processed.format(**outputs)
         assert "85%" in result

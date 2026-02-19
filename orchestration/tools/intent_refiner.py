@@ -16,20 +16,20 @@ Based on research in:
 - Prompt Engineering Best Practices
 """
 
-import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Awaitable, Any
 from enum import Enum
-
 
 # =============================================================================
 # EXTRACTED SPECIFICS
 # =============================================================================
 
+
 @dataclass
 class ExtractedSpecifics:
     """Specific details extracted from user input."""
+
     # Core entities
     entities: list[str] = field(default_factory=list)  # Companies, products, people
     technologies: list[str] = field(default_factory=list)  # Tech stack, tools
@@ -88,16 +88,25 @@ class ExtractedSpecifics:
     def has_specifics(self) -> bool:
         """Check if any specifics were extracted."""
         return bool(
-            self.entities or self.technologies or self.metrics or
-            self.timeframes or self.stakeholders or self.constraints or
-            self.requirements or self.pain_points or self.goals or
-            self.comparisons or self.domain_terms or self.key_phrases
+            self.entities
+            or self.technologies
+            or self.metrics
+            or self.timeframes
+            or self.stakeholders
+            or self.constraints
+            or self.requirements
+            or self.pain_points
+            or self.goals
+            or self.comparisons
+            or self.domain_terms
+            or self.key_phrases
         )
 
 
 @dataclass
 class QualityScore:
     """Quality evaluation of generated prompt."""
+
     overall: float = 0.0  # 0-1 score
     specificity: float = 0.0  # How specific vs generic
     completeness: float = 0.0  # All aspects covered
@@ -115,46 +124,51 @@ class QualityScore:
 # INTENT CLASSIFICATION
 # =============================================================================
 
+
 class TaskType(Enum):
     """Primary task categories."""
-    ANALYSIS = "analysis"           # Understanding something
-    CREATION = "creation"           # Making something new
+
+    ANALYSIS = "analysis"  # Understanding something
+    CREATION = "creation"  # Making something new
     TRANSFORMATION = "transformation"  # Changing something existing
-    DECISION = "decision"           # Choosing between options
-    RESEARCH = "research"           # Finding information
-    AUTOMATION = "automation"       # Recurring process
+    DECISION = "decision"  # Choosing between options
+    RESEARCH = "research"  # Finding information
+    AUTOMATION = "automation"  # Recurring process
 
 
 class Complexity(Enum):
     """Task complexity levels."""
-    ATOMIC = "atomic"               # Single step, clear outcome
-    COMPOSITE = "composite"         # Multiple steps, single goal
-    EXPLORATORY = "exploratory"     # Goal discovered during work
+
+    ATOMIC = "atomic"  # Single step, clear outcome
+    COMPOSITE = "composite"  # Multiple steps, single goal
+    EXPLORATORY = "exploratory"  # Goal discovered during work
 
 
 class Domain(Enum):
     """Knowledge domains."""
+
     # Core domains
-    TECHNICAL = "technical"         # Code, systems, data
-    BUSINESS = "business"           # Strategy, operations, marketing, sales
-    CREATIVE = "creative"           # Writing, design, content
-    RESEARCH = "research"           # Academic, scientific
-    PERSONAL = "personal"           # Life, productivity
+    TECHNICAL = "technical"  # Code, systems, data
+    BUSINESS = "business"  # Strategy, operations, marketing, sales
+    CREATIVE = "creative"  # Writing, design, content
+    RESEARCH = "research"  # Academic, scientific
+    PERSONAL = "personal"  # Life, productivity
 
     # Specialized domains
-    SCIENCE = "science"             # Biology, chemistry, physics, quantum
-    FINANCE = "finance"             # Stocks, crypto, real estate, investing
-    HEALTH = "health"               # Medical, wellness, mental health
-    LEGAL = "legal"                 # Law, contracts, IP, compliance
-    EDUCATION = "education"         # Teaching, learning, curriculum
-    ENTERTAINMENT = "entertainment" # Music, film, gaming, content creation
-    FASHION = "fashion"             # Style, clothing, design
+    SCIENCE = "science"  # Biology, chemistry, physics, quantum
+    FINANCE = "finance"  # Stocks, crypto, real estate, investing
+    HEALTH = "health"  # Medical, wellness, mental health
+    LEGAL = "legal"  # Law, contracts, IP, compliance
+    EDUCATION = "education"  # Teaching, learning, curriculum
+    ENTERTAINMENT = "entertainment"  # Music, film, gaming, content creation
+    FASHION = "fashion"  # Style, clothing, design
     ENTREPRENEURSHIP = "entrepreneurship"  # Startups, founding, scaling
 
 
 @dataclass
 class IntentClassification:
     """Classification of user intent."""
+
     task_type: TaskType
     complexity: Complexity
     domain: Domain
@@ -166,21 +180,24 @@ class IntentClassification:
 # ELICITATION FRAMEWORK
 # =============================================================================
 
+
 @dataclass
 class ClarificationQuestion:
     """A question to clarify user intent."""
+
     question: str
-    dimension: str          # What aspect this clarifies
-    priority: int           # 1=must ask, 2=should ask, 3=nice to have
+    dimension: str  # What aspect this clarifies
+    priority: int  # 1=must ask, 2=should ask, 3=nice to have
     options: list[str] = field(default_factory=list)  # Multiple choice options
-    default: Optional[str] = None  # Assumed if not asked
+    default: str | None = None  # Assumed if not asked
     information_gain: float = 0.5  # How much this changes the output
 
 
 @dataclass
 class ElicitedContext:
     """Context gathered through elicitation."""
-    goal: str = ""                  # What user ultimately wants
+
+    goal: str = ""  # What user ultimately wants
     success_criteria: list[str] = field(default_factory=list)
     failure_modes: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
@@ -195,6 +212,7 @@ class ElicitedContext:
 # =============================================================================
 # MENTAL MODEL
 # =============================================================================
+
 
 @dataclass
 class IntentModel:
@@ -221,7 +239,12 @@ class IntentModel:
         lines.append("│ INPUTS:".ljust(61) + "│")
         for inp in self.inputs:
             status = "✓" if inp.get("confirmed") else "○"
-            lines.append(f"│   {status} {inp.get('name', '?')}: {inp.get('description', '')}".ljust(61)[:61] + "│")
+            lines.append(
+                f"│   {status} {inp.get('name', '?')}: {inp.get('description', '')}".ljust(
+                    61
+                )[:61]
+                + "│"
+            )
 
         lines.append("│".ljust(61) + "│")
         lines.append("│ PROCESS:".ljust(61) + "│")
@@ -231,12 +254,20 @@ class IntentModel:
         lines.append("│".ljust(61) + "│")
         lines.append("│ OUTPUTS:".ljust(61) + "│")
         for out in self.outputs:
-            lines.append(f"│   ◆ {out.get('name', '?')}: {out.get('format', '')}".ljust(61)[:61] + "│")
+            lines.append(
+                f"│   ◆ {out.get('name', '?')}: {out.get('format', '')}".ljust(61)[:61]
+                + "│"
+            )
 
         lines.append("│".ljust(61) + "│")
         lines.append("│ ASSUMPTIONS (inferred):".ljust(61) + "│")
         for assumption in self.assumptions:
-            lines.append(f"│   ○ {assumption.get('key', '?')}: {assumption.get('value', '')}".ljust(61)[:61] + "│")
+            lines.append(
+                f"│   ○ {assumption.get('key', '?')}: {assumption.get('value', '')}".ljust(
+                    61
+                )[:61]
+                + "│"
+            )
 
         if self.uncertainties:
             lines.append("│".ljust(61) + "│")
@@ -272,10 +303,10 @@ class IntentModel:
         for i in range(len(self.inputs)):
             lines.append(f"    I{i} --> P0")
         for i in range(len(self.process) - 1):
-            lines.append(f"    P{i} --> P{i+1}")
+            lines.append(f"    P{i} --> P{i + 1}")
         if self.process:
             for i in range(len(self.outputs)):
-                lines.append(f"    P{len(self.process)-1} --> O{i}")
+                lines.append(f"    P{len(self.process) - 1} --> O{i}")
 
         return "\n".join(lines)
 
@@ -283,6 +314,7 @@ class IntentModel:
 # =============================================================================
 # INTENT REFINER
 # =============================================================================
+
 
 class IntentRefiner:
     """
@@ -316,28 +348,71 @@ class IntentRefiner:
     # Task type signal words
     TASK_SIGNALS = {
         TaskType.ANALYSIS: [
-            "analyze", "understand", "explain", "why", "how does",
-            "what causes", "investigate", "assess", "evaluate"
+            "analyze",
+            "understand",
+            "explain",
+            "why",
+            "how does",
+            "what causes",
+            "investigate",
+            "assess",
+            "evaluate",
         ],
         TaskType.CREATION: [
-            "create", "make", "build", "write", "design", "develop",
-            "generate", "produce", "compose", "draft"
+            "create",
+            "make",
+            "build",
+            "write",
+            "design",
+            "develop",
+            "generate",
+            "produce",
+            "compose",
+            "draft",
         ],
         TaskType.TRANSFORMATION: [
-            "improve", "fix", "change", "modify", "update", "convert",
-            "refactor", "optimize", "enhance", "revise"
+            "improve",
+            "fix",
+            "change",
+            "modify",
+            "update",
+            "convert",
+            "refactor",
+            "optimize",
+            "enhance",
+            "revise",
         ],
         TaskType.DECISION: [
-            "should i", "which", "choose", "decide", "compare",
-            "versus", "better", "recommend", "advise"
+            "should i",
+            "which",
+            "choose",
+            "decide",
+            "compare",
+            "versus",
+            "better",
+            "recommend",
+            "advise",
         ],
         TaskType.RESEARCH: [
-            "find", "search", "look up", "research", "discover",
-            "learn about", "what is", "who is", "where"
+            "find",
+            "search",
+            "look up",
+            "research",
+            "discover",
+            "learn about",
+            "what is",
+            "who is",
+            "where",
         ],
         TaskType.AUTOMATION: [
-            "automate", "every time", "whenever", "always",
-            "recurring", "schedule", "repeat", "workflow"
+            "automate",
+            "every time",
+            "whenever",
+            "always",
+            "recurring",
+            "schedule",
+            "repeat",
+            "workflow",
         ],
     }
 
@@ -345,124 +420,451 @@ class IntentRefiner:
     DOMAIN_SIGNALS = {
         # Core domains
         Domain.TECHNICAL: [
-            "code", "api", "database", "server", "bug", "deploy",
-            "function", "class", "error", "debug", "test", "software",
-            "programming", "algorithm", "framework", "library", "git",
-            "frontend", "backend", "devops", "cloud", "aws", "docker"
+            "code",
+            "api",
+            "database",
+            "server",
+            "bug",
+            "deploy",
+            "function",
+            "class",
+            "error",
+            "debug",
+            "test",
+            "software",
+            "programming",
+            "algorithm",
+            "framework",
+            "library",
+            "git",
+            "frontend",
+            "backend",
+            "devops",
+            "cloud",
+            "aws",
+            "docker",
         ],
         Domain.BUSINESS: [
-            "revenue", "customer", "market", "strategy", "sales",
-            "growth", "profit", "competitor", "stakeholder", "marketing",
-            "brand", "campaign", "kpi", "roi", "pipeline", "b2b", "b2c",
-            "team", "management", "leadership", "hr", "hiring", "operations"
+            "revenue",
+            "customer",
+            "market",
+            "strategy",
+            "sales",
+            "growth",
+            "profit",
+            "competitor",
+            "stakeholder",
+            "marketing",
+            "brand",
+            "campaign",
+            "kpi",
+            "roi",
+            "pipeline",
+            "b2b",
+            "b2c",
+            "team",
+            "management",
+            "leadership",
+            "hr",
+            "hiring",
+            "operations",
         ],
         Domain.CREATIVE: [
-            "story", "design", "content", "visual", "creative", "artistic",
-            "style", "tone", "writing", "novel", "screenplay", "script",
-            "graphics", "illustration", "ux", "ui"
+            "story",
+            "design",
+            "content",
+            "visual",
+            "creative",
+            "artistic",
+            "style",
+            "tone",
+            "writing",
+            "novel",
+            "screenplay",
+            "script",
+            "graphics",
+            "illustration",
+            "ux",
+            "ui",
         ],
         Domain.RESEARCH: [
-            "study", "paper", "papers", "literature", "hypothesis", "experiment",
-            "methodology", "findings", "citation", "academic", "thesis",
-            "dissertation", "peer review", "journal", "research", "publication"
+            "study",
+            "paper",
+            "papers",
+            "literature",
+            "hypothesis",
+            "experiment",
+            "methodology",
+            "findings",
+            "citation",
+            "academic",
+            "thesis",
+            "dissertation",
+            "peer review",
+            "journal",
+            "research",
+            "publication",
         ],
         Domain.PERSONAL: [
-            "my life", "personal", "habit", "goal setting", "productivity",
-            "schedule", "organize", "planning", "self-improvement",
-            "work-life", "balance", "routine"
+            "my life",
+            "personal",
+            "habit",
+            "goal setting",
+            "productivity",
+            "schedule",
+            "organize",
+            "planning",
+            "self-improvement",
+            "work-life",
+            "balance",
+            "routine",
         ],
-
         # Science & Research (specialized)
         Domain.SCIENCE: [
-            "biology", "chemistry", "physics", "quantum", "gene", "genes",
-            "dna", "rna", "protein", "cell", "cells", "crispr", "genomic",
-            "sequencing", "pcr", "microscopy", "spectroscopy", "nmr",
-            "mass spec", "chromatography", "synthesis", "reaction", "catalyst",
-            "molecular", "compound", "qubit", "entanglement", "superposition",
-            "hamiltonian", "qiskit", "synthetic biology", "metabolic",
-            "pathway", "bioreactor", "fermentation", "enzyme", "biomarker",
-            "clinical trial", "irb", "particle", "hadron", "quantum field",
-            "condensed matter", "lab", "pipette", "assay", "western blot",
-            "elisa", "experiment", "scientific", "hypothesis"
+            "biology",
+            "chemistry",
+            "physics",
+            "quantum",
+            "gene",
+            "genes",
+            "dna",
+            "rna",
+            "protein",
+            "cell",
+            "cells",
+            "crispr",
+            "genomic",
+            "sequencing",
+            "pcr",
+            "microscopy",
+            "spectroscopy",
+            "nmr",
+            "mass spec",
+            "chromatography",
+            "synthesis",
+            "reaction",
+            "catalyst",
+            "molecular",
+            "compound",
+            "qubit",
+            "entanglement",
+            "superposition",
+            "hamiltonian",
+            "qiskit",
+            "synthetic biology",
+            "metabolic",
+            "pathway",
+            "bioreactor",
+            "fermentation",
+            "enzyme",
+            "biomarker",
+            "clinical trial",
+            "irb",
+            "particle",
+            "hadron",
+            "quantum field",
+            "condensed matter",
+            "lab",
+            "pipette",
+            "assay",
+            "western blot",
+            "elisa",
+            "experiment",
+            "scientific",
+            "hypothesis",
         ],
-
         # Finance
         Domain.FINANCE: [
-            "stock", "invest", "portfolio", "dividend", "etf", "mutual fund",
-            "trading", "options", "puts", "calls", "hedge", "forex",
-            "crypto", "bitcoin", "ethereum", "blockchain", "defi", "yield",
-            "nft", "token", "wallet", "exchange", "binance", "coinbase",
-            "real estate", "property", "rental", "mortgage", "reit", "flip",
-            "retirement", "401k", "ira", "compound interest", "passive income",
-            "market cap", "pe ratio", "fundamental", "technical analysis"
+            "stock",
+            "invest",
+            "portfolio",
+            "dividend",
+            "etf",
+            "mutual fund",
+            "trading",
+            "options",
+            "puts",
+            "calls",
+            "hedge",
+            "forex",
+            "crypto",
+            "bitcoin",
+            "ethereum",
+            "blockchain",
+            "defi",
+            "yield",
+            "nft",
+            "token",
+            "wallet",
+            "exchange",
+            "binance",
+            "coinbase",
+            "real estate",
+            "property",
+            "rental",
+            "mortgage",
+            "reit",
+            "flip",
+            "retirement",
+            "401k",
+            "ira",
+            "compound interest",
+            "passive income",
+            "market cap",
+            "pe ratio",
+            "fundamental",
+            "technical analysis",
         ],
-
         # Health & Wellness
         Domain.HEALTH: [
-            "health", "healthy", "healthier", "medical", "doctor", "symptom",
-            "diagnosis", "treatment", "medication", "therapy", "hospital",
-            "clinic", "patient", "nutrition", "diet", "calories", "macros",
-            "vitamins", "supplements", "fitness", "workout", "exercise",
-            "cardio", "strength", "muscle", "weight", "lose weight", "bmi",
-            "metabolism", "sleep", "insomnia", "mental health", "anxiety",
-            "anxious", "depression", "depressed", "stress", "stressed",
-            "therapist", "meditation", "mindfulness", "wellness", "self-care",
-            "burnout", "longevity", "aging", "regenerative", "stem cell",
-            "biological age"
+            "health",
+            "healthy",
+            "healthier",
+            "medical",
+            "doctor",
+            "symptom",
+            "diagnosis",
+            "treatment",
+            "medication",
+            "therapy",
+            "hospital",
+            "clinic",
+            "patient",
+            "nutrition",
+            "diet",
+            "calories",
+            "macros",
+            "vitamins",
+            "supplements",
+            "fitness",
+            "workout",
+            "exercise",
+            "cardio",
+            "strength",
+            "muscle",
+            "weight",
+            "lose weight",
+            "bmi",
+            "metabolism",
+            "sleep",
+            "insomnia",
+            "mental health",
+            "anxiety",
+            "anxious",
+            "depression",
+            "depressed",
+            "stress",
+            "stressed",
+            "therapist",
+            "meditation",
+            "mindfulness",
+            "wellness",
+            "self-care",
+            "burnout",
+            "longevity",
+            "aging",
+            "regenerative",
+            "stem cell",
+            "biological age",
         ],
-
         # Legal
         Domain.LEGAL: [
-            "legal", "law", "lawyer", "attorney", "court", "litigation",
-            "contract", "agreement", "clause", "terms", "conditions",
-            "intellectual property", "ip", "patent", "trademark", "copyright",
-            "compliance", "regulation", "gdpr", "hipaa", "sec", "fda",
-            "liability", "negligence", "tort", "dispute", "arbitration",
-            "corporate", "llc", "incorporation", "bylaws", "governance",
-            "employment law", "non-compete", "nda", "licensing", "protect"
+            "legal",
+            "law",
+            "lawyer",
+            "attorney",
+            "court",
+            "litigation",
+            "contract",
+            "agreement",
+            "clause",
+            "terms",
+            "conditions",
+            "intellectual property",
+            "ip",
+            "patent",
+            "trademark",
+            "copyright",
+            "compliance",
+            "regulation",
+            "gdpr",
+            "hipaa",
+            "sec",
+            "fda",
+            "liability",
+            "negligence",
+            "tort",
+            "dispute",
+            "arbitration",
+            "corporate",
+            "llc",
+            "incorporation",
+            "bylaws",
+            "governance",
+            "employment law",
+            "non-compete",
+            "nda",
+            "licensing",
+            "protect",
         ],
-
         # Education
         Domain.EDUCATION: [
-            "teach", "teaching", "learn", "learning", "student", "students",
-            "teacher", "professor", "course", "curriculum", "lesson",
-            "lecture", "assignment", "exam", "quiz", "grade", "grading",
-            "assessment", "rubric", "syllabus", "textbook", "classroom",
-            "online learning", "mooc", "tutoring", "mentorship", "k-12",
-            "higher ed", "university", "college", "school", "pedagogy",
-            "edtech", "lms", "engaged", "engagement", "retention", "class"
+            "teach",
+            "teaching",
+            "learn",
+            "learning",
+            "student",
+            "students",
+            "teacher",
+            "professor",
+            "course",
+            "curriculum",
+            "lesson",
+            "lecture",
+            "assignment",
+            "exam",
+            "quiz",
+            "grade",
+            "grading",
+            "assessment",
+            "rubric",
+            "syllabus",
+            "textbook",
+            "classroom",
+            "online learning",
+            "mooc",
+            "tutoring",
+            "mentorship",
+            "k-12",
+            "higher ed",
+            "university",
+            "college",
+            "school",
+            "pedagogy",
+            "edtech",
+            "lms",
+            "engaged",
+            "engagement",
+            "retention",
+            "class",
         ],
-
         # Entertainment & Media
         Domain.ENTERTAINMENT: [
-            "music", "song", "lyrics", "melody", "beat", "album", "track",
-            "film", "movie", "screenplay", "director", "cinema", "scene",
-            "game", "gaming", "level design", "mechanics", "unity", "unreal",
-            "streaming", "twitch", "youtube", "content creator", "influencer",
-            "podcast", "episode", "audio", "production", "mixing", "mastering",
-            "comedy", "standup", "joke", "humor", "sketch",
-            "animation", "vfx", "3d", "render", "storyboard"
+            "music",
+            "song",
+            "lyrics",
+            "melody",
+            "beat",
+            "album",
+            "track",
+            "film",
+            "movie",
+            "screenplay",
+            "director",
+            "cinema",
+            "scene",
+            "game",
+            "gaming",
+            "level design",
+            "mechanics",
+            "unity",
+            "unreal",
+            "streaming",
+            "twitch",
+            "youtube",
+            "content creator",
+            "influencer",
+            "podcast",
+            "episode",
+            "audio",
+            "production",
+            "mixing",
+            "mastering",
+            "comedy",
+            "standup",
+            "joke",
+            "humor",
+            "sketch",
+            "animation",
+            "vfx",
+            "3d",
+            "render",
+            "storyboard",
         ],
-
         # Fashion
         Domain.FASHION: [
-            "fashion", "clothing", "clothes", "outfit", "outfits", "wardrobe",
-            "wear", "wearing", "dress", "dressing", "trend", "trends",
-            "designer", "collection", "runway", "look", "looks",
-            "sustainable fashion", "eco-friendly", "vintage", "thrift",
-            "accessory", "accessories", "jewelry", "shoes", "handbag", "watch",
-            "dress code", "formal", "casual", "business casual", "streetwear",
-            "capsule wardrobe", "color palette", "fabric", "textile", "attire"
+            "fashion",
+            "clothing",
+            "clothes",
+            "outfit",
+            "outfits",
+            "wardrobe",
+            "wear",
+            "wearing",
+            "dress",
+            "dressing",
+            "trend",
+            "trends",
+            "designer",
+            "collection",
+            "runway",
+            "look",
+            "looks",
+            "sustainable fashion",
+            "eco-friendly",
+            "vintage",
+            "thrift",
+            "accessory",
+            "accessories",
+            "jewelry",
+            "shoes",
+            "handbag",
+            "watch",
+            "dress code",
+            "formal",
+            "casual",
+            "business casual",
+            "streetwear",
+            "capsule wardrobe",
+            "color palette",
+            "fabric",
+            "textile",
+            "attire",
         ],
-
         # Entrepreneurship
         Domain.ENTREPRENEURSHIP: [
-            "startup", "founder", "cofounder", "entrepreneur", "venture",
-            "funding", "investor", "vc", "angel", "seed", "series a",
-            "pitch", "deck", "valuation", "equity", "cap table",
-            "mvp", "product market fit", "pivot", "scale", "growth hacking",
-            "bootstrapping", "accelerator", "incubator", "yc", "techstars",
-            "exit", "acquisition", "ipo", "unicorn", "burn rate", "runway"
+            "startup",
+            "founder",
+            "cofounder",
+            "entrepreneur",
+            "venture",
+            "funding",
+            "investor",
+            "vc",
+            "angel",
+            "seed",
+            "series a",
+            "pitch",
+            "deck",
+            "valuation",
+            "equity",
+            "cap table",
+            "mvp",
+            "product market fit",
+            "pivot",
+            "scale",
+            "growth hacking",
+            "bootstrapping",
+            "accelerator",
+            "incubator",
+            "yc",
+            "techstars",
+            "exit",
+            "acquisition",
+            "ipo",
+            "unicorn",
+            "burn rate",
+            "runway",
         ],
     }
 
@@ -519,7 +921,13 @@ class IntentRefiner:
                 question="Are there any constraints I should know about?",
                 dimension="constraints",
                 priority=3,
-                options=["Time limit", "Budget", "Format requirements", "Compliance", "None"],
+                options=[
+                    "Time limit",
+                    "Budget",
+                    "Format requirements",
+                    "Compliance",
+                    "None",
+                ],
                 information_gain=0.5,
             ),
         ],
@@ -536,7 +944,11 @@ class IntentRefiner:
                 question="Should this be comprehensive or focused on key points?",
                 dimension="scope",
                 priority=2,
-                options=["Quick overview", "Detailed analysis", "Comprehensive deep-dive"],
+                options=[
+                    "Quick overview",
+                    "Detailed analysis",
+                    "Comprehensive deep-dive",
+                ],
                 default="Detailed analysis",
                 information_gain=0.5,
             ),
@@ -545,7 +957,7 @@ class IntentRefiner:
 
     def __init__(
         self,
-        executor: Optional[Callable[[str], Awaitable[str]]] = None,
+        executor: Callable[[str], Awaitable[str]] | None = None,
         min_questions: int = 2,
         max_questions: int = 5,
     ):
@@ -575,7 +987,7 @@ class IntentRefiner:
             return signal in text
         else:
             # Single-word signal - use word boundary matching
-            pattern = r'\b' + re.escape(signal) + r'\b'
+            pattern = r"\b" + re.escape(signal) + r"\b"
             return bool(re.search(pattern, text))
 
     def parse(self, user_input: str) -> IntentClassification:
@@ -620,7 +1032,11 @@ class IntentRefiner:
 
         if word_count > 50 or "and then" in input_lower or "steps" in input_lower:
             complexity = Complexity.COMPOSITE
-        if "explore" in input_lower or "figure out" in input_lower or "not sure" in input_lower:
+        if (
+            "explore" in input_lower
+            or "figure out" in input_lower
+            or "not sure" in input_lower
+        ):
             complexity = Complexity.EXPLORATORY
 
         # Overall confidence
@@ -638,7 +1054,9 @@ class IntentRefiner:
     # STAGE 1.5: EXTRACT SPECIFICS
     # =========================================================================
 
-    def extract_specifics(self, user_input: str, classification: IntentClassification) -> ExtractedSpecifics:
+    def extract_specifics(
+        self, user_input: str, classification: IntentClassification
+    ) -> ExtractedSpecifics:
         """
         Extract specific details, entities, and context from user input.
 
@@ -646,14 +1064,14 @@ class IntentRefiner:
         """
         specifics = ExtractedSpecifics()
         text = user_input
-        text_lower = text.lower()
+        text.lower()
 
         # --- ENTITY EXTRACTION ---
         # Company types and business models
         business_patterns = [
-            r'\b(B2B|B2C|SaaS|startup|enterprise|SMB|agency|consultancy|e-commerce|marketplace)\b',
-            r'\b(our company|our team|our organization|our business|my company)\b',
-            r'\b(fintech|edtech|healthtech|martech|proptech|insurtech|regtech|foodtech)\b',
+            r"\b(B2B|B2C|SaaS|startup|enterprise|SMB|agency|consultancy|e-commerce|marketplace)\b",
+            r"\b(our company|our team|our organization|our business|my company)\b",
+            r"\b(fintech|edtech|healthtech|martech|proptech|insurtech|regtech|foodtech)\b",
         ]
         for pattern in business_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -662,15 +1080,15 @@ class IntentRefiner:
         # --- TECHNOLOGY EXTRACTION ---
         tech_patterns = [
             # Programming
-            r'\b(Python|JavaScript|TypeScript|Java|C\+\+|Rust|Go|Ruby|PHP|Swift|Kotlin)\b',
+            r"\b(Python|JavaScript|TypeScript|Java|C\+\+|Rust|Go|Ruby|PHP|Swift|Kotlin)\b",
             # Frameworks
-            r'\b(React|Vue|Angular|Django|Flask|FastAPI|Express|Rails|Spring|Next\.js)\b',
+            r"\b(React|Vue|Angular|Django|Flask|FastAPI|Express|Rails|Spring|Next\.js)\b",
             # Infrastructure
-            r'\b(AWS|Azure|GCP|Docker|Kubernetes|Terraform|Redis|PostgreSQL|MongoDB|MySQL)\b',
+            r"\b(AWS|Azure|GCP|Docker|Kubernetes|Terraform|Redis|PostgreSQL|MongoDB|MySQL)\b",
             # AI/ML
-            r'\b(GPT|LLM|machine learning|deep learning|neural network|NLP|computer vision)\b',
+            r"\b(GPT|LLM|machine learning|deep learning|neural network|NLP|computer vision)\b",
             # Other tech
-            r'\b(API|REST|GraphQL|microservices|serverless|blockchain|CI/CD)\b',
+            r"\b(API|REST|GraphQL|microservices|serverless|blockchain|CI/CD)\b",
         ]
         for pattern in tech_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -679,11 +1097,11 @@ class IntentRefiner:
         # --- METRICS EXTRACTION ---
         # Numbers with context
         metric_patterns = [
-            r'\b(\d+%|\d+\s*percent)\b',  # Percentages
-            r'\$[\d,]+(?:\.\d{2})?(?:[KMB])?',  # Money
-            r'\b\d+(?:\.\d+)?[xX]\b',  # Multipliers
-            r'\b\d+[KMB]?\s*(?:users|customers|subscribers|downloads|visits|conversions)\b',
-            r'\b(?:ROI|CTR|CAC|LTV|MRR|ARR|DAU|MAU|NPS)\s*(?:of\s*)?\d+',
+            r"\b(\d+%|\d+\s*percent)\b",  # Percentages
+            r"\$[\d,]+(?:\.\d{2})?(?:[KMB])?",  # Money
+            r"\b\d+(?:\.\d+)?[xX]\b",  # Multipliers
+            r"\b\d+[KMB]?\s*(?:users|customers|subscribers|downloads|visits|conversions)\b",
+            r"\b(?:ROI|CTR|CAC|LTV|MRR|ARR|DAU|MAU|NPS)\s*(?:of\s*)?\d+",
         ]
         for pattern in metric_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -691,11 +1109,11 @@ class IntentRefiner:
 
         # --- TIMEFRAME EXTRACTION ---
         time_patterns = [
-            r'\b(today|tomorrow|yesterday|this week|next week|this month|next month)\b',
-            r'\b(past\s+\d+\s+(?:days?|weeks?|months?|years?))\b',
-            r'\b(\d+\s+(?:days?|weeks?|months?|years?)\s*(?:ago|from now)?)\b',
-            r'\b(Q[1-4]|quarter|fiscal year|FY\d{2,4})\b',
-            r'\b(deadline|by\s+\w+day|urgent|asap|immediately)\b',
+            r"\b(today|tomorrow|yesterday|this week|next week|this month|next month)\b",
+            r"\b(past\s+\d+\s+(?:days?|weeks?|months?|years?))\b",
+            r"\b(\d+\s+(?:days?|weeks?|months?|years?)\s*(?:ago|from now)?)\b",
+            r"\b(Q[1-4]|quarter|fiscal year|FY\d{2,4})\b",
+            r"\b(deadline|by\s+\w+day|urgent|asap|immediately)\b",
         ]
         for pattern in time_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -703,9 +1121,9 @@ class IntentRefiner:
 
         # --- STAKEHOLDER EXTRACTION ---
         stakeholder_patterns = [
-            r'\b(CEO|CTO|CFO|CMO|COO|VP|director|manager|executive|board)\b',
-            r'\b(team|department|client|customer|user|investor|partner|vendor)\b',
-            r'\b(audience|reader|viewer|stakeholder|decision[- ]maker)\b',
+            r"\b(CEO|CTO|CFO|CMO|COO|VP|director|manager|executive|board)\b",
+            r"\b(team|department|client|customer|user|investor|partner|vendor)\b",
+            r"\b(audience|reader|viewer|stakeholder|decision[- ]maker)\b",
         ]
         for pattern in stakeholder_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -713,11 +1131,24 @@ class IntentRefiner:
 
         # --- CONSTRAINT EXTRACTION ---
         constraint_indicators = [
-            "but", "however", "except", "without", "can't", "cannot", "won't",
-            "shouldn't", "must not", "limited", "constraint", "restriction",
-            "budget", "deadline", "only", "just"
+            "but",
+            "however",
+            "except",
+            "without",
+            "can't",
+            "cannot",
+            "won't",
+            "shouldn't",
+            "must not",
+            "limited",
+            "constraint",
+            "restriction",
+            "budget",
+            "deadline",
+            "only",
+            "just",
         ]
-        sentences = re.split(r'[.!?]', text)
+        sentences = re.split(r"[.!?]", text)
         for sentence in sentences:
             if any(ind in sentence.lower() for ind in constraint_indicators):
                 # Extract the constraint phrase
@@ -725,9 +1156,22 @@ class IntentRefiner:
 
         # --- PAIN POINT EXTRACTION ---
         pain_indicators = [
-            "problem", "issue", "challenge", "struggle", "difficult", "hard",
-            "failing", "broken", "doesn't work", "not working", "slow",
-            "frustrat", "annoying", "pain", "stuck", "blocked"
+            "problem",
+            "issue",
+            "challenge",
+            "struggle",
+            "difficult",
+            "hard",
+            "failing",
+            "broken",
+            "doesn't work",
+            "not working",
+            "slow",
+            "frustrat",
+            "annoying",
+            "pain",
+            "stuck",
+            "blocked",
         ]
         for sentence in sentences:
             if any(ind in sentence.lower() for ind in pain_indicators):
@@ -735,9 +1179,22 @@ class IntentRefiner:
 
         # --- GOAL EXTRACTION ---
         goal_indicators = [
-            "want to", "need to", "trying to", "goal", "objective", "aim",
-            "hope to", "would like", "looking to", "seeking", "achieve",
-            "improve", "increase", "decrease", "optimize", "enhance"
+            "want to",
+            "need to",
+            "trying to",
+            "goal",
+            "objective",
+            "aim",
+            "hope to",
+            "would like",
+            "looking to",
+            "seeking",
+            "achieve",
+            "improve",
+            "increase",
+            "decrease",
+            "optimize",
+            "enhance",
         ]
         for sentence in sentences:
             if any(ind in sentence.lower() for ind in goal_indicators):
@@ -745,22 +1202,24 @@ class IntentRefiner:
 
         # --- COMPARISON EXTRACTION ---
         comparison_patterns = [
-            r'\b(competitor|competing|versus|vs\.?|compared to|better than|worse than)\b.*',
-            r'\b(like|similar to|such as)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\b',
-            r'\b(benchmark|industry standard|best practice)\b',
+            r"\b(competitor|competing|versus|vs\.?|compared to|better than|worse than)\b.*",
+            r"\b(like|similar to|such as)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\b",
+            r"\b(benchmark|industry standard|best practice)\b",
         ]
         for pattern in comparison_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             if matches:
-                specifics.comparisons.extend([m if isinstance(m, str) else ' '.join(m) for m in matches])
+                specifics.comparisons.extend(
+                    [m if isinstance(m, str) else " ".join(m) for m in matches]
+                )
 
         # --- DOMAIN-SPECIFIC TERMS ---
         # Science
         if classification.domain == Domain.SCIENCE:
             sci_patterns = [
-                r'\b(gene|protein|cell|enzyme|pathway|assay|PCR|sequencing|CRISPR)\b',
-                r'\b(quantum|qubit|entanglement|superposition|Hamiltonian)\b',
-                r'\b(synthesis|catalyst|reaction|compound|molecule)\b',
+                r"\b(gene|protein|cell|enzyme|pathway|assay|PCR|sequencing|CRISPR)\b",
+                r"\b(quantum|qubit|entanglement|superposition|Hamiltonian)\b",
+                r"\b(synthesis|catalyst|reaction|compound|molecule)\b",
             ]
             for pattern in sci_patterns:
                 matches = re.findall(pattern, text, re.IGNORECASE)
@@ -769,10 +1228,10 @@ class IntentRefiner:
         # Finance
         elif classification.domain == Domain.FINANCE:
             fin_patterns = [
-                r'\b(stock|bond|ETF|mutual fund|portfolio|dividend|yield)\b',
-                r'\b(crypto|bitcoin|ethereum|DeFi|NFT|token|wallet)\b',
-                r'\b(real estate|property|mortgage|REIT|rental)\b',
-                r'\b(P/E ratio|market cap|fundamentals|technical analysis)\b',
+                r"\b(stock|bond|ETF|mutual fund|portfolio|dividend|yield)\b",
+                r"\b(crypto|bitcoin|ethereum|DeFi|NFT|token|wallet)\b",
+                r"\b(real estate|property|mortgage|REIT|rental)\b",
+                r"\b(P/E ratio|market cap|fundamentals|technical analysis)\b",
             ]
             for pattern in fin_patterns:
                 matches = re.findall(pattern, text, re.IGNORECASE)
@@ -781,10 +1240,10 @@ class IntentRefiner:
         # Health
         elif classification.domain == Domain.HEALTH:
             health_patterns = [
-                r'\b(symptom|diagnosis|treatment|medication|therapy)\b',
-                r'\b(diet|nutrition|calories|macros|protein|carbs|fat)\b',
-                r'\b(workout|exercise|cardio|strength|muscle|weight)\b',
-                r'\b(anxiety|depression|stress|sleep|mental health)\b',
+                r"\b(symptom|diagnosis|treatment|medication|therapy)\b",
+                r"\b(diet|nutrition|calories|macros|protein|carbs|fat)\b",
+                r"\b(workout|exercise|cardio|strength|muscle|weight)\b",
+                r"\b(anxiety|depression|stress|sleep|mental health)\b",
             ]
             for pattern in health_patterns:
                 matches = re.findall(pattern, text, re.IGNORECASE)
@@ -837,7 +1296,7 @@ class IntentRefiner:
             List of prioritized clarification questions
         """
         questions = []
-        input_lower = user_input.lower()
+        user_input.lower()
 
         # Always ask about goal if vague
         if classification.confidence < 0.7:
@@ -867,7 +1326,7 @@ class IntentRefiner:
         questions.sort(key=lambda q: (-q.information_gain, q.priority))
 
         # Apply min/max limits
-        return questions[:self.max_questions]
+        return questions[: self.max_questions]
 
     def get_questions_interactive(
         self,
@@ -903,7 +1362,7 @@ class IntentRefiner:
         self,
         user_input: str,
         classification: IntentClassification,
-        answers: Optional[dict] = None,
+        answers: dict | None = None,
     ) -> IntentModel:
         """
         Build visual mental model from input and answers.
@@ -921,17 +1380,23 @@ class IntentRefiner:
         # Extract inputs from user input
         inputs = []
         if "using" in user_input.lower() or "with" in user_input.lower():
-            inputs.append({
-                "name": "User-provided data",
-                "description": "Data or context from user",
-                "confirmed": False,
-            })
+            inputs.append(
+                {
+                    "name": "User-provided data",
+                    "description": "Data or context from user",
+                    "confirmed": False,
+                }
+            )
 
-        inputs.append({
-            "name": "Task description",
-            "description": user_input[:100] + "..." if len(user_input) > 100 else user_input,
-            "confirmed": True,
-        })
+        inputs.append(
+            {
+                "name": "Task description",
+                "description": user_input[:100] + "..."
+                if len(user_input) > 100
+                else user_input,
+                "confirmed": True,
+            }
+        )
 
         # Determine process steps based on task type
         process = []
@@ -973,46 +1438,62 @@ class IntentRefiner:
         elif classification.task_type == TaskType.CREATION:
             outputs.append({"name": "Created artifact", "format": "As specified"})
         elif classification.task_type == TaskType.RESEARCH:
-            outputs.append({"name": "Research summary", "format": "Findings with sources"})
+            outputs.append(
+                {"name": "Research summary", "format": "Findings with sources"}
+            )
         elif classification.task_type == TaskType.DECISION:
-            outputs.append({"name": "Recommendation", "format": "Decision with rationale"})
+            outputs.append(
+                {"name": "Recommendation", "format": "Decision with rationale"}
+            )
         else:
             outputs.append({"name": "Response", "format": "Text"})
 
         # Build assumptions
         assumptions = []
-        assumptions.append({
-            "key": "Task type",
-            "value": classification.task_type.value,
-        })
-        assumptions.append({
-            "key": "Domain",
-            "value": classification.domain.value,
-        })
+        assumptions.append(
+            {
+                "key": "Task type",
+                "value": classification.task_type.value,
+            }
+        )
+        assumptions.append(
+            {
+                "key": "Domain",
+                "value": classification.domain.value,
+            }
+        )
 
         if "audience" not in answers:
-            assumptions.append({
-                "key": "Audience",
-                "value": "Professional/knowledgeable",
-            })
+            assumptions.append(
+                {
+                    "key": "Audience",
+                    "value": "Professional/knowledgeable",
+                }
+            )
 
         if "scope" not in answers:
-            assumptions.append({
-                "key": "Scope",
-                "value": "Moderate depth",
-            })
+            assumptions.append(
+                {
+                    "key": "Scope",
+                    "value": "Moderate depth",
+                }
+            )
 
         # Identify uncertainties
         uncertainties = []
         if classification.confidence < 0.6:
-            uncertainties.append({
-                "question": "Is this the right interpretation of your goal?",
-            })
+            uncertainties.append(
+                {
+                    "question": "Is this the right interpretation of your goal?",
+                }
+            )
 
         if classification.complexity == Complexity.EXPLORATORY:
-            uncertainties.append({
-                "question": "The goal may evolve as we work - is that okay?",
-            })
+            uncertainties.append(
+                {
+                    "question": "The goal may evolve as we work - is that okay?",
+                }
+            )
 
         # Build success criteria from answers
         success_criteria = []
@@ -1042,8 +1523,8 @@ class IntentRefiner:
         self,
         model: IntentModel,
         classification: IntentClassification,
-        answers: Optional[dict] = None,
-        specifics: Optional[ExtractedSpecifics] = None,
+        answers: dict | None = None,
+        specifics: ExtractedSpecifics | None = None,
         user_input: str = "",
     ) -> str:
         """
@@ -1106,9 +1587,7 @@ class IntentRefiner:
             audience = ", ".join(specifics.stakeholders[:3])
 
         # Build success criteria
-        criteria_text = "\n".join(
-            f"- {c['criterion']}" for c in model.success_criteria
-        )
+        criteria_text = "\n".join(f"- {c['criterion']}" for c in model.success_criteria)
 
         # Build the prompt
         prompt_parts = []
@@ -1119,7 +1598,7 @@ class IntentRefiner:
 
         # ==== SPECIFIC SITUATION (NEW SECTION) ====
         prompt_parts.append("## Specific Situation")
-        prompt_parts.append(f"The user's request: \"{user_input}\"")
+        prompt_parts.append(f'The user\'s request: "{user_input}"')
         prompt_parts.append("")
 
         # Inject extracted specifics
@@ -1127,34 +1606,57 @@ class IntentRefiner:
             prompt_parts.append("### Key Details Extracted:")
 
             if specifics.entities:
-                prompt_parts.append(f"- **Business Context**: {', '.join(specifics.entities)}")
+                prompt_parts.append(
+                    f"- **Business Context**: {', '.join(specifics.entities)}"
+                )
 
             if specifics.technologies:
-                prompt_parts.append(f"- **Technologies/Tools**: {', '.join(specifics.technologies)}")
+                prompt_parts.append(
+                    f"- **Technologies/Tools**: {', '.join(specifics.technologies)}"
+                )
 
             if specifics.metrics:
-                prompt_parts.append(f"- **Metrics/Numbers**: {', '.join(specifics.metrics)}")
+                prompt_parts.append(
+                    f"- **Metrics/Numbers**: {', '.join(specifics.metrics)}"
+                )
 
             if specifics.timeframes:
-                prompt_parts.append(f"- **Timeframe**: {', '.join(specifics.timeframes)}")
+                prompt_parts.append(
+                    f"- **Timeframe**: {', '.join(specifics.timeframes)}"
+                )
 
             if specifics.stakeholders:
-                prompt_parts.append(f"- **Stakeholders**: {', '.join(specifics.stakeholders)}")
+                prompt_parts.append(
+                    f"- **Stakeholders**: {', '.join(specifics.stakeholders)}"
+                )
 
             if specifics.pain_points:
-                prompt_parts.append(f"- **Current Problems**: " + "; ".join(p[:100] for p in specifics.pain_points[:3]))
+                prompt_parts.append(
+                    "- **Current Problems**: "
+                    + "; ".join(p[:100] for p in specifics.pain_points[:3])
+                )
 
             if specifics.goals:
-                prompt_parts.append(f"- **Desired Outcomes**: " + "; ".join(g[:100] for g in specifics.goals[:3]))
+                prompt_parts.append(
+                    "- **Desired Outcomes**: "
+                    + "; ".join(g[:100] for g in specifics.goals[:3])
+                )
 
             if specifics.constraints:
-                prompt_parts.append(f"- **Constraints**: " + "; ".join(c[:100] for c in specifics.constraints[:3]))
+                prompt_parts.append(
+                    "- **Constraints**: "
+                    + "; ".join(c[:100] for c in specifics.constraints[:3])
+                )
 
             if specifics.comparisons:
-                prompt_parts.append(f"- **Competitors/Benchmarks**: {', '.join(specifics.comparisons)}")
+                prompt_parts.append(
+                    f"- **Competitors/Benchmarks**: {', '.join(specifics.comparisons)}"
+                )
 
             if specifics.domain_terms:
-                prompt_parts.append(f"- **Domain Terms**: {', '.join(specifics.domain_terms)}")
+                prompt_parts.append(
+                    f"- **Domain Terms**: {', '.join(specifics.domain_terms)}"
+                )
 
             prompt_parts.append("")
 
@@ -1190,10 +1692,14 @@ class IntentRefiner:
 
         # Add specific considerations based on extracted info
         if specifics.entities or specifics.technologies:
-            prompt_parts.append(f"{len(model.process) + 1}. Consider the specific context: {', '.join((specifics.entities + specifics.technologies)[:5])}")
+            prompt_parts.append(
+                f"{len(model.process) + 1}. Consider the specific context: {', '.join((specifics.entities + specifics.technologies)[:5])}"
+            )
 
         if specifics.constraints:
-            prompt_parts.append(f"{len(model.process) + 2}. Work within stated constraints")
+            prompt_parts.append(
+                f"{len(model.process) + 2}. Work within stated constraints"
+            )
 
         prompt_parts.append("")
 
@@ -1204,9 +1710,13 @@ class IntentRefiner:
 
         # Add specific output guidance
         if specifics.metrics:
-            prompt_parts.append(f"- Reference these metrics where relevant: {', '.join(specifics.metrics)}")
+            prompt_parts.append(
+                f"- Reference these metrics where relevant: {', '.join(specifics.metrics)}"
+            )
         if specifics.comparisons:
-            prompt_parts.append(f"- Include comparison with: {', '.join(specifics.comparisons)}")
+            prompt_parts.append(
+                f"- Include comparison with: {', '.join(specifics.comparisons)}"
+            )
 
         prompt_parts.append("")
 
@@ -1218,7 +1728,9 @@ class IntentRefiner:
         if specifics.goals:
             prompt_parts.append(f"- Directly addresses: {specifics.goals[0][:100]}")
         if specifics.pain_points:
-            prompt_parts.append(f"- Solves the stated problem: {specifics.pain_points[0][:100]}")
+            prompt_parts.append(
+                f"- Solves the stated problem: {specifics.pain_points[0][:100]}"
+            )
 
         prompt_parts.append("")
 
@@ -1239,13 +1751,19 @@ class IntentRefiner:
             prompt_parts.append("- Use precise scientific terminology")
             prompt_parts.append("- Reference established methodologies")
         if classification.domain == Domain.FINANCE:
-            prompt_parts.append("- This is not financial advice - for informational purposes only")
+            prompt_parts.append(
+                "- This is not financial advice - for informational purposes only"
+            )
             prompt_parts.append("- Consider risk factors and diversification")
         if classification.domain == Domain.HEALTH:
-            prompt_parts.append("- This is not medical advice - consult healthcare professionals")
+            prompt_parts.append(
+                "- This is not medical advice - consult healthcare professionals"
+            )
             prompt_parts.append("- Prioritize evidence-based information")
         if classification.domain == Domain.LEGAL:
-            prompt_parts.append("- This is not legal advice - consult a licensed attorney")
+            prompt_parts.append(
+                "- This is not legal advice - consult a licensed attorney"
+            )
             prompt_parts.append("- Note jurisdiction-specific variations")
         if classification.domain == Domain.EDUCATION:
             prompt_parts.append("- Adapt to learner's level and context")
@@ -1342,7 +1860,9 @@ class IntentRefiner:
             "guardrails": "guardrail" in prompt_lower or "accurate" in prompt_lower,
         }
 
-        score.completeness = sum(completeness_checks.values()) / len(completeness_checks)
+        score.completeness = sum(completeness_checks.values()) / len(
+            completeness_checks
+        )
 
         for check, passed in completeness_checks.items():
             if not passed:
@@ -1350,26 +1870,93 @@ class IntentRefiner:
 
         # --- ACTIONABILITY SCORE ---
         actionability_checks = {
-            "clear_verb": any(v in prompt_lower for v in ["analyze", "create", "improve", "research", "recommend"]),
+            "clear_verb": any(
+                v in prompt_lower
+                for v in ["analyze", "create", "improve", "research", "recommend"]
+            ),
             "approach": "approach" in prompt_lower or "step" in prompt_lower,
             "requirements": "requirement" in prompt_lower or "provide" in prompt_lower,
         }
 
-        score.actionability = sum(actionability_checks.values()) / len(actionability_checks)
+        score.actionability = sum(actionability_checks.values()) / len(
+            actionability_checks
+        )
 
         # --- CONTEXT PRESERVATION SCORE ---
         # Check if key words from input appear in prompt
         input_words = set(input_lower.split())
         # Remove common words
-        stopwords = {"the", "a", "an", "is", "are", "was", "were", "be", "been",
-                     "being", "have", "has", "had", "do", "does", "did", "will",
-                     "would", "could", "should", "may", "might", "must", "shall",
-                     "can", "need", "dare", "ought", "used", "to", "of", "in",
-                     "for", "on", "with", "at", "by", "from", "as", "into",
-                     "through", "during", "before", "after", "above", "below",
-                     "between", "under", "again", "further", "then", "once",
-                     "i", "me", "my", "we", "our", "you", "your", "it", "its",
-                     "this", "that", "and", "but", "or", "so", "if", "because"}
+        stopwords = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "dare",
+            "ought",
+            "used",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "i",
+            "me",
+            "my",
+            "we",
+            "our",
+            "you",
+            "your",
+            "it",
+            "its",
+            "this",
+            "that",
+            "and",
+            "but",
+            "or",
+            "so",
+            "if",
+            "because",
+        }
 
         content_words = input_words - stopwords
         preserved = sum(1 for w in content_words if w in prompt_lower)
@@ -1399,10 +1986,10 @@ class IntentRefiner:
         }
 
         score.overall = (
-            score.specificity * weights["specificity"] +
-            score.completeness * weights["completeness"] +
-            score.actionability * weights["actionability"] +
-            score.context_preservation * weights["context_preservation"]
+            score.specificity * weights["specificity"]
+            + score.completeness * weights["completeness"]
+            + score.actionability * weights["actionability"]
+            + score.context_preservation * weights["context_preservation"]
         )
 
         score.missing_elements = missing[:10]  # Limit to top 10
@@ -1417,7 +2004,7 @@ class IntentRefiner:
     def iterative_refine(
         self,
         user_input: str,
-        answers: Optional[dict] = None,
+        answers: dict | None = None,
         quality_threshold: float = 0.7,
         max_iterations: int = 3,
     ) -> dict:
@@ -1460,9 +2047,11 @@ class IntentRefiner:
         for i in range(max_iterations):
             # Generate prompt with current specifics
             current_prompt = self.generate_prompt(
-                model, classification, answers,
+                model,
+                classification,
+                answers,
                 specifics=cumulative_specifics,
-                user_input=user_input
+                user_input=user_input,
             )
 
             # Evaluate quality
@@ -1540,7 +2129,7 @@ class IntentRefiner:
     def refine(
         self,
         user_input: str,
-        answers: Optional[dict] = None,
+        answers: dict | None = None,
     ) -> dict:
         """
         Run full refinement pipeline with specific detail extraction.
@@ -1568,9 +2157,7 @@ class IntentRefiner:
 
         # Generate prompt WITH SPECIFICS
         prompt = self.generate_prompt(
-            model, classification, answers,
-            specifics=specifics,
-            user_input=user_input
+            model, classification, answers, specifics=specifics, user_input=user_input
         )
 
         # Evaluate quality
@@ -1638,7 +2225,9 @@ class IntentRefiner:
 
         parts.append("**Here's what I understood:**")
         parts.append("")
-        parts.append(f"You want me to **{classification.task_type.value}** something in the **{classification.domain.value}** domain.")
+        parts.append(
+            f"You want me to **{classification.task_type.value}** something in the **{classification.domain.value}** domain."
+        )
         parts.append("")
 
         parts.append("**Process:**")
@@ -1663,7 +2252,9 @@ class IntentRefiner:
                 parts.append(f"  ? {unc['question']}")
             parts.append("")
 
-        parts.append("**Is this correct?** If not, please clarify what I should change.")
+        parts.append(
+            "**Is this correct?** If not, please clarify what I should change."
+        )
 
         return "\n".join(parts)
 
@@ -1672,7 +2263,8 @@ class IntentRefiner:
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-def refine_intent(user_input: str, answers: Optional[dict] = None) -> dict:
+
+def refine_intent(user_input: str, answers: dict | None = None) -> dict:
     """Quick function to refine user intent with specific detail extraction."""
     refiner = IntentRefiner()
     return refiner.refine(user_input, answers)
@@ -1680,7 +2272,7 @@ def refine_intent(user_input: str, answers: Optional[dict] = None) -> dict:
 
 def refine_intent_iterative(
     user_input: str,
-    answers: Optional[dict] = None,
+    answers: dict | None = None,
     quality_threshold: float = 0.7,
     max_iterations: int = 3,
 ) -> dict:
@@ -1701,9 +2293,10 @@ def refine_intent_iterative(
     """
     refiner = IntentRefiner()
     return refiner.iterative_refine(
-        user_input, answers,
+        user_input,
+        answers,
         quality_threshold=quality_threshold,
-        max_iterations=max_iterations
+        max_iterations=max_iterations,
     )
 
 
@@ -1714,7 +2307,7 @@ def get_clarification_questions(user_input: str) -> list[dict]:
     return refiner.get_questions_interactive(user_input, classification)
 
 
-def generate_system_prompt(user_input: str, answers: Optional[dict] = None) -> str:
+def generate_system_prompt(user_input: str, answers: dict | None = None) -> str:
     """Generate optimized system prompt from user input."""
     refiner = IntentRefiner()
     result = refiner.refine(user_input, answers)

@@ -14,10 +14,10 @@ Usage:
     agenticom dashboard            Start web dashboard
 """
 
-import sys
 import json
-import click
 from pathlib import Path
+
+import click
 
 from . import __version__
 from .core import AgenticomCore
@@ -38,6 +38,7 @@ def cli(ctx):
 
 
 # ============== Install/Uninstall ==============
+
 
 @cli.command()
 @click.pass_context
@@ -90,6 +91,7 @@ def uninstall(ctx, force):
 
 # ============== Workflow Commands ==============
 
+
 @cli.group()
 def workflow():
     """Workflow management commands"""
@@ -116,7 +118,11 @@ def workflow_list(ctx):
         else:
             click.echo(f"🔹 {wf['id']}")
             click.echo(f"   Name: {wf['name']}")
-            click.echo(f"   {wf['description'][:60]}..." if len(wf.get('description', '')) > 60 else f"   {wf.get('description', '')}")
+            click.echo(
+                f"   {wf['description'][:60]}..."
+                if len(wf.get("description", "")) > 60
+                else f"   {wf.get('description', '')}"
+            )
             click.echo(f"   Agents: {wf['agents']} | Steps: {wf['steps']}")
             click.echo()
 
@@ -168,13 +174,17 @@ def workflow_run(ctx, workflow_id, task, context, dry_run):
 
     click.echo(f"✅ Run ID: {result['run_id']}")
     click.echo(f"📊 Status: {result['status']}")
-    click.echo(f"📈 Progress: {result['steps_completed']}/{result['total_steps']} steps")
+    click.echo(
+        f"📈 Progress: {result['steps_completed']}/{result['total_steps']} steps"
+    )
     click.echo()
 
     click.echo("📋 Step Results:")
     for step in result["results"]:
         status_icon = "✅" if step["status"] == "completed" else "❌"
-        click.echo(f"   {status_icon} {step['step']} ({step['agent']}): {step['status']}")
+        click.echo(
+            f"   {status_icon} {step['step']} ({step['agent']}): {step['status']}"
+        )
 
     click.echo(f"\n💡 Check status: agenticom workflow status {result['run_id']}")
 
@@ -210,8 +220,16 @@ def workflow_status(ctx, run_id, as_json):
     if result.get("steps"):
         click.echo("\n📋 Steps:")
         for step in result["steps"]:
-            status_icon = "✅" if step["status"] == "completed" else "⏳" if step["status"] == "running" else "❌"
-            click.echo(f"   {status_icon} {step['step_id']} ({step['agent']}): {step['status']}")
+            status_icon = (
+                "✅"
+                if step["status"] == "completed"
+                else "⏳"
+                if step["status"] == "running"
+                else "❌"
+            )
+            click.echo(
+                f"   {status_icon} {step['step_id']} ({step['agent']}): {step['status']}"
+            )
 
 
 @workflow.command("resume")
@@ -230,7 +248,9 @@ def workflow_resume(ctx, run_id):
 
     click.echo(f"✅ Run ID: {result['run_id']}")
     click.echo(f"📊 Status: {result['status']}")
-    click.echo(f"📈 Progress: {result['steps_completed']}/{result['total_steps']} steps")
+    click.echo(
+        f"📈 Progress: {result['steps_completed']}/{result['total_steps']} steps"
+    )
 
 
 @workflow.command("inspect")
@@ -251,7 +271,9 @@ def workflow_inspect(ctx, run_id, step, as_json):
         click.echo(format_json(result))
         return
 
-    click.echo(f"🔍 Run: {result['run_id']}  |  Workflow: {result['workflow']}  |  Status: {result['status']}")
+    click.echo(
+        f"🔍 Run: {result['run_id']}  |  Workflow: {result['workflow']}  |  Status: {result['status']}"
+    )
     click.echo(f"📝 Task: {result['task']}")
     click.echo("=" * 80)
 
@@ -263,10 +285,10 @@ def workflow_inspect(ctx, run_id, step, as_json):
         if s.get("error"):
             click.echo(f"❌ Error: {s['error']}")
 
-        click.echo(f"\n📥 INPUT:")
+        click.echo("\n📥 INPUT:")
         click.echo(s["input"].strip())
 
-        click.echo(f"\n📤 OUTPUT:")
+        click.echo("\n📤 OUTPUT:")
         click.echo(s["output"].strip() if s["output"] else "(empty)")
 
         click.echo(f"\n🕐 {s['started_at']} → {s['completed_at'] or 'n/a'}")
@@ -319,8 +341,7 @@ def workflow_delete(ctx, run_id, permanent):
 
     if permanent:
         confirm = click.confirm(
-            f"⚠️  Permanently delete run {run_id}? This cannot be undone!",
-            default=False
+            f"⚠️  Permanently delete run {run_id}? This cannot be undone!", default=False
         )
         if not confirm:
             click.echo("❌ Delete cancelled")
@@ -339,6 +360,7 @@ def workflow_delete(ctx, run_id, permanent):
 
 
 # ============== Stats ==============
+
 
 @cli.command()
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -367,6 +389,7 @@ def stats(ctx, as_json):
 
 # ============== Diagnostics ==============
 
+
 @cli.command()
 @click.pass_context
 def diagnostics(ctx):
@@ -380,7 +403,8 @@ def diagnostics(ctx):
         click.echo("✅ Playwright: Installed")
         try:
             import playwright
-            version = getattr(playwright, '__version__', 'unknown')
+
+            version = getattr(playwright, "__version__", "unknown")
             click.echo(f"   Version: {version}")
         except Exception:
             pass
@@ -401,11 +425,14 @@ def diagnostics(ctx):
 
 # ============== Phase 5: Criteria Builder ==============
 
+
 @cli.command("build-criteria")
 @click.argument("task")
-@click.option("--context", "-c", help="JSON context (e.g., '{\"framework\": \"React\"}')")
+@click.option("--context", "-c", help='JSON context (e.g., \'{"framework": "React"}\')')
 @click.option("--output", "-o", default="success_criteria.json", help="Output file")
-@click.option("--non-interactive", is_flag=True, help="Skip Q&A (use initial criteria only)")
+@click.option(
+    "--non-interactive", is_flag=True, help="Skip Q&A (use initial criteria only)"
+)
 @click.pass_context
 def build_criteria(ctx, task, context, output, non_interactive):
     """Build success criteria interactively with AI
@@ -415,6 +442,7 @@ def build_criteria(ctx, task, context, output, non_interactive):
     """
     import asyncio
     import json as json_lib
+
     from orchestration.diagnostics.criteria_builder import CriteriaBuilder
     from orchestration.integrations.unified import auto_setup_executor
 
@@ -472,7 +500,9 @@ def build_criteria(ctx, task, context, output, non_interactive):
 
         click.echo(f"📊 Confidence: {criteria.confidence:.2f}")
         click.echo(f"❓ Questions Asked: {len(criteria.questions_asked)}")
-        click.echo(f"💬 Responses Provided: {len([r for r in criteria.human_responses if r and r != 'No response provided'])}")
+        click.echo(
+            f"💬 Responses Provided: {len([r for r in criteria.human_responses if r and r != 'No response provided'])}"
+        )
         click.echo()
 
         # Save to file
@@ -481,21 +511,35 @@ def build_criteria(ctx, task, context, output, non_interactive):
 
         click.echo(f"📝 Saved to: {output}")
         click.echo()
-        click.echo("💡 Tip: Use these criteria in your workflow YAML under step metadata")
+        click.echo(
+            "💡 Tip: Use these criteria in your workflow YAML under step metadata"
+        )
 
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
         import traceback
+
         traceback.print_exc()
 
 
 # ============== Phase 6: Diagnostics Testing ==============
 
+
 @cli.command("test-diagnostics")
 @click.argument("url")
-@click.option("--actions", "-a", type=click.Path(exists=True), help="JSON file with browser actions")
+@click.option(
+    "--actions",
+    "-a",
+    type=click.Path(exists=True),
+    help="JSON file with browser actions",
+)
 @click.option("--headless/--headed", default=True, help="Run browser in headless mode")
-@click.option("--output-dir", "-o", default="outputs/diagnostics", help="Output directory for screenshots")
+@click.option(
+    "--output-dir",
+    "-o",
+    default="outputs/diagnostics",
+    help="Output directory for screenshots",
+)
 @click.pass_context
 def test_diagnostics(ctx, url, actions, headless, output_dir):
     """Test URL with browser automation diagnostics
@@ -505,8 +549,12 @@ def test_diagnostics(ctx, url, actions, headless, output_dir):
     """
     import asyncio
     import json as json_lib
-    from pathlib import Path
-    from orchestration.diagnostics import DiagnosticsConfig, PlaywrightCapture, BrowserAction
+
+    from orchestration.diagnostics import (
+        BrowserAction,
+        DiagnosticsConfig,
+        PlaywrightCapture,
+    )
 
     try:
         # Load actions
@@ -589,10 +637,12 @@ def test_diagnostics(ctx, url, actions, headless, output_dir):
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
         import traceback
+
         traceback.print_exc()
 
 
 # ============== Dashboard ==============
+
 
 @cli.command()
 @click.option("--port", "-p", default=8081, help="Port number (default: 8081)")
@@ -602,6 +652,7 @@ def dashboard(ctx, port, no_browser):
     """Start the web dashboard"""
     try:
         from .dashboard import start_dashboard
+
         start_dashboard(port=port, open_browser=not no_browser)
     except ImportError as e:
         click.echo(f"❌ Dashboard import error: {e}")
@@ -610,6 +661,7 @@ def dashboard(ctx, port, no_browser):
 
 
 # ============== Main ==============
+
 
 def main():
     """Entry point for CLI."""

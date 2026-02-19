@@ -5,27 +5,29 @@ Provides seamless integration with Nanobot for LLM execution.
 Handles automatic installation if Nanobot is not present.
 """
 
+import os
 import subprocess
 import sys
-import os
-from typing import Optional, Any
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class NanobotConfig:
     """Configuration for Nanobot"""
+
     model: str = "gpt-4-turbo-preview"
     max_tokens: int = 4096
     temperature: float = 0.7
-    api_key: Optional[str] = None  # Uses OPENAI_API_KEY env var if not set
-    base_url: Optional[str] = None  # For custom endpoints
+    api_key: str | None = None  # Uses OPENAI_API_KEY env var if not set
+    base_url: str | None = None  # For custom endpoints
 
 
 def is_nanobot_installed() -> bool:
     """Check if Nanobot (OpenAI SDK) is installed"""
     try:
         import openai
+
         return True
     except ImportError:
         return False
@@ -63,7 +65,7 @@ class NanobotExecutor:
         result = await executor.execute("Write a Python function")
     """
 
-    def __init__(self, config: Optional[NanobotConfig] = None):
+    def __init__(self, config: NanobotConfig | None = None):
         self.config = config or NanobotConfig()
         self._client = None
         self._ensure_installed()
@@ -125,9 +127,7 @@ class NanobotExecutor:
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             temperature=self.config.temperature,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}],
         )
 
         return response.choices[0].message.content
@@ -157,7 +157,7 @@ class NanobotAsyncExecutor:
         result = await executor.execute("Write a Python function")
     """
 
-    def __init__(self, config: Optional[NanobotConfig] = None):
+    def __init__(self, config: NanobotConfig | None = None):
         self.config = config or NanobotConfig()
         self._client = None
         self._ensure_installed()
@@ -196,9 +196,7 @@ class NanobotAsyncExecutor:
             model=self.config.model,
             max_tokens=self.config.max_tokens,
             temperature=self.config.temperature,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}],
         )
 
         return response.choices[0].message.content
@@ -206,9 +204,9 @@ class NanobotAsyncExecutor:
 
 def create_nanobot_executor(
     model: str = "gpt-4-turbo-preview",
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     async_mode: bool = False,
-    **kwargs
+    **kwargs,
 ) -> NanobotExecutor:
     """
     Factory function to create Nanobot executor.
@@ -222,11 +220,7 @@ def create_nanobot_executor(
     Returns:
         Configured NanobotExecutor
     """
-    config = NanobotConfig(
-        model=model,
-        api_key=api_key,
-        **kwargs
-    )
+    config = NanobotConfig(model=model, api_key=api_key, **kwargs)
 
     if async_mode:
         return NanobotAsyncExecutor(config)

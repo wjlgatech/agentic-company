@@ -10,25 +10,33 @@ Following antfarm pattern:
 
 import re
 import uuid
-import yaml
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
-from dataclasses import dataclass, field
+from typing import Any, Optional
 
-from .state import StateManager, WorkflowRun, StepResult, StepStatus, WorkflowStage
+import yaml
+
 from orchestration.artifact_manager import ArtifactManager
+
+from .state import StateManager, StepResult, StepStatus, WorkflowRun, WorkflowStage
+
 
 # Lazy import to avoid circular dependency
 def get_failure_handler():
     from .failure_handler import FailureHandler
+
     return FailureHandler
+
+
 from orchestration.artifacts import ArtifactCollection
 
 
 @dataclass
 class AgentDefinition:
     """Definition of an agent in a workflow."""
+
     id: str
     name: str
     role: str
@@ -40,32 +48,35 @@ class AgentDefinition:
 @dataclass
 class FailureAction:
     """Configuration for what to do when a step fails."""
+
     action: str  # "stop", "retry", "loop_back", "escalate", "llm_decide"
-    to_step: Optional[str] = None  # For loop_back: which step to return to
+    to_step: str | None = None  # For loop_back: which step to return to
     max_loops: int = 2  # Maximum number of loop-backs
-    feedback_template: Optional[str] = None  # Feedback to provide on retry
-    escalate_to: Optional[str] = None  # For escalate: which agent
+    feedback_template: str | None = None  # Feedback to provide on retry
+    escalate_to: str | None = None  # For escalate: which agent
     use_llm_analysis: bool = False  # Use LLM to analyze failure and decide
 
 
 @dataclass
 class StepDefinition:
     """Definition of a step in a workflow."""
+
     id: str
     agent: str
     description: str
     input_template: str
-    expects: Optional[str] = None  # Expected output pattern
+    expects: str | None = None  # Expected output pattern
     retry_count: int = 2
     timeout_seconds: int = 300
     requires_approval: bool = False
-    verify_with: Optional[str] = None  # Agent ID for cross-verification
-    on_failure: Optional[FailureAction] = None  # What to do if step fails
+    verify_with: str | None = None  # Agent ID for cross-verification
+    on_failure: FailureAction | None = None  # What to do if step fails
 
 
 @dataclass
 class WorkflowDefinition:
     """Complete workflow definition loaded from YAML."""
+
     id: str
     name: str
     description: str
@@ -87,7 +98,7 @@ class WorkflowDefinition:
                 role=a.get("role", a.get("name", a["id"])),
                 prompt_template=a.get("prompt", ""),
                 workspace_files=a.get("workspace", {}).get("files", {}),
-                tools=a.get("tools", [])
+                tools=a.get("tools", []),
             )
             for a in data.get("agents", [])
         ]
@@ -109,8 +120,12 @@ class WorkflowDefinition:
                     max_loops=s.get("on_failure", {}).get("max_loops", 2),
                     feedback_template=s.get("on_failure", {}).get("feedback_template"),
                     escalate_to=s.get("on_failure", {}).get("escalate_to"),
-                    use_llm_analysis=s.get("on_failure", {}).get("use_llm_analysis", False)
-                ) if s.get("on_failure") else None
+                    use_llm_analysis=s.get("on_failure", {}).get(
+                        "use_llm_analysis", False
+                    ),
+                )
+                if s.get("on_failure")
+                else None,
             )
             for s in data.get("steps", [])
         ]
@@ -122,7 +137,7 @@ class WorkflowDefinition:
             agents=agents,
             steps=steps,
             version=data.get("version", "1.0"),
-            tags=data.get("tags", [])
+            tags=data.get("tags", []),
         )
 
     def to_yaml(self) -> str:
@@ -139,8 +154,10 @@ class WorkflowDefinition:
                     "name": a.name,
                     "role": a.role,
                     "prompt": a.prompt_template,
-                    "workspace": {"files": a.workspace_files} if a.workspace_files else {},
-                    "tools": a.tools
+                    "workspace": {"files": a.workspace_files}
+                    if a.workspace_files
+                    else {},
+                    "tools": a.tools,
                 }
                 for a in self.agents
             ],
@@ -154,10 +171,10 @@ class WorkflowDefinition:
                     "retry": s.retry_count,
                     "timeout": s.timeout_seconds,
                     "approval": s.requires_approval,
-                    "verify_with": s.verify_with
+                    "verify_with": s.verify_with,
                 }
                 for s in self.steps
-            ]
+            ],
         }
         return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
@@ -175,9 +192,9 @@ class WorkflowRunner:
 
     def __init__(
         self,
-        state_manager: Optional[StateManager] = None,
-        executor: Optional[Callable[[str, str], str]] = None,
-        failure_handler: Optional["FailureHandler"] = None
+        state_manager: StateManager | None = None,
+        executor: Callable[[str, str], str] | None = None,
+        failure_handler: Optional["FailureHandler"] = None,
     ):
         self.state = state_manager or StateManager()
         self.executor = executor or self._default_executor
@@ -189,7 +206,7 @@ class WorkflowRunner:
             self.failure_handler = FailureHandler(llm_executor=self.executor)
 
     @staticmethod
-    def _detect_stage_from_step_id(step_id: str) -> Optional[WorkflowStage]:
+    def _detect_stage_from_step_id(step_id: str) -> WorkflowStage | None:
         """Detect workflow stage from step ID.
 
         Matches step IDs like 'plan', 'develop'/'implement', 'verify', 'test', 'review'.
@@ -199,7 +216,13 @@ class WorkflowRunner:
         # Direct matches
         stage_keywords = {
             WorkflowStage.PLAN: ["plan", "planning", "analyze", "breakdown"],
-            WorkflowStage.IMPLEMENT: ["develop", "implement", "code", "build", "create"],
+            WorkflowStage.IMPLEMENT: [
+                "develop",
+                "implement",
+                "code",
+                "build",
+                "create",
+            ],
             WorkflowStage.VERIFY: ["verify", "check", "validate", "review-code"],
             WorkflowStage.TEST: ["test", "testing", "qa"],
             WorkflowStage.REVIEW: ["review", "finalize", "approve", "feedback"],
@@ -227,7 +250,9 @@ class WorkflowRunner:
 
         # Keyword matching: at least half of significant words must be present
         skip_words = {"with", "and", "the", "for", "from", "that", "this", "into"}
-        keywords = [w for w in expects_lower.split() if len(w) >= 4 and w not in skip_words]
+        keywords = [
+            w for w in expects_lower.split() if len(w) >= 4 and w not in skip_words
+        ]
         if not keywords:
             return False
 
@@ -244,22 +269,32 @@ class WorkflowRunner:
             # Enhanced stemming: try removing common endings to find base form
             # E.g., "verified" -> "verify", "approved" -> "approve"
             base_endings = [
-                ("ied", "y"),      # verified -> verify
-                ("ed", ""),        # approved -> approve, tested -> test
-                ("ing", ""),       # testing -> test
-                ("ion", ""),       # verification -> verif (partial, but helps)
-                ("ation", ""),     # creation -> cre
+                ("ied", "y"),  # verified -> verify
+                ("ed", ""),  # approved -> approve, tested -> test
+                ("ing", ""),  # testing -> test
+                ("ion", ""),  # verification -> verif (partial, but helps)
+                ("ation", ""),  # creation -> cre
             ]
 
             for ending, replacement in base_endings:
                 if kw.endswith(ending):
-                    base = kw[:-len(ending)] + replacement
+                    base = kw[: -len(ending)] + replacement
                     if base in output_lower:
                         return True
 
             # Try common suffixes from the base: -tion/-sion, -ing, -ed, -ment, -ity
             stem = kw.rstrip("s")
-            for suffix in ("tion", "sion", "ing", "ed", "ment", "ity", "ies", "ation", "ication"):
+            for suffix in (
+                "tion",
+                "sion",
+                "ing",
+                "ed",
+                "ment",
+                "ity",
+                "ies",
+                "ation",
+                "ication",
+            ):
                 if (stem + suffix) in output_lower:
                     return True
             return False
@@ -268,7 +303,7 @@ class WorkflowRunner:
         threshold = max(1, len(keywords) // 2)  # At least half, minimum 1
         return matched >= threshold
 
-    def _check_quality_gate(self, step_id: str, output: str) -> tuple[bool, Optional[str]]:
+    def _check_quality_gate(self, step_id: str, output: str) -> tuple[bool, str | None]:
         """
         Check if output passes quality gate for critical review steps.
         Returns (passed, error_message).
@@ -276,56 +311,65 @@ class WorkflowRunner:
         For REVIEW steps, look for negative indicators that suggest rejection.
         """
         # Only apply quality gate to review/verification steps
-        if not any(keyword in step_id.lower() for keyword in ['review', 'verify', 'validate', 'approve']):
+        if not any(
+            keyword in step_id.lower()
+            for keyword in ["review", "verify", "validate", "approve"]
+        ):
             return True, None
 
         output_lower = output.lower()
 
         # Negative indicators that suggest review failed
         negative_indicators = [
-            'not approved',
-            'cannot be approved',
-            'major rework required',
-            'not suitable for production',
-            'fails to meet',
-            'recommendation: reject',
-            'must be rejected',
-            'does not meet requirements',
-            'incomplete implementation',
-            'missing critical',
-            'security vulnerabilities',
-            'not production-ready',
-            'requires complete redesign',
-            'approximately 0%',
-            'approximately 10%',
-            'approximately 15%',
-            'approximately 20%',  # Less than 25% completion is failure
+            "not approved",
+            "cannot be approved",
+            "major rework required",
+            "not suitable for production",
+            "fails to meet",
+            "recommendation: reject",
+            "must be rejected",
+            "does not meet requirements",
+            "incomplete implementation",
+            "missing critical",
+            "security vulnerabilities",
+            "not production-ready",
+            "requires complete redesign",
+            "approximately 0%",
+            "approximately 10%",
+            "approximately 15%",
+            "approximately 20%",  # Less than 25% completion is failure
         ]
 
         # Check for negative indicators
         found_negative = [ind for ind in negative_indicators if ind in output_lower]
         if found_negative:
-            return False, f"Quality gate failed: Review contains rejection indicators: {', '.join(found_negative[:3])}"
+            return (
+                False,
+                f"Quality gate failed: Review contains rejection indicators: {', '.join(found_negative[:3])}",
+            )
 
         # Positive indicators that suggest approval
         positive_indicators = [
-            'approved for production',
-            'production-ready',
-            'meets all requirements',
-            'ready for deployment',
-            'passes all checks',
-            'recommendation: approve',
-            'fully implemented',
+            "approved for production",
+            "production-ready",
+            "meets all requirements",
+            "ready for deployment",
+            "passes all checks",
+            "recommendation: approve",
+            "fully implemented",
         ]
 
         # If it's a review step with expects pattern, we need either:
         # 1. Positive indicator present, OR
         # 2. No negative indicators (neutral review)
-        has_positive = any(ind in output_lower for ind in positive_indicators)
+        any(ind in output_lower for ind in positive_indicators)
 
         # For review steps, we want explicit approval OR at least no rejection
         if found_negative:
-            return False, f"Quality gate failed: Review rejected with: {found_negative[0]}"
+            return (
+                False,
+                f"Quality gate failed: Review rejected with: {found_negative[0]}",
+            )
 
         return True, None
 
@@ -350,7 +394,7 @@ and provide the output back to continue the workflow.
         self,
         workflow: WorkflowDefinition,
         task: str,
-        initial_context: Optional[dict] = None
+        initial_context: dict | None = None,
     ) -> WorkflowRun:
         """Start a new workflow run."""
         run_id = str(uuid.uuid4())[:8]
@@ -365,17 +409,14 @@ and provide the output back to continue the workflow.
             total_steps=len(workflow.steps),
             context=initial_context or {"task": task},
             created_at=now,
-            updated_at=now
+            updated_at=now,
         )
 
         self.state.create_run(run)
         return run
 
     def execute_step(
-        self,
-        workflow: WorkflowDefinition,
-        run: WorkflowRun,
-        step_index: int
+        self, workflow: WorkflowDefinition, run: WorkflowRun, step_index: int
     ) -> StepResult:
         """Execute a single step in the workflow."""
         if step_index >= len(workflow.steps):
@@ -425,7 +466,9 @@ YOUR TASK FOR THIS STEP:
         detected_stage = self._detect_stage_from_step_id(step.id)
         if detected_stage:
             run.start_stage(detected_stage, step.id)
-            self.state.update_run(run.id, stages=run.stages, current_stage=run.current_stage)
+            self.state.update_run(
+                run.id, stages=run.stages, current_stage=run.current_stage
+            )
 
         # Record step start
         now = datetime.now().isoformat()
@@ -436,11 +479,13 @@ YOUR TASK FOR THIS STEP:
             status=StepStatus.RUNNING,
             input_context=input_text,
             output="",
-            started_at=now
+            started_at=now,
         )
 
         # Update run status
-        self.state.update_run(run.id, current_step=step_index, status=StepStatus.RUNNING)
+        self.state.update_run(
+            run.id, current_step=step_index, status=StepStatus.RUNNING
+        )
 
         try:
             # Execute the step
@@ -455,16 +500,22 @@ YOUR TASK FOR THIS STEP:
             output_dir = None
             if output:
                 try:
-                    extracted_artifacts = self.artifact_manager.extract_artifacts_from_text(output, run_id=run.id)
+                    extracted_artifacts = (
+                        self.artifact_manager.extract_artifacts_from_text(
+                            output, run_id=run.id
+                        )
+                    )
                     if extracted_artifacts:
-                        collection = ArtifactCollection(run_id=run.id, artifacts=extracted_artifacts)
+                        collection = ArtifactCollection(
+                            run_id=run.id, artifacts=extracted_artifacts
+                        )
                         output_dir = self.artifact_manager.save_collection(collection)
 
                         # Add artifacts to current stage
                         if detected_stage and output_dir:
                             run.add_artifact(detected_stage, str(output_dir))
                             self.state.update_run(run.id, stages=run.stages)
-                except Exception as e:
+                except Exception:
                     # Don't fail the step if artifact extraction fails
                     pass
 
@@ -481,7 +532,9 @@ YOUR TASK FOR THIS STEP:
                 has_artifacts = len(extracted_artifacts) > 0
 
                 # If step has artifacts OR matches expected output, it's successful
-                if not (has_artifacts or self._output_matches_expects(output, step.expects)):
+                if not (
+                    has_artifacts or self._output_matches_expects(output, step.expects)
+                ):
                     result.status = StepStatus.FAILED
                     result.error = f"Output did not contain expected: {step.expects}"
                 else:
@@ -517,8 +570,8 @@ YOUR TASK FOR THIS STEP:
         self,
         workflow: WorkflowDefinition,
         task: str,
-        initial_context: Optional[dict] = None,
-        stop_on_failure: bool = True
+        initial_context: dict | None = None,
+        stop_on_failure: bool = True,
     ) -> tuple[WorkflowRun, list[StepResult]]:
         """Run all steps in the workflow with intelligent failure recovery."""
         run = self.start(workflow, task, initial_context)
@@ -553,7 +606,9 @@ YOUR TASK FOR THIS STEP:
 
                 # No handler or handler says stop
                 if stop_on_failure:
-                    self.state.update_run(run.id, status=StepStatus.FAILED, error=result.error)
+                    self.state.update_run(
+                        run.id, status=StepStatus.FAILED, error=result.error
+                    )
                     run = self.state.get_run(run.id)
                     break
 
@@ -568,7 +623,9 @@ YOUR TASK FOR THIS STEP:
 
         return run, results
 
-    def resume(self, run_id: str, workflow: WorkflowDefinition) -> tuple[WorkflowRun, list[StepResult]]:
+    def resume(
+        self, run_id: str, workflow: WorkflowDefinition
+    ) -> tuple[WorkflowRun, list[StepResult]]:
         """Resume a failed or paused workflow run."""
         run = self.state.get_run(run_id)
         if not run:
@@ -582,7 +639,9 @@ YOUR TASK FOR THIS STEP:
             results_by_step[r.step_id] = r
 
         # Find the first incomplete step
-        completed_steps = {r.step_id for r in existing_results if r.status == StepStatus.COMPLETED}
+        completed_steps = {
+            r.step_id for r in existing_results if r.status == StepStatus.COMPLETED
+        }
 
         for i, step in enumerate(workflow.steps):
             if step.id in completed_steps:
@@ -592,11 +651,17 @@ YOUR TASK FOR THIS STEP:
             results_by_step[step.id] = result  # Replace old result
 
             if result.status == StepStatus.FAILED:
-                self.state.update_run(run.id, status=StepStatus.FAILED, error=result.error)
+                self.state.update_run(
+                    run.id, status=StepStatus.FAILED, error=result.error
+                )
                 break
 
         # Convert back to list in step order
-        results = [results_by_step[step.id] for step in workflow.steps if step.id in results_by_step]
+        results = [
+            results_by_step[step.id]
+            for step in workflow.steps
+            if step.id in results_by_step
+        ]
 
         run = self.state.get_run(run_id)
 
@@ -630,8 +695,8 @@ YOUR TASK FOR THIS STEP:
                     "status": r.status.value,
                     "started_at": r.started_at,
                     "completed_at": r.completed_at,
-                    "error": r.error
+                    "error": r.error,
                 }
                 for r in results
-            ]
+            ],
         }

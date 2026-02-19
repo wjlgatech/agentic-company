@@ -7,7 +7,7 @@ Supports environment variables, .env files, and YAML configuration.
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -24,7 +24,7 @@ class LLMConfig:
     model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 4096
     temperature: float = 0.7
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
 
 @dataclass
@@ -46,10 +46,10 @@ class MemoryConfig:
     backend: str = "local"  # local, supabase, redis, postgres
     max_entries: int = 1000
     ttl_seconds: int = 86400  # 24 hours
-    supabase_url: Optional[str] = None
-    supabase_key: Optional[str] = None
-    redis_url: Optional[str] = None
-    database_url: Optional[str] = None
+    supabase_url: str | None = None
+    supabase_key: str | None = None
+    redis_url: str | None = None
+    database_url: str | None = None
 
 
 @dataclass
@@ -72,7 +72,7 @@ class ObservabilityConfig:
     metrics_enabled: bool = True
     logging_enabled: bool = True
     log_level: str = "INFO"
-    otlp_endpoint: Optional[str] = None
+    otlp_endpoint: str | None = None
     prometheus_port: int = 9090
 
 
@@ -188,7 +188,7 @@ class OrchestratorConfig:
 
 
 # Global config instance
-_config: Optional[OrchestratorConfig] = None
+_config: OrchestratorConfig | None = None
 
 
 def get_config() -> OrchestratorConfig:

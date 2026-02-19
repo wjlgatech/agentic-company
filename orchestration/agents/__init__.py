@@ -5,15 +5,15 @@ Provides specialized agent roles that work together in coordinated workflows
 with cross-verification and fresh context per step.
 """
 
-from orchestration.agents.base import Agent, AgentRole, AgentConfig
-from orchestration.agents.team import AgentTeam, TeamConfig, TeamResult
+from orchestration.agents.base import Agent, AgentConfig, AgentRole
 from orchestration.agents.specialized import (
-    PlannerAgent,
     DeveloperAgent,
-    VerifierAgent,
-    TesterAgent,
+    PlannerAgent,
     ReviewerAgent,
+    TesterAgent,
+    VerifierAgent,
 )
+from orchestration.agents.team import AgentTeam, TeamConfig, TeamResult
 
 __all__ = [
     # Base

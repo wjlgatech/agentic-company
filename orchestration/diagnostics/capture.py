@@ -1,12 +1,11 @@
 """Browser automation and diagnostic capture using Playwright."""
 
 import asyncio
-import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import structlog
 
@@ -37,12 +36,12 @@ class BrowserAction:
     """
 
     type: ActionType
-    selector: Optional[str] = None
-    value: Optional[str] = None
-    timeout: Optional[int] = None
+    selector: str | None = None
+    value: str | None = None
+    timeout: int | None = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BrowserAction":
+    def from_dict(cls, data: dict[str, Any]) -> "BrowserAction":
         """Create BrowserAction from dictionary.
 
         Args:
@@ -59,7 +58,7 @@ class BrowserAction:
             timeout=data.get("timeout"),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "type": self.type.value,
@@ -77,7 +76,7 @@ class ConsoleMessage:
     text: str
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "type": self.type,
@@ -92,11 +91,11 @@ class NetworkRequest:
 
     url: str
     method: str
-    status: Optional[int] = None
-    response_time_ms: Optional[float] = None
+    status: int | None = None
+    response_time_ms: float | None = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "url": self.url,
@@ -124,16 +123,16 @@ class DiagnosticCapture:
     """
 
     success: bool
-    error: Optional[str] = None
-    console_logs: List[ConsoleMessage] = field(default_factory=list)
-    console_errors: List[ConsoleMessage] = field(default_factory=list)
-    network_requests: List[NetworkRequest] = field(default_factory=list)
-    screenshots: List[str] = field(default_factory=list)
-    final_url: Optional[str] = None
-    execution_time_ms: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    console_logs: list[ConsoleMessage] = field(default_factory=list)
+    console_errors: list[ConsoleMessage] = field(default_factory=list)
+    network_requests: list[NetworkRequest] = field(default_factory=list)
+    screenshots: list[str] = field(default_factory=list)
+    final_url: str | None = None
+    execution_time_ms: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -148,7 +147,7 @@ class DiagnosticCapture:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DiagnosticCapture":
+    def from_dict(cls, data: dict[str, Any]) -> "DiagnosticCapture":
         """Create DiagnosticCapture from dictionary."""
         # Convert console logs
         console_logs = [
@@ -234,10 +233,10 @@ class PlaywrightCapture:
         self.page = None
 
         # Capture state
-        self.console_logs: List[ConsoleMessage] = []
-        self.console_errors: List[ConsoleMessage] = []
-        self.network_requests: List[NetworkRequest] = []
-        self.screenshots: List[str] = []
+        self.console_logs: list[ConsoleMessage] = []
+        self.console_errors: list[ConsoleMessage] = []
+        self.network_requests: list[NetworkRequest] = []
+        self.screenshots: list[str] = []
 
     async def __aenter__(self) -> "PlaywrightCapture":
         """Start browser automation session."""
@@ -245,9 +244,12 @@ class PlaywrightCapture:
             from playwright.async_api import async_playwright
         except ImportError:
             from ..diagnostics import require_playwright
+
             require_playwright()
 
-        logger.info("Starting browser automation session", browser=self.config.browser_type)
+        logger.info(
+            "Starting browser automation session", browser=self.config.browser_type
+        )
 
         # Launch playwright
         self.playwright = await async_playwright().start()
@@ -352,7 +354,7 @@ class PlaywrightCapture:
                 break
 
     async def execute_actions(
-        self, actions: List[BrowserAction], output_dir: Optional[Path] = None
+        self, actions: list[BrowserAction], output_dir: Path | None = None
     ) -> DiagnosticCapture:
         """Execute a series of browser actions and capture diagnostics.
 
@@ -379,7 +381,7 @@ class PlaywrightCapture:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         start_time = datetime.utcnow()
-        error: Optional[str] = None
+        error: str | None = None
 
         try:
             for action in actions:
@@ -395,12 +397,17 @@ class PlaywrightCapture:
             # Capture error screenshot
             if self.config.screenshot_on_error:
                 try:
-                    error_screenshot = output_dir / f"error_{datetime.utcnow().timestamp()}.png"
+                    error_screenshot = (
+                        output_dir / f"error_{datetime.utcnow().timestamp()}.png"
+                    )
                     await self.page.screenshot(path=str(error_screenshot))
                     self.screenshots.append(str(error_screenshot))
                     logger.info("Error screenshot captured", path=str(error_screenshot))
                 except Exception as screenshot_error:
-                    logger.warning("Failed to capture error screenshot", error=str(screenshot_error))
+                    logger.warning(
+                        "Failed to capture error screenshot",
+                        error=str(screenshot_error),
+                    )
 
         # Calculate execution time
         end_time = datetime.utcnow()
@@ -434,7 +441,9 @@ class PlaywrightCapture:
         if not self.page:
             raise RuntimeError("Browser page not available")
 
-        logger.debug("Executing action", action_type=action.type.value, selector=action.selector)
+        logger.debug(
+            "Executing action", action_type=action.type.value, selector=action.selector
+        )
 
         # Get timeout for this action
         timeout = action.timeout or self.config.timeout_ms

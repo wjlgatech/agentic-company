@@ -2,12 +2,11 @@
 """Complete integration test of all diagnostic features."""
 
 import asyncio
-import json
 from pathlib import Path
 
-print("="*70)
+print("=" * 70)
 print("COMPLETE DIAGNOSTICS SYSTEM INTEGRATION TEST")
-print("="*70)
+print("=" * 70)
 print()
 
 # =============================================================================
@@ -19,6 +18,7 @@ print("-" * 70)
 
 from orchestration.diagnostics.criteria_builder import CriteriaBuilder
 from orchestration.integrations.unified import auto_setup_executor
+
 
 async def test_criteria_builder():
     """Test criteria builder with a real task."""
@@ -32,7 +32,7 @@ async def test_criteria_builder():
     responses = [
         "Yes, show recent searches and popular pages",
         "Real-time with debouncing (300ms delay)",
-        "English and Spanish"
+        "English and Spanish",
     ]
     response_idx = [0]
 
@@ -50,7 +50,7 @@ async def test_criteria_builder():
 
     criteria = await builder.build_criteria(
         "Build a documentation search feature",
-        context={"framework": "React", "backend": "Elasticsearch"}
+        context={"framework": "React", "backend": "Elasticsearch"},
     )
 
     print()
@@ -60,10 +60,13 @@ async def test_criteria_builder():
     print()
     print(f"   Confidence: {criteria.confidence:.2f}")
     print(f"   Questions: {len(criteria.questions_asked)}")
-    print(f"   Responses: {len([r for r in criteria.human_responses if r != 'No response'])}")
+    print(
+        f"   Responses: {len([r for r in criteria.human_responses if r != 'No response'])}"
+    )
     print()
 
     return criteria
+
 
 # =============================================================================
 # Test 2: Browser Automation with Diagnostics
@@ -73,7 +76,12 @@ print()
 print("Test 2: Browser Automation & Diagnostics Capture")
 print("-" * 70)
 
-from orchestration.diagnostics import DiagnosticsConfig, PlaywrightCapture, BrowserAction
+from orchestration.diagnostics import (
+    BrowserAction,
+    DiagnosticsConfig,
+    PlaywrightCapture,
+)
+
 
 async def test_browser_diagnostics():
     """Test browser automation with diagnostic capture."""
@@ -89,8 +97,12 @@ async def test_browser_diagnostics():
     )
 
     actions = [
-        BrowserAction.from_dict({"type": "navigate", "value": "https://docs.python.org"}),
-        BrowserAction.from_dict({"type": "wait_for_selector", "selector": "h1", "timeout": 5000}),
+        BrowserAction.from_dict(
+            {"type": "navigate", "value": "https://docs.python.org"}
+        ),
+        BrowserAction.from_dict(
+            {"type": "wait_for_selector", "selector": "h1", "timeout": 5000}
+        ),
         BrowserAction.from_dict({"type": "screenshot", "value": "python_docs.png"}),
     ]
 
@@ -114,6 +126,7 @@ async def test_browser_diagnostics():
 
     return result
 
+
 # =============================================================================
 # Test 3: Iteration Monitoring
 # =============================================================================
@@ -122,40 +135,41 @@ print()
 print("Test 3: Iteration Monitoring & Tracking")
 print("-" * 70)
 
+from orchestration.diagnostics.capture import ConsoleMessage, DiagnosticCapture
 from orchestration.diagnostics.iteration_monitor import IterationMonitor
-from orchestration.diagnostics.capture import DiagnosticCapture, ConsoleMessage
+
 
 def test_iteration_monitor():
     """Test iteration monitoring for auto-retry loop."""
     print("🔄 Simulating 3 test iterations...")
     print()
 
-    config = DiagnosticsConfig(
-        enabled=True,
-        iteration_threshold=2,
-        max_iterations=5
-    )
+    config = DiagnosticsConfig(enabled=True, iteration_threshold=2, max_iterations=5)
 
     monitor = IterationMonitor(config)
     monitor.start_step("test_search_feature")
 
     # Simulate failures
     for i in range(3):
-        print(f"   Iteration {i+1}: ", end="")
+        print(f"   Iteration {i + 1}: ", end="")
 
         diagnostics = DiagnosticCapture(
             success=(i == 2),  # Fail first 2, succeed on 3rd
-            error=None if i == 2 else f"Search not returning results (attempt {i+1})",
-            console_errors=[] if i == 2 else [
-                ConsoleMessage(type="error", text=f"TypeError: Cannot read property 'results'")
-            ]
+            error=None if i == 2 else f"Search not returning results (attempt {i + 1})",
+            console_errors=[]
+            if i == 2
+            else [
+                ConsoleMessage(
+                    type="error", text="TypeError: Cannot read property 'results'"
+                )
+            ],
         )
 
         monitor.record_iteration(
             error=diagnostics.error,
-            fix_attempted=f"Updated search query logic (attempt {i+1})",
+            fix_attempted=f"Updated search query logic (attempt {i + 1})",
             test_result=diagnostics.success,
-            diagnostics=diagnostics
+            diagnostics=diagnostics,
         )
 
         if diagnostics.success:
@@ -165,7 +179,7 @@ def test_iteration_monitor():
 
         # Check if meta-analysis should trigger
         if monitor.should_trigger_meta_analysis() and i < 2:
-            print(f"      ⚠️  Meta-analysis threshold reached after {i+1} failures")
+            print(f"      ⚠️  Meta-analysis threshold reached after {i + 1} failures")
 
     print()
     print("✅ Iteration Summary:")
@@ -177,6 +191,7 @@ def test_iteration_monitor():
 
     return monitor
 
+
 # =============================================================================
 # Test 4: Meta-Analysis
 # =============================================================================
@@ -185,9 +200,11 @@ print()
 print("Test 4: LLM-Based Meta-Analysis")
 print("-" * 70)
 
-from orchestration.diagnostics.meta_analyzer import MetaAnalyzer
-from orchestration.diagnostics.iteration_monitor import IterationRecord
 from datetime import datetime
+
+from orchestration.diagnostics.iteration_monitor import IterationRecord
+from orchestration.diagnostics.meta_analyzer import MetaAnalyzer
+
 
 async def test_meta_analysis():
     """Test meta-analysis on repeated failures."""
@@ -205,9 +222,11 @@ async def test_meta_analysis():
             diagnostics=DiagnosticCapture(
                 success=False,
                 error="Empty results array",
-                console_errors=[ConsoleMessage(type="error", text="Search API returned 0 results")]
+                console_errors=[
+                    ConsoleMessage(type="error", text="Search API returned 0 results")
+                ],
             ),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         ),
         IterationRecord(
             iteration=2,
@@ -218,9 +237,11 @@ async def test_meta_analysis():
             diagnostics=DiagnosticCapture(
                 success=False,
                 error="Empty results array",
-                console_errors=[ConsoleMessage(type="error", text="Search API returned 0 results")]
+                console_errors=[
+                    ConsoleMessage(type="error", text="Search API returned 0 results")
+                ],
             ),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         ),
         IterationRecord(
             iteration=3,
@@ -231,9 +252,11 @@ async def test_meta_analysis():
             diagnostics=DiagnosticCapture(
                 success=False,
                 error="Empty results array",
-                console_errors=[ConsoleMessage(type="error", text="Search API returned 0 results")]
+                console_errors=[
+                    ConsoleMessage(type="error", text="Search API returned 0 results")
+                ],
             ),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         ),
     ]
 
@@ -254,27 +277,30 @@ async def test_meta_analysis():
 
     return analysis
 
+
 # =============================================================================
 # Run All Tests
 # =============================================================================
+
 
 async def run_all_tests():
     """Run complete integration test suite."""
     results = {}
 
     # Test 1
-    results['criteria'] = await test_criteria_builder()
+    results["criteria"] = await test_criteria_builder()
 
     # Test 2
-    results['diagnostics'] = await test_browser_diagnostics()
+    results["diagnostics"] = await test_browser_diagnostics()
 
     # Test 3 (synchronous)
-    results['monitor'] = test_iteration_monitor()
+    results["monitor"] = test_iteration_monitor()
 
     # Test 4
-    results['meta_analysis'] = await test_meta_analysis()
+    results["meta_analysis"] = await test_meta_analysis()
 
     return results
+
 
 if __name__ == "__main__":
     print("Starting complete integration test...")
@@ -283,9 +309,9 @@ if __name__ == "__main__":
     results = asyncio.run(run_all_tests())
 
     print()
-    print("="*70)
+    print("=" * 70)
     print("INTEGRATION TEST COMPLETE")
-    print("="*70)
+    print("=" * 70)
     print()
     print("✅ All Components Tested:")
     print("   ✓ Criteria Builder (AI-powered)")
@@ -296,8 +322,12 @@ if __name__ == "__main__":
     print()
     print("📊 Summary:")
     print(f"   Criteria generated: {len(results['criteria'].criteria)}")
-    print(f"   Browser test: {'✅ PASS' if results['diagnostics'].success else '❌ FAIL'}")
-    print(f"   Iterations tracked: {results['monitor'].get_iteration_count('test_search_feature')}")
+    print(
+        f"   Browser test: {'✅ PASS' if results['diagnostics'].success else '❌ FAIL'}"
+    )
+    print(
+        f"   Iterations tracked: {results['monitor'].get_iteration_count('test_search_feature')}"
+    )
     print(f"   Meta-analysis confidence: {results['meta_analysis'].confidence:.2f}")
     print()
     print("🎉 Diagnostics system is fully operational!")

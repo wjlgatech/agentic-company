@@ -8,8 +8,8 @@ debugging iteration time from 30 minutes to 30 seconds.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .capture import BrowserAction, DiagnosticCapture, PlaywrightCapture
     from .config import DiagnosticsConfig
-    from .capture import PlaywrightCapture, BrowserAction, DiagnosticCapture
 
 
 def check_playwright_installation() -> bool:
@@ -20,6 +20,7 @@ def check_playwright_installation() -> bool:
     """
     try:
         import playwright  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -51,30 +52,38 @@ def __getattr__(name: str):
     """Lazy load diagnostics modules to avoid Playwright import errors."""
     if name == "DiagnosticsConfig":
         from .config import DiagnosticsConfig
+
         return DiagnosticsConfig
     elif name == "PlaywrightCapture":
         require_playwright()
         from .capture import PlaywrightCapture
+
         return PlaywrightCapture
     elif name == "BrowserAction":
         require_playwright()
         from .capture import BrowserAction
+
         return BrowserAction
     elif name == "DiagnosticCapture":
         from .capture import DiagnosticCapture
+
         return DiagnosticCapture
     elif name == "IterationMonitor":
         from .iteration_monitor import IterationMonitor
+
         return IterationMonitor
     elif name == "CriteriaBuilder":
         from .criteria_builder import CriteriaBuilder
+
         return CriteriaBuilder
     elif name == "MetaAnalyzer":
         from .meta_analyzer import MetaAnalyzer
+
         return MetaAnalyzer
     elif name == "DiagnosticsIntegrator":
         require_playwright()
         from .integration import DiagnosticsIntegrator
+
         return DiagnosticsIntegrator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

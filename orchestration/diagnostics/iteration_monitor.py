@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
 
 import structlog
 
@@ -28,13 +27,13 @@ class IterationRecord:
 
     iteration: int
     step_id: str
-    error: Optional[str]
+    error: str | None
     fix_attempted: str
     test_result: bool
-    diagnostics: Optional[DiagnosticCapture]
+    diagnostics: DiagnosticCapture | None
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "iteration": self.iteration,
@@ -83,8 +82,8 @@ class IterationMonitor:
         self.config = config
 
         # Track iterations by step ID
-        self.iterations_by_step: Dict[str, List[IterationRecord]] = {}
-        self.current_step_id: Optional[str] = None
+        self.iterations_by_step: dict[str, list[IterationRecord]] = {}
+        self.current_step_id: str | None = None
 
     def start_step(self, step_id: str) -> None:
         """Start monitoring a new step.
@@ -100,10 +99,10 @@ class IterationMonitor:
 
     def record_iteration(
         self,
-        error: Optional[str],
+        error: str | None,
         fix_attempted: str,
         test_result: bool,
-        diagnostics: Optional[DiagnosticCapture] = None,
+        diagnostics: DiagnosticCapture | None = None,
     ) -> IterationRecord:
         """Record a fix-test iteration.
 
@@ -120,7 +119,9 @@ class IterationMonitor:
             RuntimeError: If no step is currently being monitored
         """
         if not self.current_step_id:
-            raise RuntimeError("No step is currently being monitored. Call start_step() first.")
+            raise RuntimeError(
+                "No step is currently being monitored. Call start_step() first."
+            )
 
         # Get iteration list for current step
         iterations = self.iterations_by_step[self.current_step_id]
@@ -169,7 +170,9 @@ class IterationMonitor:
 
         # Check recent iterations for consecutive failures
         recent_iterations = iterations[-self.config.iteration_threshold :]
-        consecutive_failures = all(not record.test_result for record in recent_iterations)
+        consecutive_failures = all(
+            not record.test_result for record in recent_iterations
+        )
 
         if consecutive_failures:
             logger.warning(
@@ -182,7 +185,7 @@ class IterationMonitor:
 
         return False
 
-    def get_iterations(self, step_id: Optional[str] = None) -> List[IterationRecord]:
+    def get_iterations(self, step_id: str | None = None) -> list[IterationRecord]:
         """Get iteration history for a step.
 
         Args:
@@ -197,7 +200,7 @@ class IterationMonitor:
 
         return self.iterations_by_step.get(step_id, [])
 
-    def get_iteration_count(self, step_id: Optional[str] = None) -> int:
+    def get_iteration_count(self, step_id: str | None = None) -> int:
         """Get iteration count for a step.
 
         Args:
@@ -208,7 +211,7 @@ class IterationMonitor:
         """
         return len(self.get_iterations(step_id))
 
-    def reset_step(self, step_id: Optional[str] = None) -> None:
+    def reset_step(self, step_id: str | None = None) -> None:
         """Reset iteration history for a step.
 
         Args:

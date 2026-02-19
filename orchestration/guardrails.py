@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -33,7 +33,7 @@ class BaseGuardrail(ABC):
     name: str = "base"
 
     @abstractmethod
-    def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
+    def check(self, content: str, context: dict | None = None) -> GuardrailResult:
         """Check content against the guardrail."""
         pass
 
@@ -45,19 +45,19 @@ class ContentFilter(BaseGuardrail):
 
     # Common security patterns for sensitive data
     COMMON_SECURITY_PATTERNS = [
-        r'sk-ant-[a-zA-Z0-9\-_]{40,}',  # Anthropic API keys
-        r'sk-[a-zA-Z0-9]{20,}',  # OpenAI API keys
-        r'xoxb-[a-zA-Z0-9\-]+',  # Slack bot tokens
-        r'ghp_[a-zA-Z0-9]{36,}',  # GitHub personal access tokens
-        r'AKIA[0-9A-Z]{16}',  # AWS access key IDs
-        r'[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}',  # Credit card numbers
-        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Email addresses (optional - may be too broad)
+        r"sk-ant-[a-zA-Z0-9\-_]{40,}",  # Anthropic API keys
+        r"sk-[a-zA-Z0-9]{20,}",  # OpenAI API keys
+        r"xoxb-[a-zA-Z0-9\-]+",  # Slack bot tokens
+        r"ghp_[a-zA-Z0-9]{36,}",  # GitHub personal access tokens
+        r"AKIA[0-9A-Z]{16}",  # AWS access key IDs
+        r"[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}",  # Credit card numbers
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email addresses (optional - may be too broad)
     ]
 
     def __init__(
         self,
-        blocked_topics: Optional[list[str]] = None,
-        blocked_patterns: Optional[list[str]] = None,
+        blocked_topics: list[str] | None = None,
+        blocked_patterns: list[str] | None = None,
         case_sensitive: bool = False,
     ):
         self.blocked_topics = blocked_topics or ["harmful", "illegal", "violence"]
@@ -70,8 +70,8 @@ class ContentFilter(BaseGuardrail):
     @classmethod
     def with_security_patterns(
         cls,
-        blocked_topics: Optional[list[str]] = None,
-        additional_patterns: Optional[list[str]] = None,
+        blocked_topics: list[str] | None = None,
+        additional_patterns: list[str] | None = None,
         case_sensitive: bool = False,
     ) -> "ContentFilter":
         """Create a ContentFilter with common security patterns pre-configured.
@@ -98,7 +98,7 @@ class ContentFilter(BaseGuardrail):
             case_sensitive=case_sensitive,
         )
 
-    def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
+    def check(self, content: str, context: dict | None = None) -> GuardrailResult:
         """Check content for blocked topics and patterns."""
         check_content = content if self.case_sensitive else content.lower()
 
@@ -137,13 +137,13 @@ class RelevanceGuardrail(BaseGuardrail):
 
     def __init__(
         self,
-        allowed_topics: Optional[list[str]] = None,
+        allowed_topics: list[str] | None = None,
         threshold: float = 0.5,
     ):
         self.allowed_topics = allowed_topics or []
         self.threshold = threshold
 
-    def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
+    def check(self, content: str, context: dict | None = None) -> GuardrailResult:
         """Check if content is relevant to allowed topics."""
         if not self.allowed_topics:
             return GuardrailResult(
@@ -159,7 +159,9 @@ class RelevanceGuardrail(BaseGuardrail):
             if topic.lower() in content_lower:
                 matches.append(topic)
 
-        relevance_score = len(matches) / len(self.allowed_topics) if self.allowed_topics else 0
+        relevance_score = (
+            len(matches) / len(self.allowed_topics) if self.allowed_topics else 0
+        )
 
         if matches:
             return GuardrailResult(
@@ -191,7 +193,7 @@ class RateLimiter(BaseGuardrail):
         self.window_seconds = window_seconds
         self.requests: dict[str, list[float]] = defaultdict(list)
 
-    def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
+    def check(self, content: str, context: dict | None = None) -> GuardrailResult:
         """Check if request is within rate limit."""
         user_id = (context or {}).get("user_id", "default")
         now = time.time()
@@ -229,7 +231,7 @@ class RateLimiter(BaseGuardrail):
             },
         )
 
-    def reset(self, user_id: Optional[str] = None) -> None:
+    def reset(self, user_id: str | None = None) -> None:
         """Reset rate limit counters."""
         if user_id:
             self.requests[user_id] = []
@@ -250,7 +252,7 @@ class LengthGuardrail(BaseGuardrail):
         self.min_length = min_length
         self.max_length = max_length
 
-    def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
+    def check(self, content: str, context: dict | None = None) -> GuardrailResult:
         """Check if content length is within bounds."""
         length = len(content)
 
@@ -283,16 +285,20 @@ class PIIGuardrail(BaseGuardrail):
 
     name = "pii"
 
-    def __init__(self, check_email: bool = True, check_phone: bool = True, check_ssn: bool = True):
+    def __init__(
+        self, check_email: bool = True, check_phone: bool = True, check_ssn: bool = True
+    ):
         self.patterns = {}
         if check_email:
-            self.patterns["email"] = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+            self.patterns["email"] = re.compile(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+            )
         if check_phone:
             self.patterns["phone"] = re.compile(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b")
         if check_ssn:
             self.patterns["ssn"] = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 
-    def check(self, content: str, context: Optional[dict] = None) -> GuardrailResult:
+    def check(self, content: str, context: dict | None = None) -> GuardrailResult:
         """Check for PII in content."""
         found_pii = []
 
@@ -318,7 +324,7 @@ class PIIGuardrail(BaseGuardrail):
 class GuardrailPipeline:
     """Pipeline for running multiple guardrails."""
 
-    def __init__(self, guardrails: Optional[list[BaseGuardrail]] = None):
+    def __init__(self, guardrails: list[BaseGuardrail] | None = None):
         self.guardrails = guardrails or []
 
     def add(self, guardrail: BaseGuardrail) -> "GuardrailPipeline":
@@ -326,7 +332,7 @@ class GuardrailPipeline:
         self.guardrails.append(guardrail)
         return self
 
-    def check(self, content: str, context: Optional[dict] = None) -> list[GuardrailResult]:
+    def check(self, content: str, context: dict | None = None) -> list[GuardrailResult]:
         """Run all guardrails and return results."""
         results = []
         for guardrail in self.guardrails:
@@ -334,13 +340,17 @@ class GuardrailPipeline:
             results.append(result)
         return results
 
-    def check_all_pass(self, content: str, context: Optional[dict] = None) -> tuple[bool, list[GuardrailResult]]:
+    def check_all_pass(
+        self, content: str, context: dict | None = None
+    ) -> tuple[bool, list[GuardrailResult]]:
         """Check if all guardrails pass."""
         results = self.check(content, context)
         all_passed = all(r.passed for r in results)
         return all_passed, results
 
-    def check_stop_on_fail(self, content: str, context: Optional[dict] = None) -> tuple[bool, list[GuardrailResult]]:
+    def check_stop_on_fail(
+        self, content: str, context: dict | None = None
+    ) -> tuple[bool, list[GuardrailResult]]:
         """Run guardrails and stop on first failure."""
         results = []
         for guardrail in self.guardrails:
@@ -357,8 +367,10 @@ class GuardrailPipeline:
 # Factory function for common guardrail configurations
 def create_default_pipeline() -> GuardrailPipeline:
     """Create a pipeline with default guardrails."""
-    return GuardrailPipeline([
-        ContentFilter(),
-        RateLimiter(),
-        LengthGuardrail(min_length=1, max_length=50000),
-    ])
+    return GuardrailPipeline(
+        [
+            ContentFilter(),
+            RateLimiter(),
+            LengthGuardrail(min_length=1, max_length=50000),
+        ]
+    )

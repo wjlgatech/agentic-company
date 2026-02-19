@@ -40,42 +40,44 @@ Architecture:
 Key Insight: LLM generates the FINAL PROMPT, not templates!
 """
 
-import json
-import hashlib
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Callable, Awaitable
-from enum import Enum
 import asyncio
-
+import hashlib
+import json
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 # =============================================================================
 # DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass
 class AnalysisResult:
     """Structured analysis from LLM."""
+
     # Understanding
     summary: str = ""
     task_type: str = "general"
     domain: str = "general"
 
     # Extracted details
-    entities: List[str] = field(default_factory=list)
-    goals: List[str] = field(default_factory=list)
-    constraints: List[str] = field(default_factory=list)
-    pain_points: List[str] = field(default_factory=list)
-    stakeholders: List[str] = field(default_factory=list)
-    technologies: List[str] = field(default_factory=list)
-    metrics: List[str] = field(default_factory=list)
+    entities: list[str] = field(default_factory=list)
+    goals: list[str] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
+    pain_points: list[str] = field(default_factory=list)
+    stakeholders: list[str] = field(default_factory=list)
+    technologies: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
 
     # Readiness
     readiness_score: float = 0.0
-    missing_info: List[str] = field(default_factory=list)
-    clarifying_questions: List[Dict] = field(default_factory=list)
+    missing_info: list[str] = field(default_factory=list)
+    clarifying_questions: list[dict] = field(default_factory=list)
 
     # Approach
-    suggested_approach: List[str] = field(default_factory=list)
+    suggested_approach: list[str] = field(default_factory=list)
 
 
 class SessionState(Enum):
@@ -88,10 +90,11 @@ class SessionState(Enum):
 @dataclass
 class Session:
     """Conversation session."""
+
     session_id: str
     state: SessionState = SessionState.INITIAL
-    user_inputs: List[str] = field(default_factory=list)
-    analysis: Optional[AnalysisResult] = None
+    user_inputs: list[str] = field(default_factory=list)
+    analysis: AnalysisResult | None = None
     final_prompt: str = ""
 
 
@@ -213,6 +216,7 @@ Return ONLY the response text."""
 # HYBRID REFINER
 # =============================================================================
 
+
 class HybridRefiner:
     """
     Hybrid refiner using rules for speed and LLM for quality.
@@ -241,8 +245,8 @@ class HybridRefiner:
         """
         self.llm_call = llm_call
         self.readiness_threshold = readiness_threshold
-        self.sessions: Dict[str, Session] = {}
-        self._cache: Dict[str, AnalysisResult] = {}
+        self.sessions: dict[str, Session] = {}
+        self._cache: dict[str, AnalysisResult] = {}
 
     # =========================================================================
     # SESSION MANAGEMENT
@@ -251,11 +255,12 @@ class HybridRefiner:
     def create_session(self) -> str:
         """Create a new session."""
         import uuid
+
         session_id = str(uuid.uuid4())[:8]
         self.sessions[session_id] = Session(session_id=session_id)
         return session_id
 
-    def get_session(self, session_id: str) -> Optional[Session]:
+    def get_session(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
     # =========================================================================
@@ -266,7 +271,7 @@ class HybridRefiner:
         self,
         session_id: str,
         user_input: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Process user input and return response.
 
@@ -319,7 +324,7 @@ class HybridRefiner:
                     "summary": analysis.summary,
                     "readiness": analysis.readiness_score,
                     "approach": analysis.suggested_approach,
-                }
+                },
             }
         else:
             session.state = SessionState.CLARIFYING
@@ -331,7 +336,7 @@ class HybridRefiner:
                 "questions": analysis.clarifying_questions,
             }
 
-    async def _finalize(self, session: Session) -> Dict[str, Any]:
+    async def _finalize(self, session: Session) -> dict[str, Any]:
         """Generate the final prompt using LLM."""
 
         session.state = SessionState.COMPLETE
@@ -363,8 +368,7 @@ class HybridRefiner:
 
         # Call LLM
         response = await self.llm_call(
-            ANALYSIS_PROMPT,
-            f"Analyze this request:\n\n{user_input}"
+            ANALYSIS_PROMPT, f"Analyze this request:\n\n{user_input}"
         )
 
         # Parse JSON
@@ -404,11 +408,13 @@ class HybridRefiner:
             return AnalysisResult(
                 summary="I need to understand your request better.",
                 readiness_score=0.3,
-                clarifying_questions=[{
-                    "question": "Could you tell me more about what you're trying to accomplish?",
-                    "why": "core goal",
-                    "options": []
-                }]
+                clarifying_questions=[
+                    {
+                        "question": "Could you tell me more about what you're trying to accomplish?",
+                        "why": "core goal",
+                        "options": [],
+                    }
+                ],
             )
 
     async def _generate_prompt(
@@ -423,19 +429,33 @@ class HybridRefiner:
             summary=analysis.summary,
             task_type=analysis.task_type,
             domain=analysis.domain,
-            entities=", ".join(analysis.entities) if analysis.entities else "not specified",
+            entities=", ".join(analysis.entities)
+            if analysis.entities
+            else "not specified",
             goals="; ".join(analysis.goals) if analysis.goals else "not specified",
-            constraints="; ".join(analysis.constraints) if analysis.constraints else "none mentioned",
-            pain_points="; ".join(analysis.pain_points) if analysis.pain_points else "none mentioned",
-            stakeholders=", ".join(analysis.stakeholders) if analysis.stakeholders else "not specified",
-            technologies=", ".join(analysis.technologies) if analysis.technologies else "none mentioned",
-            metrics=", ".join(analysis.metrics) if analysis.metrics else "none mentioned",
-            approach="\n".join(analysis.suggested_approach) if analysis.suggested_approach else "to be determined",
+            constraints="; ".join(analysis.constraints)
+            if analysis.constraints
+            else "none mentioned",
+            pain_points="; ".join(analysis.pain_points)
+            if analysis.pain_points
+            else "none mentioned",
+            stakeholders=", ".join(analysis.stakeholders)
+            if analysis.stakeholders
+            else "not specified",
+            technologies=", ".join(analysis.technologies)
+            if analysis.technologies
+            else "none mentioned",
+            metrics=", ".join(analysis.metrics)
+            if analysis.metrics
+            else "none mentioned",
+            approach="\n".join(analysis.suggested_approach)
+            if analysis.suggested_approach
+            else "to be determined",
         )
 
         final_prompt = await self.llm_call(
             "You are a world-class prompt engineer. Generate an excellent, specific system prompt.",
-            prompt_request
+            prompt_request,
         )
 
         return final_prompt.strip()
@@ -447,10 +467,12 @@ class HybridRefiner:
             RESPONSE_GENERATION_PROMPT.format(
                 summary=analysis.summary,
                 readiness=int(analysis.readiness_score * 100),
-                missing=", ".join(analysis.missing_info) if analysis.missing_info else "none",
+                missing=", ".join(analysis.missing_info)
+                if analysis.missing_info
+                else "none",
                 questions=json.dumps(analysis.clarifying_questions),
             ),
-            "Generate a clarifying response."
+            "Generate a clarifying response.",
         )
 
         return response.strip()
@@ -465,7 +487,7 @@ class HybridRefiner:
                 missing="none",
                 questions="[]",
             ),
-            "Generate a ready-to-proceed response."
+            "Generate a ready-to-proceed response.",
         )
 
         return response.strip()
@@ -477,20 +499,48 @@ class HybridRefiner:
     def _is_acceptance(self, text: str) -> bool:
         """Quick check for acceptance signals."""
         signals = [
-            "yes", "yep", "yeah", "sure", "ok", "okay",
-            "go ahead", "proceed", "do it", "looks good",
-            "perfect", "great", "that works", "sounds good",
-            "let's go", "approved", "continue", "execute"
+            "yes",
+            "yep",
+            "yeah",
+            "sure",
+            "ok",
+            "okay",
+            "go ahead",
+            "proceed",
+            "do it",
+            "looks good",
+            "perfect",
+            "great",
+            "that works",
+            "sounds good",
+            "let's go",
+            "approved",
+            "continue",
+            "execute",
         ]
         return any(s in text for s in signals)
 
     def _is_refinement(self, text: str) -> bool:
         """Quick check for refinement requests."""
         signals = [
-            "change", "modify", "adjust", "refine", "tweak",
-            "actually", "wait", "hold on", "not quite",
-            "can you", "could you", "what if", "instead",
-            "more", "less", "different", "add", "remove"
+            "change",
+            "modify",
+            "adjust",
+            "refine",
+            "tweak",
+            "actually",
+            "wait",
+            "hold on",
+            "not quite",
+            "can you",
+            "could you",
+            "what if",
+            "instead",
+            "more",
+            "less",
+            "different",
+            "add",
+            "remove",
         ]
         return any(s in text for s in signals)
 
@@ -498,6 +548,7 @@ class HybridRefiner:
 # =============================================================================
 # SYNC WRAPPER
 # =============================================================================
+
 
 class SyncHybridRefiner:
     """Synchronous wrapper for HybridRefiner."""
@@ -511,7 +562,7 @@ class SyncHybridRefiner:
     def create_session(self) -> str:
         return self._async_refiner.create_session()
 
-    def process(self, session_id: str, user_input: str) -> Dict[str, Any]:
+    def process(self, session_id: str, user_input: str) -> dict[str, Any]:
         return asyncio.run(self._async_refiner.process(session_id, user_input))
 
 
@@ -519,7 +570,7 @@ class SyncHybridRefiner:
 # EXAMPLE WITH REAL LLM
 # =============================================================================
 
-EXAMPLE_OPENAI = '''
+EXAMPLE_OPENAI = """
 import openai
 from hybrid_refiner import HybridRefiner
 
@@ -553,9 +604,9 @@ print(result["analysis"])  # Shows understanding
 # Turn 3: Accept
 result = await refiner.process(session_id, "looks good")
 print(result["final_prompt"])  # LLM-generated high-quality prompt!
-'''
+"""
 
-EXAMPLE_ANTHROPIC = '''
+EXAMPLE_ANTHROPIC = """
 import anthropic
 from hybrid_refiner import HybridRefiner
 
@@ -572,4 +623,4 @@ async def call_claude(system_prompt: str, user_message: str) -> str:
 
 refiner = HybridRefiner(llm_call=call_claude)
 # ... same usage as above
-'''
+"""

@@ -9,7 +9,6 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import List, Optional, Dict, Any
 
 from .artifacts import Artifact, ArtifactCollection, ArtifactType
 
@@ -64,7 +63,7 @@ class ArtifactManager:
         file_path.parent.mkdir(exist_ok=True, parents=True)
 
         # Write content
-        file_path.write_text(artifact.content, encoding='utf-8')
+        file_path.write_text(artifact.content, encoding="utf-8")
 
         logger.info(
             f"Saved artifact: {file_path} "
@@ -92,10 +91,9 @@ class ArtifactManager:
             saved_paths.append(path)
 
         # Create manifest
-        manifest_path = run_dir / 'manifest.json'
+        manifest_path = run_dir / "manifest.json"
         manifest_path.write_text(
-            json.dumps(collection.to_dict(), indent=2),
-            encoding='utf-8'
+            json.dumps(collection.to_dict(), indent=2), encoding="utf-8"
         )
 
         logger.info(
@@ -106,7 +104,7 @@ class ArtifactManager:
 
         return run_dir
 
-    def load_artifact(self, run_id: str, filename: str) -> Optional[Artifact]:
+    def load_artifact(self, run_id: str, filename: str) -> Artifact | None:
         """
         Load a single artifact from disk.
 
@@ -124,7 +122,7 @@ class ArtifactManager:
             logger.warning(f"Artifact not found: {file_path}")
             return None
 
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
 
         # Infer type and language from extension
         artifact_type, language = self._infer_type_and_language(filename)
@@ -136,7 +134,7 @@ class ArtifactManager:
             language=language,
         )
 
-    def load_collection(self, run_id: str) -> Optional[ArtifactCollection]:
+    def load_collection(self, run_id: str) -> ArtifactCollection | None:
         """
         Load artifact collection from disk.
 
@@ -147,7 +145,7 @@ class ArtifactManager:
             ArtifactCollection if manifest exists, None otherwise
         """
         run_dir = self.get_run_dir(run_id)
-        manifest_path = run_dir / 'manifest.json'
+        manifest_path = run_dir / "manifest.json"
 
         if not manifest_path.exists():
             logger.warning(f"Manifest not found: {manifest_path}")
@@ -155,7 +153,7 @@ class ArtifactManager:
 
         return ArtifactCollection.load_manifest(str(manifest_path))
 
-    def list_artifacts(self, run_id: str) -> List[str]:
+    def list_artifacts(self, run_id: str) -> list[str]:
         """
         List all artifact filenames for a run.
 
@@ -172,13 +170,16 @@ class ArtifactManager:
 
         # Get all files except manifest
         files = [
-            f.name for f in run_dir.iterdir()
-            if f.is_file() and f.name != 'manifest.json'
+            f.name
+            for f in run_dir.iterdir()
+            if f.is_file() and f.name != "manifest.json"
         ]
 
         return sorted(files)
 
-    def extract_artifacts_from_text(self, text: str, run_id: str = None) -> List[Artifact]:
+    def extract_artifacts_from_text(
+        self, text: str, run_id: str = None
+    ) -> list[Artifact]:
         """
         Extract code blocks from text and convert to artifacts.
 
@@ -198,11 +199,11 @@ class ArtifactManager:
         artifacts = []
 
         # Regex to find ```language\n code \n```
-        pattern = r'```(\w+)?\n(.*?)\n```'
+        pattern = r"```(\w+)?\n(.*?)\n```"
         matches = re.finditer(pattern, text, re.DOTALL)
 
         for i, match in enumerate(matches):
-            language = match.group(1) or 'text'
+            language = match.group(1) or "text"
             content = match.group(2).strip()
 
             # Try to extract filename from first line comment
@@ -211,7 +212,7 @@ class ArtifactManager:
             if not filename:
                 # Generate filename from index and language
                 ext = self._get_extension(language)
-                filename = f'output_{i}.{ext}'
+                filename = f"output_{i}.{ext}"
 
             # Infer artifact type
             artifact_type = self._infer_artifact_type(filename, language)
@@ -221,7 +222,7 @@ class ArtifactManager:
                 filename=filename,
                 content=content,
                 language=language,
-                metadata={'extracted_from': 'code_block', 'index': i}
+                metadata={"extracted_from": "code_block", "index": i},
             )
 
             artifacts.append(artifact)
@@ -234,7 +235,7 @@ class ArtifactManager:
 
         return artifacts
 
-    def _extract_filename(self, content: str, language: str) -> Optional[str]:
+    def _extract_filename(self, content: str, language: str) -> str | None:
         """
         Extract filename from code comments.
 
@@ -244,14 +245,14 @@ class ArtifactManager:
         - <!-- filename.html --> (HTML)
         """
         patterns = {
-            'python': r'^#\s*([^\s#]+\.(py|pyi))',
-            'javascript': r'^//\s*([^\s/]+\.js)',
-            'typescript': r'^//\s*([^\s/]+\.ts)',
-            'java': r'^//\s*([^\s/]+\.java)',
-            'rust': r'^//\s*([^\s/]+\.rs)',
-            'go': r'^//\s*([^\s/]+\.go)',
-            'html': r'^<!--\s*([^\s>]+\.html)',
-            'css': r'^/\*\s*([^\s*]+\.css)',
+            "python": r"^#\s*([^\s#]+\.(py|pyi))",
+            "javascript": r"^//\s*([^\s/]+\.js)",
+            "typescript": r"^//\s*([^\s/]+\.ts)",
+            "java": r"^//\s*([^\s/]+\.java)",
+            "rust": r"^//\s*([^\s/]+\.rs)",
+            "go": r"^//\s*([^\s/]+\.go)",
+            "html": r"^<!--\s*([^\s>]+\.html)",
+            "css": r"^/\*\s*([^\s*]+\.css)",
         }
 
         pattern = patterns.get(language)
@@ -259,7 +260,7 @@ class ArtifactManager:
             return None
 
         # Check first few lines
-        for line in content.split('\n')[:5]:
+        for line in content.split("\n")[:5]:
             if match := re.search(pattern, line.strip()):
                 return match.group(1)
 
@@ -268,46 +269,48 @@ class ArtifactManager:
     def _get_extension(self, language: str) -> str:
         """Get file extension for language"""
         extensions = {
-            'python': 'py',
-            'javascript': 'js',
-            'typescript': 'ts',
-            'java': 'java',
-            'rust': 'rs',
-            'go': 'go',
-            'html': 'html',
-            'css': 'css',
-            'json': 'json',
-            'yaml': 'yaml',
-            'markdown': 'md',
-            'text': 'txt',
-            'bash': 'sh',
-            'shell': 'sh',
+            "python": "py",
+            "javascript": "js",
+            "typescript": "ts",
+            "java": "java",
+            "rust": "rs",
+            "go": "go",
+            "html": "html",
+            "css": "css",
+            "json": "json",
+            "yaml": "yaml",
+            "markdown": "md",
+            "text": "txt",
+            "bash": "sh",
+            "shell": "sh",
         }
-        return extensions.get(language, 'txt')
+        return extensions.get(language, "txt")
 
-    def _infer_type_and_language(self, filename: str) -> tuple[ArtifactType, Optional[str]]:
+    def _infer_type_and_language(
+        self, filename: str
+    ) -> tuple[ArtifactType, str | None]:
         """Infer artifact type and language from filename"""
-        ext = Path(filename).suffix.lower().lstrip('.')
+        ext = Path(filename).suffix.lower().lstrip(".")
 
         # Map extensions to types and languages
         type_map = {
-            'py': (ArtifactType.CODE, 'python'),
-            'js': (ArtifactType.CODE, 'javascript'),
-            'ts': (ArtifactType.CODE, 'typescript'),
-            'java': (ArtifactType.CODE, 'java'),
-            'rs': (ArtifactType.CODE, 'rust'),
-            'go': (ArtifactType.CODE, 'go'),
-            'html': (ArtifactType.CODE, 'html'),
-            'css': (ArtifactType.CODE, 'css'),
-            'json': (ArtifactType.DATA, 'json'),
-            'yaml': (ArtifactType.CONFIG, 'yaml'),
-            'yml': (ArtifactType.CONFIG, 'yaml'),
-            'md': (ArtifactType.DOCUMENT, 'markdown'),
-            'txt': (ArtifactType.DOCUMENT, 'text'),
+            "py": (ArtifactType.CODE, "python"),
+            "js": (ArtifactType.CODE, "javascript"),
+            "ts": (ArtifactType.CODE, "typescript"),
+            "java": (ArtifactType.CODE, "java"),
+            "rs": (ArtifactType.CODE, "rust"),
+            "go": (ArtifactType.CODE, "go"),
+            "html": (ArtifactType.CODE, "html"),
+            "css": (ArtifactType.CODE, "css"),
+            "json": (ArtifactType.DATA, "json"),
+            "yaml": (ArtifactType.CONFIG, "yaml"),
+            "yml": (ArtifactType.CONFIG, "yaml"),
+            "md": (ArtifactType.DOCUMENT, "markdown"),
+            "txt": (ArtifactType.DOCUMENT, "text"),
         }
 
         # Check if it's a test file
-        if 'test' in filename.lower():
+        if "test" in filename.lower():
             return ArtifactType.TEST, type_map.get(ext, (ArtifactType.FILE, None))[1]
 
         return type_map.get(ext, (ArtifactType.FILE, None))
@@ -316,15 +319,15 @@ class ArtifactManager:
         """Infer artifact type from filename and language"""
         filename_lower = filename.lower()
 
-        if 'test' in filename_lower:
+        if "test" in filename_lower:
             return ArtifactType.TEST
-        elif filename_lower.endswith(('.json', '.yaml', '.yml', '.toml', '.ini')):
+        elif filename_lower.endswith((".json", ".yaml", ".yml", ".toml", ".ini")):
             return ArtifactType.CONFIG
-        elif filename_lower.endswith(('.md', '.txt', '.rst')):
+        elif filename_lower.endswith((".md", ".txt", ".rst")):
             return ArtifactType.DOCUMENT
-        elif filename_lower.endswith(('.csv', '.json', '.xml')):
+        elif filename_lower.endswith((".csv", ".json", ".xml")):
             return ArtifactType.DATA
-        elif language in ('python', 'javascript', 'typescript', 'java', 'rust', 'go'):
+        elif language in ("python", "javascript", "typescript", "java", "rust", "go"):
             return ArtifactType.CODE
         else:
             return ArtifactType.FILE
@@ -346,9 +349,9 @@ class ArtifactManager:
 
         # Copy all files except manifest
         for file_path in run_dir.iterdir():
-            if file_path.is_file() and file_path.name != 'manifest.json':
+            if file_path.is_file() and file_path.name != "manifest.json":
                 target_file = target_path / file_path.name
-                target_file.write_text(file_path.read_text(encoding='utf-8'))
+                target_file.write_text(file_path.read_text(encoding="utf-8"))
 
         logger.info(f"Exported artifacts from {run_id} to {target_path}")
         return target_path
@@ -364,5 +367,6 @@ class ArtifactManager:
 
         if run_dir.exists():
             import shutil
+
             shutil.rmtree(run_dir)
             logger.info(f"Cleaned up artifacts for run {run_id}")

@@ -17,11 +17,12 @@ Each test validates:
 - Tools are declared properly
 """
 
-import pytest
 from pathlib import Path
-from orchestration.workflows.parser import WorkflowParser, load_workflow
-from orchestration.agents.team import AgentTeam
 
+import pytest
+
+from orchestration.agents.team import AgentTeam
+from orchestration.workflows.parser import WorkflowParser
 
 # Path to bundled workflows
 WORKFLOWS_DIR = Path(__file__).parent.parent / "agenticom" / "bundled_workflows"
@@ -140,8 +141,9 @@ class TestEnterpriseWorkflowStructure:
                 for prev_step in definition.steps[:i]:
                     # If referenced, should exist
                     if f"step_outputs.{prev_step.id}" in step.input:
-                        assert prev_step.id in step_ids, \
+                        assert prev_step.id in step_ids, (
                             f"Invalid reference in {yaml_file.name}: {prev_step.id}"
+                        )
 
     def test_agent_roles_valid(self, parser):
         """All agent roles should be valid."""
@@ -163,14 +165,18 @@ class TestEnterpriseWorkflowStructure:
             for step in definition.steps:
                 # First step must reference {{task}}
                 if step == definition.steps[0]:
-                    assert "{{task}}" in step.input, \
+                    assert "{{task}}" in step.input, (
                         f"First step in {yaml_file.name} should reference {{{{task}}}}"
+                    )
 
                 # Later steps should reference previous outputs
                 if step != definition.steps[0]:
-                    has_ref = "{{step_outputs." in step.input or "{{task}}" in step.input
-                    assert has_ref, \
+                    has_ref = (
+                        "{{step_outputs." in step.input or "{{task}}" in step.input
+                    )
+                    assert has_ref, (
                         f"Step {step.id} in {yaml_file.name} should reference context"
+                    )
 
 
 class TestEnterpriseWorkflowMetadata:
@@ -184,8 +190,9 @@ class TestEnterpriseWorkflowMetadata:
         """All workflows should have descriptions."""
         for yaml_file in WORKFLOWS_DIR.glob("*.yaml"):
             definition = parser.parse_file(yaml_file)
-            assert definition.description, \
+            assert definition.description, (
                 f"Workflow {yaml_file.name} missing description"
+            )
 
     def test_all_workflows_have_metadata(self, parser):
         """Enterprise workflows should have metadata."""
@@ -203,10 +210,12 @@ class TestEnterpriseWorkflowMetadata:
             path = WORKFLOWS_DIR / name
             if path.exists():
                 definition = parser.parse_file(path)
-                assert definition.metadata.get("category"), \
+                assert definition.metadata.get("category"), (
                     f"Workflow {name} missing category"
-                assert definition.metadata.get("typical_time_saved"), \
+                )
+                assert definition.metadata.get("typical_time_saved"), (
                     f"Workflow {name} missing time_saved estimate"
+                )
 
 
 class TestTemplateSubstitution:
@@ -254,7 +263,7 @@ class TestTemplateSubstitution:
 
         outputs = {
             "task": "Analyze Acme Corp acquisition",
-            "analysis": "Revenue: $50M, Growth: 25%, EBITDA: $10M"
+            "analysis": "Revenue: $50M, Growth: 25%, EBITDA: $10M",
         }
 
         result = processed.format(**outputs)
@@ -269,8 +278,7 @@ class TestEnterpriseWorkflowCapabilities:
 
     def test_multi_step_coordination(self):
         """Test 5-step workflow coordination."""
-        from orchestration.agents.team import AgentTeam, TeamConfig, WorkflowStep
-        from orchestration.agents.base import AgentRole
+        from orchestration.agents.team import AgentTeam, TeamConfig
 
         team = AgentTeam(TeamConfig(name="test"))
 
@@ -279,7 +287,11 @@ class TestEnterpriseWorkflowCapabilities:
         steps = [
             ("step1", "Task: {{task}}", {"task": "Test input"}),
             ("step2", "Based on: {{step_outputs.step1}}", {"step1": "Step 1 output"}),
-            ("step3", "Analysis of: {{step_outputs.step2}}", {"step2": "Step 2 output"}),
+            (
+                "step3",
+                "Analysis of: {{step_outputs.step2}}",
+                {"step2": "Step 2 output"},
+            ),
             ("step4", "Review: {{step_outputs.step3}}", {"step3": "Step 3 output"}),
             ("step5", "Final: {{step_outputs.step4}}", {"step4": "Step 4 output"}),
         ]

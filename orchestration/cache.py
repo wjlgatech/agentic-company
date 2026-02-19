@@ -8,10 +8,10 @@ import hashlib
 import json
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 @dataclass
@@ -20,7 +20,7 @@ class CacheEntry:
 
     value: Any
     created_at: float
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     hits: int = 0
 
     @property
@@ -35,12 +35,12 @@ class CacheBackend(ABC):
     """Abstract cache backend."""
 
     @abstractmethod
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache."""
         pass
 
     @abstractmethod
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache."""
         pass
 
@@ -69,7 +69,7 @@ class LocalCache(CacheBackend):
         self._cache: dict[str, CacheEntry] = {}
         self._stats = {"hits": 0, "misses": 0, "evictions": 0}
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache."""
         entry = self._cache.get(key)
 
@@ -86,7 +86,7 @@ class LocalCache(CacheBackend):
         self._stats["hits"] += 1
         return entry.value
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache."""
         # Evict if at capacity
         if len(self._cache) >= self.max_size:
@@ -153,10 +153,7 @@ class LocalCache(CacheBackend):
 
     def cleanup_expired(self) -> int:
         """Remove expired entries."""
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if entry.is_expired
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired]
         for key in expired_keys:
             del self._cache[key]
         return len(expired_keys)
@@ -182,6 +179,7 @@ class RedisCache(CacheBackend):
         if self._client is None:
             try:
                 import redis
+
                 self._client = redis.from_url(self.redis_url, decode_responses=True)
             except ImportError:
                 raise ImportError("Redis support requires: pip install redis")
@@ -191,14 +189,14 @@ class RedisCache(CacheBackend):
         """Prefix the key."""
         return f"{self.prefix}{key}"
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache."""
         data = self.client.get(self._key(key))
         if data:
             return json.loads(data)
         return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache."""
         ttl = ttl or self.default_ttl
         data = json.dumps(value)
@@ -224,7 +222,7 @@ class RedisCache(CacheBackend):
 
 
 # Global cache instance
-_cache: Optional[CacheBackend] = None
+_cache: CacheBackend | None = None
 
 
 def get_cache() -> CacheBackend:
@@ -243,12 +241,14 @@ def set_cache(cache: CacheBackend) -> None:
 
 # ============== Caching Decorators ==============
 
+
 def cached(
     ttl: int = 300,
     key_prefix: str = "",
-    key_builder: Optional[Callable[..., str]] = None,
+    key_builder: Callable[..., str] | None = None,
 ):
     """Decorator to cache function results."""
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -279,15 +279,17 @@ def cached(
             return result
 
         return wrapper
+
     return decorator
 
 
 def cached_async(
     ttl: int = 300,
     key_prefix: str = "",
-    key_builder: Optional[Callable[..., str]] = None,
+    key_builder: Callable[..., str] | None = None,
 ):
     """Decorator to cache async function results."""
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -318,6 +320,7 @@ def cached_async(
             return result
 
         return wrapper
+
     return decorator
 
 
@@ -325,10 +328,7 @@ def invalidate_cache(pattern: str) -> int:
     """Invalidate cache entries matching pattern."""
     cache = get_cache()
     if isinstance(cache, LocalCache):
-        keys_to_delete = [
-            key for key in cache._cache.keys()
-            if pattern in key
-        ]
+        keys_to_delete = [key for key in cache._cache.keys() if pattern in key]
         for key in keys_to_delete:
             cache.delete(key)
         return len(keys_to_delete)
@@ -342,6 +342,7 @@ def invalidate_cache(pattern: str) -> int:
 
 
 # ============== Response Caching for FastAPI ==============
+
 
 class CacheMiddleware:
     """Middleware for caching API responses."""

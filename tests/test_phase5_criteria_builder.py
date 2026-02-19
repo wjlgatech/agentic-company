@@ -1,11 +1,11 @@
 """Tests for Phase 5: Collaborative Criteria Builder."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
 import json
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from orchestration.diagnostics.criteria_builder import CriteriaBuilder, SuccessCriteria
-
 
 # ============== Fixtures ==============
 
@@ -31,6 +31,7 @@ def test_criteria_builder_initialization(mock_executor):
 
 def test_criteria_builder_with_callback(mock_executor):
     """Test CriteriaBuilder with question callback."""
+
     def callback(q):
         return "test response"
 
@@ -44,29 +45,35 @@ async def test_build_criteria_basic(mock_executor):
     # Mock responses
     mock_executor.execute.side_effect = [
         # Initial criteria
-        json.dumps({
-            "criteria": [
-                "Login form renders correctly",
-                "Email and password fields accept input",
-                "Submit button is clickable"
-            ]
-        }),
+        json.dumps(
+            {
+                "criteria": [
+                    "Login form renders correctly",
+                    "Email and password fields accept input",
+                    "Submit button is clickable",
+                ]
+            }
+        ),
         # Questions
-        json.dumps({
-            "questions": [
-                "What should happen when login fails?",
-                "Should there be password validation?"
-            ]
-        }),
+        json.dumps(
+            {
+                "questions": [
+                    "What should happen when login fails?",
+                    "Should there be password validation?",
+                ]
+            }
+        ),
         # Refined criteria
-        json.dumps({
-            "criteria": [
-                "Login form renders with email and password fields",
-                "Email validation shows error for invalid emails",
-                "Failed login displays appropriate error message",
-                "Successful login redirects to dashboard"
-            ]
-        })
+        json.dumps(
+            {
+                "criteria": [
+                    "Login form renders with email and password fields",
+                    "Email validation shows error for invalid emails",
+                    "Failed login displays appropriate error message",
+                    "Successful login redirects to dashboard",
+                ]
+            }
+        ),
     ]
 
     builder = CriteriaBuilder(mock_executor, max_questions=2)
@@ -84,13 +91,12 @@ async def test_build_criteria_with_context(mock_executor):
     mock_executor.execute.side_effect = [
         json.dumps({"criteria": ["Criterion 1", "Criterion 2"]}),
         json.dumps({"questions": ["Question 1?"]}),
-        json.dumps({"criteria": ["Refined 1", "Refined 2", "Refined 3"]})
+        json.dumps({"criteria": ["Refined 1", "Refined 2", "Refined 3"]}),
     ]
 
     builder = CriteriaBuilder(mock_executor, max_questions=1)
     criteria = await builder.build_criteria(
-        "Build a dashboard",
-        context={"framework": "React", "design": "Material UI"}
+        "Build a dashboard", context={"framework": "React", "design": "Material UI"}
     )
 
     assert criteria.task == "Build a dashboard"
@@ -103,7 +109,7 @@ async def test_build_criteria_with_interactive_callback(mock_executor):
     mock_executor.execute.side_effect = [
         json.dumps({"criteria": ["Initial criterion"]}),
         json.dumps({"questions": ["What colors should be used?"]}),
-        json.dumps({"criteria": ["Refined criterion with blue colors"]})
+        json.dumps({"criteria": ["Refined criterion with blue colors"]}),
     ]
 
     responses = ["Blue and white"]
@@ -114,7 +120,9 @@ async def test_build_criteria_with_interactive_callback(mock_executor):
         response_index[0] += 1
         return response
 
-    builder = CriteriaBuilder(mock_executor, max_questions=1, question_callback=callback)
+    builder = CriteriaBuilder(
+        mock_executor, max_questions=1, question_callback=callback
+    )
     criteria = await builder.build_criteria("Design a UI")
 
     assert len(criteria.questions_asked) == 1
@@ -125,13 +133,9 @@ async def test_build_criteria_with_interactive_callback(mock_executor):
 @pytest.mark.asyncio
 async def test_propose_initial_criteria(mock_executor):
     """Test _propose_initial_criteria method."""
-    mock_executor.execute.return_value = json.dumps({
-        "criteria": [
-            "Criterion A",
-            "Criterion B",
-            "Criterion C"
-        ]
-    })
+    mock_executor.execute.return_value = json.dumps(
+        {"criteria": ["Criterion A", "Criterion B", "Criterion C"]}
+    )
 
     builder = CriteriaBuilder(mock_executor)
     criteria = await builder._propose_initial_criteria("Test task", {})
@@ -162,13 +166,9 @@ Hope this helps!"""
 @pytest.mark.asyncio
 async def test_generate_questions(mock_executor):
     """Test _generate_questions method."""
-    mock_executor.execute.return_value = json.dumps({
-        "questions": [
-            "Question 1?",
-            "Question 2?",
-            "Question 3?"
-        ]
-    })
+    mock_executor.execute.return_value = json.dumps(
+        {"questions": ["Question 1?", "Question 2?", "Question 3?"]}
+    )
 
     builder = CriteriaBuilder(mock_executor)
     questions = await builder._generate_questions("Task", {}, ["Criterion 1"])
@@ -180,22 +180,20 @@ async def test_generate_questions(mock_executor):
 @pytest.mark.asyncio
 async def test_refine_criteria(mock_executor):
     """Test _refine_criteria method."""
-    mock_executor.execute.return_value = json.dumps({
-        "criteria": [
-            "Refined criterion 1",
-            "Refined criterion 2",
-            "Refined criterion 3",
-            "Refined criterion 4"
-        ]
-    })
+    mock_executor.execute.return_value = json.dumps(
+        {
+            "criteria": [
+                "Refined criterion 1",
+                "Refined criterion 2",
+                "Refined criterion 3",
+                "Refined criterion 4",
+            ]
+        }
+    )
 
     builder = CriteriaBuilder(mock_executor)
     refined = await builder._refine_criteria(
-        "Task",
-        {},
-        ["Initial 1", "Initial 2"],
-        ["Q1?", "Q2?"],
-        ["A1", "A2"]
+        "Task", {}, ["Initial 1", "Initial 2"], ["Q1?", "Q2?"], ["A1", "A2"]
     )
 
     assert len(refined) == 4
@@ -264,7 +262,7 @@ def test_success_criteria_to_dict():
         questions_asked=["Q1?", "Q2?"],
         human_responses=["A1", "A2"],
         confidence=0.85,
-        metadata={"key": "value"}
+        metadata={"key": "value"},
     )
 
     result = criteria.to_dict()
@@ -302,6 +300,7 @@ async def test_build_criteria_real_llm():
 
     try:
         from orchestration.integrations.unified import auto_setup_executor
+
         executor = auto_setup_executor()
     except Exception:
         pytest.skip("No LLM executor available")
@@ -309,7 +308,7 @@ async def test_build_criteria_real_llm():
     builder = CriteriaBuilder(executor, max_questions=2)
     criteria = await builder.build_criteria(
         "Build a user authentication system",
-        context={"language": "Python", "framework": "FastAPI"}
+        context={"language": "Python", "framework": "FastAPI"},
     )
 
     # Verify result structure
@@ -319,9 +318,9 @@ async def test_build_criteria_real_llm():
     assert 0.0 <= criteria.confidence <= 1.0
 
     # Log for manual inspection
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Real LLM Criteria Builder Result")
-    print("="*60)
+    print("=" * 60)
     print(f"Task: {criteria.task}")
     print(f"\nCriteria ({len(criteria.criteria)}):")
     for i, criterion in enumerate(criteria.criteria, 1):
@@ -330,4 +329,4 @@ async def test_build_criteria_real_llm():
     for i, question in enumerate(criteria.questions_asked, 1):
         print(f"  {i}. {question}")
     print(f"\nConfidence: {criteria.confidence}")
-    print("="*60)
+    print("=" * 60)

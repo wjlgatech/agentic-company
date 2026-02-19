@@ -8,10 +8,11 @@ import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Generator, Optional
+from typing import Any
 
 import structlog
 
@@ -34,9 +35,9 @@ class Span:
     trace_id: str
     span_id: str
     name: str
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
     events: list[dict[str, Any]] = field(default_factory=list)
     status: str = "OK"
@@ -47,12 +48,14 @@ class Span:
             return (self.end_time - self.start_time).total_seconds() * 1000
         return 0.0
 
-    def add_event(self, name: str, attributes: Optional[dict] = None) -> None:
-        self.events.append({
-            "name": name,
-            "timestamp": datetime.now().isoformat(),
-            "attributes": attributes or {},
-        })
+    def add_event(self, name: str, attributes: dict | None = None) -> None:
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": datetime.now().isoformat(),
+                "attributes": attributes or {},
+            }
+        )
 
     def set_attribute(self, key: str, value: Any) -> None:
         self.attributes[key] = value
@@ -87,31 +90,35 @@ class MetricsCollector:
         self.histograms: dict[str, list[float]] = defaultdict(list)
         self.history: list[Metric] = []
 
-    def increment(self, name: str, value: float = 1.0, labels: Optional[dict] = None) -> None:
+    def increment(
+        self, name: str, value: float = 1.0, labels: dict | None = None
+    ) -> None:
         """Increment a counter."""
         key = self._make_key(name, labels)
         self.counters[key] += value
         self._record(name, self.counters[key], labels, "counter")
 
-    def set_gauge(self, name: str, value: float, labels: Optional[dict] = None) -> None:
+    def set_gauge(self, name: str, value: float, labels: dict | None = None) -> None:
         """Set a gauge value."""
         key = self._make_key(name, labels)
         self.gauges[key] = value
         self._record(name, value, labels, "gauge")
 
-    def observe(self, name: str, value: float, labels: Optional[dict] = None) -> None:
+    def observe(self, name: str, value: float, labels: dict | None = None) -> None:
         """Record a histogram observation."""
         key = self._make_key(name, labels)
         self.histograms[key].append(value)
         self._record(name, value, labels, "histogram")
 
-    def _make_key(self, name: str, labels: Optional[dict] = None) -> str:
+    def _make_key(self, name: str, labels: dict | None = None) -> str:
         if labels:
             label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
             return f"{name}{{{label_str}}}"
         return name
 
-    def _record(self, name: str, value: float, labels: Optional[dict], metric_type: str) -> None:
+    def _record(
+        self, name: str, value: float, labels: dict | None, metric_type: str
+    ) -> None:
         metric = Metric(
             name=name,
             value=value,
@@ -123,22 +130,33 @@ class MetricsCollector:
         if len(self.history) > 10000:
             self.history = self.history[-5000:]
 
-    def get_counter(self, name: str, labels: Optional[dict] = None) -> float:
+    def get_counter(self, name: str, labels: dict | None = None) -> float:
         """Get counter value."""
         key = self._make_key(name, labels)
         return self.counters.get(key, 0.0)
 
-    def get_gauge(self, name: str, labels: Optional[dict] = None) -> float:
+    def get_gauge(self, name: str, labels: dict | None = None) -> float:
         """Get gauge value."""
         key = self._make_key(name, labels)
         return self.gauges.get(key, 0.0)
 
-    def get_histogram_stats(self, name: str, labels: Optional[dict] = None) -> dict[str, float]:
+    def get_histogram_stats(
+        self, name: str, labels: dict | None = None
+    ) -> dict[str, float]:
         """Get histogram statistics."""
         key = self._make_key(name, labels)
         values = self.histograms.get(key, [])
         if not values:
-            return {"count": 0, "sum": 0, "avg": 0, "min": 0, "max": 0, "p50": 0, "p95": 0, "p99": 0}
+            return {
+                "count": 0,
+                "sum": 0,
+                "avg": 0,
+                "min": 0,
+                "max": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+            }
 
         sorted_values = sorted(values)
         count = len(values)
@@ -162,7 +180,9 @@ class MetricsCollector:
         }
 
     @contextmanager
-    def timer(self, name: str, labels: Optional[dict] = None) -> Generator[None, None, None]:
+    def timer(
+        self, name: str, labels: dict | None = None
+    ) -> Generator[None, None, None]:
         """Context manager to time operations."""
         start = time.time()
         try:
@@ -179,7 +199,7 @@ class Tracer:
         self.spans: dict[str, Span] = {}
         self.active_traces: dict[str, list[str]] = defaultdict(list)
 
-    def start_trace(self, name: str, attributes: Optional[dict] = None) -> Span:
+    def start_trace(self, name: str, attributes: dict | None = None) -> Span:
         """Start a new trace."""
         trace_id = str(uuid.uuid4())
         span_id = str(uuid.uuid4())[:8]
@@ -198,8 +218,8 @@ class Tracer:
     def start_span(
         self,
         name: str,
-        parent: Optional[Span] = None,
-        attributes: Optional[dict] = None,
+        parent: Span | None = None,
+        attributes: dict | None = None,
     ) -> Span:
         """Start a new span, optionally as child of parent."""
         if parent:
@@ -236,8 +256,8 @@ class Tracer:
     def trace(
         self,
         name: str,
-        parent: Optional[Span] = None,
-        attributes: Optional[dict] = None,
+        parent: Span | None = None,
+        attributes: dict | None = None,
     ) -> Generator[Span, None, None]:
         """Context manager for tracing."""
         span = self.start_span(name, parent, attributes)
@@ -318,7 +338,7 @@ class ObservabilityStack:
     def observe(
         self,
         operation: str,
-        labels: Optional[dict] = None,
+        labels: dict | None = None,
     ) -> Generator[Span, None, None]:
         """Combined context manager for metrics and tracing."""
         # Start trace
@@ -362,7 +382,7 @@ class ObservabilityStack:
 
 
 # Global instance
-_stack: Optional[ObservabilityStack] = None
+_stack: ObservabilityStack | None = None
 
 
 def get_observability() -> ObservabilityStack:

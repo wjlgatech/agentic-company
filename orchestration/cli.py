@@ -7,7 +7,6 @@ Provides commands for health checks, workflow management, and server control.
 import asyncio
 import json
 import sys
-from typing import Optional
 
 import click
 from rich.console import Console
@@ -16,7 +15,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 from orchestration._version import __version__
-from orchestration.config import get_config, validate_config, OrchestratorConfig
+from orchestration.config import get_config, validate_config
 from orchestration.observability import get_observability
 
 console = Console()
@@ -27,7 +26,7 @@ console = Console()
 @click.option("--config", "-c", type=click.Path(exists=True), help="Config file path")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.pass_context
-def main(ctx: click.Context, config: Optional[str], verbose: bool) -> None:
+def main(ctx: click.Context, config: str | None, verbose: bool) -> None:
     """Agentic Company - AI Agent Orchestration System
 
     Manage AI agent workflows with guardrails, memory, and observability.
@@ -50,7 +49,7 @@ def health(ctx: click.Context) -> None:
     if config.llm.api_key:
         tree.add(f"[green]✓[/green] LLM Connection: OK ({config.llm.provider})")
     else:
-        tree.add(f"[red]✗[/red] LLM Connection: No API key configured")
+        tree.add("[red]✗[/red] LLM Connection: No API key configured")
 
     # Memory Backend
     tree.add(f"[green]✓[/green] Memory Backend: {config.memory.backend}")
@@ -67,7 +66,9 @@ def health(ctx: click.Context) -> None:
         for error in errors:
             error_branch.add(f"[red]✗[/red] {error}")
 
-    console.print(Panel(tree, title="Agentic Company Health Check", border_style="blue"))
+    console.print(
+        Panel(tree, title="Agentic Company Health Check", border_style="blue")
+    )
 
     # Exit with error code if unhealthy
     if errors:
@@ -100,7 +101,7 @@ def config_show(format: str) -> None:
                 for key, value in values.items():
                     table.add_row(f"  {key}", str(value))
             else:
-                table.add_row(f"  value", str(values))
+                table.add_row("  value", str(values))
 
         console.print(table)
 
@@ -130,6 +131,7 @@ def workflow() -> None:
 def workflow_list() -> None:
     """List available workflows."""
     from pathlib import Path
+
     from orchestration.workflows.parser import WorkflowParser
 
     parser = WorkflowParser()
@@ -144,24 +146,32 @@ def workflow_list() -> None:
 
     for search_path in search_paths:
         if search_path.exists():
-            for yaml_file in list(search_path.glob("*.yaml")) + list(search_path.glob("*.yml")):
+            for yaml_file in list(search_path.glob("*.yaml")) + list(
+                search_path.glob("*.yml")
+            ):
                 try:
                     definition = parser.parse_file(yaml_file)
-                    workflows.append({
-                        "name": definition.id,
-                        "description": definition.description.split('\n')[0][:60] if definition.description else "No description",
-                        "path": str(yaml_file),
-                        "agents": len(definition.agents),
-                        "steps": len(definition.steps),
-                    })
+                    workflows.append(
+                        {
+                            "name": definition.id,
+                            "description": definition.description.split("\n")[0][:60]
+                            if definition.description
+                            else "No description",
+                            "path": str(yaml_file),
+                            "agents": len(definition.agents),
+                            "steps": len(definition.steps),
+                        }
+                    )
                 except Exception as e:
-                    workflows.append({
-                        "name": yaml_file.stem,
-                        "description": f"[red]Error loading: {e}[/red]",
-                        "path": str(yaml_file),
-                        "agents": 0,
-                        "steps": 0,
-                    })
+                    workflows.append(
+                        {
+                            "name": yaml_file.stem,
+                            "description": f"[red]Error loading: {e}[/red]",
+                            "path": str(yaml_file),
+                            "agents": 0,
+                            "steps": 0,
+                        }
+                    )
 
     if not workflows:
         console.print("[yellow]No workflows found.[/yellow]")
@@ -187,14 +197,16 @@ def workflow_list() -> None:
 
 @workflow.command("run")
 @click.argument("workflow_name")
-@click.option("--input", "-i", "input_data", required=True, help="Input data or file path")
+@click.option(
+    "--input", "-i", "input_data", required=True, help="Input data or file path"
+)
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--async", "run_async", is_flag=True, help="Run asynchronously")
 @click.option("--dry-run", is_flag=True, help="Show workflow plan without executing")
 def workflow_run(
     workflow_name: str,
     input_data: str,
-    output: Optional[str],
+    output: str | None,
     run_async: bool,
     dry_run: bool,
 ) -> None:
@@ -202,7 +214,9 @@ def workflow_run(
     from pathlib import Path
 
     console.print(f"[cyan]Running workflow:[/cyan] {workflow_name}")
-    console.print(f"[cyan]Input:[/cyan] {input_data[:100]}{'...' if len(input_data) > 100 else ''}")
+    console.print(
+        f"[cyan]Input:[/cyan] {input_data[:100]}{'...' if len(input_data) > 100 else ''}"
+    )
 
     # Find and load the workflow
     workflow_paths = [
@@ -210,7 +224,8 @@ def workflow_run(
         Path(f"{workflow_name}.yml"),
         Path(f"workflows/{workflow_name}.yaml"),
         Path(f"agenticom/bundled_workflows/{workflow_name}.yaml"),
-        Path(__file__).parent.parent / f"agenticom/bundled_workflows/{workflow_name}.yaml",
+        Path(__file__).parent.parent
+        / f"agenticom/bundled_workflows/{workflow_name}.yaml",
     ]
 
     workflow_path = None
@@ -228,6 +243,7 @@ def workflow_run(
 
     try:
         from orchestration.workflows.parser import load_workflow
+
         team = load_workflow(workflow_path)
         console.print(f"[green]✓[/green] Loaded workflow from: {workflow_path}")
         console.print(f"  Agents: {[r.value for r in team.agents.keys()]}")
@@ -237,7 +253,9 @@ def workflow_run(
         if dry_run:
             console.print("\n[bold cyan]Workflow Plan:[/bold cyan]")
             for i, step in enumerate(team.steps, 1):
-                console.print(f"  {i}. [bold]{step.name}[/bold] ({step.agent_role.value})")
+                console.print(
+                    f"  {i}. [bold]{step.name}[/bold] ({step.agent_role.value})"
+                )
                 if step.expects:
                     console.print(f"     Expects: {step.expects}")
             return
@@ -257,7 +275,9 @@ def workflow_run(
             sys.exit(1)
 
         executor = auto_setup_executor()
-        backend_name = executor.active_backend.value if executor.active_backend else "None"
+        backend_name = (
+            executor.active_backend.value if executor.active_backend else "None"
+        )
         console.print(f"[green]✓[/green] LLM backend: {backend_name}")
 
         # Configure agents with executor
@@ -269,7 +289,7 @@ def workflow_run(
 
         # Execute workflow
         async def run_workflow():
-            with console.status("[bold green]Executing workflow...") as status:
+            with console.status("[bold green]Executing workflow..."):
                 result = await team.run(input_data)
 
                 # Display step results as they complete
@@ -278,7 +298,9 @@ def workflow_run(
                     if step_result.status.value == "completed":
                         console.print(f"  [green]✓[/green] {step.name}: completed")
                     else:
-                        console.print(f"  [red]✗[/red] {step.name}: {step_result.status.value}")
+                        console.print(
+                            f"  [red]✗[/red] {step.name}: {step_result.status.value}"
+                        )
 
                 return result
 
@@ -301,21 +323,28 @@ def workflow_run(
             console.print(f"[green]✓[/green] Output saved to: {output}")
         else:
             if team_result.success:
-                console.print(Panel(
-                    str(team_result.final_output)[:2000] if team_result.final_output else "No output",
-                    title="[green]Result[/green]",
-                    border_style="green"
-                ))
+                console.print(
+                    Panel(
+                        str(team_result.final_output)[:2000]
+                        if team_result.final_output
+                        else "No output",
+                        title="[green]Result[/green]",
+                        border_style="green",
+                    )
+                )
             else:
-                console.print(Panel(
-                    team_result.error or "Unknown error",
-                    title="[red]Error[/red]",
-                    border_style="red"
-                ))
+                console.print(
+                    Panel(
+                        team_result.error or "Unknown error",
+                        title="[red]Error[/red]",
+                        border_style="red",
+                    )
+                )
 
     except Exception as e:
         console.print(f"[red]✗[/red] Error: {e}")
         import traceback
+
         if console.is_terminal:
             traceback.print_exc()
         sys.exit(1)
@@ -335,14 +364,16 @@ def workflow_status(workflow_id: str) -> None:
 def workflow_tools(workflow_name: str, resolve: bool) -> None:
     """Show tools required by a workflow and their MCP mappings."""
     from pathlib import Path
-    from orchestration.workflows.parser import WorkflowParser
+
     from orchestration.tools.mcp_bridge import MCPToolBridge
+    from orchestration.workflows.parser import WorkflowParser
 
     # Find workflow file
     workflow_paths = [
         Path(f"workflows/{workflow_name}.yaml"),
         Path(f"agenticom/bundled_workflows/{workflow_name}.yaml"),
-        Path(__file__).parent.parent / f"agenticom/bundled_workflows/{workflow_name}.yaml",
+        Path(__file__).parent.parent
+        / f"agenticom/bundled_workflows/{workflow_name}.yaml",
     ]
 
     workflow_path = None
@@ -424,9 +455,11 @@ def workflow_tools(workflow_name: str, resolve: bool) -> None:
 
         # Summary
         summary = report["summary"]
-        console.print(f"\n[bold]Summary:[/bold] {summary['resolved']} resolved, "
-                      f"{summary['mocked']} mocked, {summary['unresolved']} unresolved "
-                      f"(of {summary['total']} total)")
+        console.print(
+            f"\n[bold]Summary:[/bold] {summary['resolved']} resolved, "
+            f"{summary['mocked']} mocked, {summary['unresolved']} unresolved "
+            f"(of {summary['total']} total)"
+        )
 
 
 @main.group()
@@ -494,7 +527,7 @@ def serve(host: str, port: int, workers: int, reload: bool) -> None:
     """Start the API server."""
     import uvicorn
 
-    console.print(f"[cyan]Starting Agentic Company API server[/cyan]")
+    console.print("[cyan]Starting Agentic Company API server[/cyan]")
     console.print(f"  Host: {host}")
     console.print(f"  Port: {port}")
     console.print(f"  Workers: {workers}")
@@ -530,7 +563,9 @@ def recall(query: str, limit: int) -> None:
         for entry in results:
             table.add_row(
                 entry.id[:8],
-                entry.content[:100] + "..." if len(entry.content) > 100 else entry.content,
+                entry.content[:100] + "..."
+                if len(entry.content) > 100
+                else entry.content,
                 ", ".join(entry.tags),
             )
 
@@ -572,9 +607,13 @@ def approval_reject(request_id: str, reason: str) -> None:
 
 
 @main.command()
-@click.option("--output", "-o", type=click.Path(), help="Output file path for generated workflow")
-@click.option("--voice", "-v", is_flag=True, help="Enable voice input (speak your answers)")
-def create(output: Optional[str], voice: bool) -> None:
+@click.option(
+    "--output", "-o", type=click.Path(), help="Output file path for generated workflow"
+)
+@click.option(
+    "--voice", "-v", is_flag=True, help="Enable voice input (speak your answers)"
+)
+def create(output: str | None, voice: bool) -> None:
     """Create a workflow using the Easy Mode conversational builder.
 
     Walks you through creating an AI agent workflow step by step
@@ -582,19 +621,29 @@ def create(output: Optional[str], voice: bool) -> None:
 
     Use --voice to speak your answers instead of typing!
     """
-    mode_text = "🎤 Voice mode enabled - speak your answers!" if voice else "Type your answers below"
+    mode_text = (
+        "🎤 Voice mode enabled - speak your answers!"
+        if voice
+        else "Type your answers below"
+    )
     console.print()
-    console.print(Panel(
-        f"🆕 [bold]Easy Workflow Builder[/bold]\n\n"
-        f"I'll help you create an AI agent workflow step by step.\n"
-        f"{mode_text}",
-        title="Agenticom Create",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel(
+            f"🆕 [bold]Easy Workflow Builder[/bold]\n\n"
+            f"I'll help you create an AI agent workflow step by step.\n"
+            f"{mode_text}",
+            title="Agenticom Create",
+            border_style="cyan",
+        )
+    )
     console.print()
 
     try:
-        from orchestration.conversation import ConversationBuilder, get_voice_input, VOICE_AVAILABLE
+        from orchestration.conversation import (
+            VOICE_AVAILABLE,
+            ConversationBuilder,
+            get_voice_input,
+        )
 
         # Check voice availability
         if voice and not VOICE_AVAILABLE:
@@ -610,7 +659,9 @@ def create(output: Optional[str], voice: bool) -> None:
                 break
 
             # Display question
-            console.print(f"[bold cyan]Question {builder.current_step + 1}:[/bold cyan] {question.text}")
+            console.print(
+                f"[bold cyan]Question {builder.current_step + 1}:[/bold cyan] {question.text}"
+            )
             console.print()
 
             # Display options
@@ -624,27 +675,33 @@ def create(output: Optional[str], voice: bool) -> None:
 
                 # Try voice input first if enabled
                 if voice:
-                    console.print("[cyan]🎤 Listening... (say A, B, C, etc. or speak your choice)[/cyan]")
+                    console.print(
+                        "[cyan]🎤 Listening... (say A, B, C, etc. or speak your choice)[/cyan]"
+                    )
                     voice_text = get_voice_input("Listening...")
                     if voice_text:
                         # Parse voice for letter choices
                         voice_lower = voice_text.lower()
                         for i, opt in enumerate(question.options):
-                            letter = chr(ord('a') + i)
+                            letter = chr(ord("a") + i)
                             if letter in voice_lower or opt.lower() in voice_lower:
                                 response = letter
-                                console.print(f"   Heard: [green]{voice_text}[/green] → {letter}")
+                                console.print(
+                                    f"   Heard: [green]{voice_text}[/green] → {letter}"
+                                )
                                 break
 
                 # Fall back to text input
                 if response is None:
-                    response = click.prompt("Your choice (enter letter or text)", type=str)
+                    response = click.prompt(
+                        "Your choice (enter letter or text)", type=str
+                    )
 
                 # Convert number to letter if applicable
                 try:
                     num = int(response)
                     if 1 <= num <= len(question.options):
-                        response = chr(ord('a') + num - 1)  # 1→a, 2→b, etc.
+                        response = chr(ord("a") + num - 1)  # 1→a, 2→b, etc.
                 except ValueError:
                     pass  # User typed letter or text
 
@@ -666,7 +723,9 @@ def create(output: Optional[str], voice: bool) -> None:
 
         # Show Python
         python_content = builder.generate_python()
-        console.print(Panel(python_content, title="Generated Python", border_style="blue"))
+        console.print(
+            Panel(python_content, title="Generated Python", border_style="blue")
+        )
 
         # Save to file if requested
         if output:

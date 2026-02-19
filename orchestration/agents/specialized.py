@@ -9,10 +9,8 @@ from orchestration.agents.base import (
     Agent,
     AgentConfig,
     AgentRole,
-    AgentContext,
     LLMAgent,
 )
-from typing import Any, Optional
 
 
 class PlannerAgent(LLMAgent):
@@ -23,16 +21,12 @@ class PlannerAgent(LLMAgent):
     Creates implementation plans with clear acceptance criteria.
     """
 
-    def __init__(
-        self,
-        name: str = "Planner",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Planner", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.PLANNER,
             name=name,
-            persona=persona or """You are an expert software architect and project planner.
+            persona=persona
+            or """You are an expert software architect and project planner.
 Your job is to:
 1. Break down complex features into atomic user stories
 2. Define clear acceptance criteria for each story
@@ -42,7 +36,7 @@ Your job is to:
 
 You think systematically and ensure nothing is overlooked.
 Each story you create should be implementable in a single focused session.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -71,16 +65,12 @@ class DeveloperAgent(LLMAgent):
     Focuses on one story at a time with clear deliverables.
     """
 
-    def __init__(
-        self,
-        name: str = "Developer",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Developer", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.DEVELOPER,
             name=name,
-            persona=persona or """You are a senior software developer.
+            persona=persona
+            or """You are a senior software developer.
 Your job is to:
 1. Implement features according to specifications
 2. Write clean, maintainable code
@@ -90,7 +80,7 @@ Your job is to:
 
 You focus on one task at a time and deliver working code.
 You never cut corners on code quality.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -114,16 +104,12 @@ class VerifierAgent(LLMAgent):
     Provides objective assessment without self-verification bias.
     """
 
-    def __init__(
-        self,
-        name: str = "Verifier",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Verifier", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.VERIFIER,
             name=name,
-            persona=persona or """You are a meticulous code reviewer and QA specialist.
+            persona=persona
+            or """You are a meticulous code reviewer and QA specialist.
 Your job is to:
 1. Verify work meets acceptance criteria
 2. Check for logical errors and edge cases
@@ -133,7 +119,7 @@ Your job is to:
 
 You are thorough but fair. You focus on substance over style.
 You always explain your reasoning clearly.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -166,16 +152,12 @@ class TesterAgent(LLMAgent):
     Focuses on comprehensive test coverage and edge cases.
     """
 
-    def __init__(
-        self,
-        name: str = "Tester",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Tester", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.TESTER,
             name=name,
-            persona=persona or """You are a software testing expert.
+            persona=persona
+            or """You are a software testing expert.
 Your job is to:
 1. Design comprehensive test cases
 2. Test happy paths and edge cases
@@ -185,7 +167,7 @@ Your job is to:
 
 You think like a user AND an attacker.
 You find bugs before users do.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -218,16 +200,12 @@ class ReviewerAgent(LLMAgent):
     Ensures quality standards and best practices.
     """
 
-    def __init__(
-        self,
-        name: str = "Reviewer",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Reviewer", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.REVIEWER,
             name=name,
-            persona=persona or """You are a senior code reviewer with high standards.
+            persona=persona
+            or """You are a senior code reviewer with high standards.
 Your job is to:
 1. Review code for quality and maintainability
 2. Check for security vulnerabilities
@@ -237,7 +215,7 @@ Your job is to:
 
 You are the last line of defense before code goes to production.
 You balance perfectionism with pragmatism.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -265,16 +243,12 @@ class ResearcherAgent(LLMAgent):
     Investigates topics, gathers data, and synthesizes findings.
     """
 
-    def __init__(
-        self,
-        name: str = "Researcher",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Researcher", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.RESEARCHER,
             name=name,
-            persona=persona or """You are an expert researcher and analyst.
+            persona=persona
+            or """You are an expert researcher and analyst.
 Your job is to:
 1. Investigate topics thoroughly
 2. Gather relevant information from multiple sources
@@ -284,7 +258,7 @@ Your job is to:
 
 You are curious, thorough, and objective.
 You distinguish between facts and opinions.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -296,16 +270,12 @@ class WriterAgent(LLMAgent):
     Creates clear, engaging written content.
     """
 
-    def __init__(
-        self,
-        name: str = "Writer",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Writer", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.WRITER,
             name=name,
-            persona=persona or """You are a skilled technical writer.
+            persona=persona
+            or """You are a skilled technical writer.
 Your job is to:
 1. Create clear, engaging documentation
 2. Explain complex topics simply
@@ -315,7 +285,7 @@ Your job is to:
 
 You write for your audience, not yourself.
 You make the complex accessible.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
@@ -327,16 +297,12 @@ class AnalystAgent(LLMAgent):
     Analyzes data, identifies patterns, and provides recommendations.
     """
 
-    def __init__(
-        self,
-        name: str = "Analyst",
-        persona: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, name: str = "Analyst", persona: str | None = None, **kwargs):
         config = AgentConfig(
             role=AgentRole.ANALYST,
             name=name,
-            persona=persona or """You are a data analyst and business intelligence expert.
+            persona=persona
+            or """You are a data analyst and business intelligence expert.
 Your job is to:
 1. Analyze data to find patterns and trends
 2. Create clear visualizations and summaries
@@ -346,13 +312,13 @@ Your job is to:
 
 You let the data tell the story.
 You are honest about what the data does and doesn't show.""",
-            **kwargs
+            **kwargs,
         )
         super().__init__(config)
 
 
 # Factory function for creating agents by role
-def create_agent(role: AgentRole, name: Optional[str] = None, **kwargs) -> Agent:
+def create_agent(role: AgentRole, name: str | None = None, **kwargs) -> Agent:
     """
     Factory function to create specialized agents by role.
 
@@ -380,6 +346,6 @@ def create_agent(role: AgentRole, name: Optional[str] = None, **kwargs) -> Agent
         raise ValueError(f"No specialized agent for role: {role}")
 
     if name:
-        kwargs['name'] = name
+        kwargs["name"] = name
 
     return agent_class(**kwargs)

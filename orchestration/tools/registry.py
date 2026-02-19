@@ -5,13 +5,9 @@ This module provides a Python interface to query MCP registries
 and discover available tools for Agenticom workflows.
 """
 
-import json
-import os
-import subprocess
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -53,171 +49,181 @@ class MCPRegistry:
     - HTTP API (for direct registry access)
     """
 
-    cache_dir: Path = field(default_factory=lambda: Path.home() / ".agenticom" / "mcp_cache")
+    cache_dir: Path = field(
+        default_factory=lambda: Path.home() / ".agenticom" / "mcp_cache"
+    )
     cache_ttl: int = 3600  # 1 hour
 
     # Built-in tool mappings for common categories
-    BUILTIN_MAPPINGS: dict = field(default_factory=lambda: {
-        # Research & Literature
-        "literature_search": [
-            RegistryEntry(
-                name="PubMed",
-                description="Search biomedical literature",
-                url="https://pubmed.mcp.claude.com/mcp",
-                tools=["search_articles", "get_article_metadata", "find_related_articles"],
-            ),
-            RegistryEntry(
-                name="bioRxiv",
-                description="Access bioRxiv and medRxiv preprints",
-                url="https://mcp.deepsense.ai/biorxiv/mcp",
-                tools=["search_biorxiv_publications", "get_preprint"],
-            ),
-            RegistryEntry(
-                name="Consensus",
-                description="Explore scientific research",
-                url="https://mcp.consensus.app/mcp",
-                tools=["search"],
-            ),
-            RegistryEntry(
-                name="Scholar Gateway",
-                description="Scholarly research and citations",
-                url="https://connector.scholargateway.ai/mcp",
-                tools=["Semantic Search"],
-            ),
-        ],
-
-        # Web & SEO
-        "web_search": [
-            RegistryEntry(
-                name="Ahrefs",
-                description="SEO & AI search analytics",
-                url="https://api.ahrefs.com/mcp/mcp",
-                tools=["batch-analysis", "keyword-suggestions", "backlinks"],
-            ),
-            RegistryEntry(
-                name="Similarweb",
-                description="Real time web and market data",
-                url="https://mcp.similarweb.com",
-                tools=["get-websites-traffic-and-engagement", "get-websites-similar-sites-agg"],
-            ),
-        ],
-
-        # Social Media & Analytics
-        "social_api": [
-            RegistryEntry(
-                name="LunarCrush",
-                description="Social intelligence for crypto and beyond",
-                url="https://lunarcrush.com/mcp",
-                tools=["Topic", "Topic_Posts", "Topic_Time_Series"],
-            ),
-            RegistryEntry(
-                name="Amplitude",
-                description="Analytics and insights",
-                url="https://mcp.amplitude.com/mcp",
-                tools=["query_dataset", "query_charts", "query_metric"],
-            ),
-        ],
-
-        # Business & Market Research
-        "market_research": [
-            RegistryEntry(
-                name="Harmonic",
-                description="Discover, research, and enrich companies",
-                url="https://mcp.api.harmonic.ai",
-                tools=["enrich_company", "enrich_person", "get_saved_search_companies_results"],
-            ),
-            RegistryEntry(
-                name="S&P Global",
-                description="Query S&P Global datasets",
-                url="https://kfinance.kensho.com/integrations/mcp",
-                tools=["get_company_summary_from_identifiers", "get_info_from_identifiers"],
-            ),
-        ],
-
-        "competitor_analysis": [
-            RegistryEntry(
-                name="Similarweb",
-                description="Competitor traffic and engagement",
-                url="https://mcp.similarweb.com",
-                tools=["get-websites-traffic-and-engagement", "get-websites-similar-sites-agg"],
-            ),
-            RegistryEntry(
-                name="Ahrefs",
-                description="Competitor backlink analysis",
-                url="https://api.ahrefs.com/mcp/mcp",
-                tools=["batch-analysis", "competing-domains"],
-            ),
-        ],
-
-        # Data Analysis
-        "data_analysis": [
-            RegistryEntry(
-                name="Amplitude",
-                description="Analytics queries",
-                url="https://mcp.amplitude.com/mcp",
-                tools=["query_dataset", "query_charts"],
-            ),
-            RegistryEntry(
-                name="Windsor.ai",
-                description="Connect 325+ data sources",
-                url="https://mcp.windsor.ai",
-                tools=["get_data", "get_schema"],
-            ),
-        ],
-
-        # Content & Media
-        "image_generation": [
-            RegistryEntry(
-                name="OpenAI Images",
-                description="DALL-E image generation",
-                url="",  # Built-in to OpenAI
-                tools=["generate_image"],
-            ),
-        ],
-
-        "text_generation": [
-            # This is handled by the LLM itself, not an external tool
-        ],
-
-        # CRM & Business
-        "crm": [
-            RegistryEntry(
-                name="HubSpot",
-                description="Chat with your CRM data",
-                url="https://mcp.hubspot.com/anthropic",
-                tools=["search_crm_objects", "get_crm_objects"],
-            ),
-            RegistryEntry(
-                name="Day AI",
-                description="Analyze & update CRM records",
-                url="https://day.ai/api/mcp",
-                tools=["create_or_update_person_organization", "read_crm_schema"],
-            ),
-        ],
-
-        # Communication
-        "messaging": [
-            # Slack, Discord - typically handled via native integrations
-        ],
-
-        "analytics": [
-            RegistryEntry(
-                name="Amplitude",
-                description="Product analytics",
-                url="https://mcp.amplitude.com/mcp",
-                tools=["get_charts", "query_metric"],
-            ),
-        ],
-
-        "reporting": [
-            RegistryEntry(
-                name="Gamma",
-                description="Generate presentations and docs",
-                url="https://gamma.app/mcp",
-                tools=["generate"],
-            ),
-        ],
-    })
+    BUILTIN_MAPPINGS: dict = field(
+        default_factory=lambda: {
+            # Research & Literature
+            "literature_search": [
+                RegistryEntry(
+                    name="PubMed",
+                    description="Search biomedical literature",
+                    url="https://pubmed.mcp.claude.com/mcp",
+                    tools=[
+                        "search_articles",
+                        "get_article_metadata",
+                        "find_related_articles",
+                    ],
+                ),
+                RegistryEntry(
+                    name="bioRxiv",
+                    description="Access bioRxiv and medRxiv preprints",
+                    url="https://mcp.deepsense.ai/biorxiv/mcp",
+                    tools=["search_biorxiv_publications", "get_preprint"],
+                ),
+                RegistryEntry(
+                    name="Consensus",
+                    description="Explore scientific research",
+                    url="https://mcp.consensus.app/mcp",
+                    tools=["search"],
+                ),
+                RegistryEntry(
+                    name="Scholar Gateway",
+                    description="Scholarly research and citations",
+                    url="https://connector.scholargateway.ai/mcp",
+                    tools=["Semantic Search"],
+                ),
+            ],
+            # Web & SEO
+            "web_search": [
+                RegistryEntry(
+                    name="Ahrefs",
+                    description="SEO & AI search analytics",
+                    url="https://api.ahrefs.com/mcp/mcp",
+                    tools=["batch-analysis", "keyword-suggestions", "backlinks"],
+                ),
+                RegistryEntry(
+                    name="Similarweb",
+                    description="Real time web and market data",
+                    url="https://mcp.similarweb.com",
+                    tools=[
+                        "get-websites-traffic-and-engagement",
+                        "get-websites-similar-sites-agg",
+                    ],
+                ),
+            ],
+            # Social Media & Analytics
+            "social_api": [
+                RegistryEntry(
+                    name="LunarCrush",
+                    description="Social intelligence for crypto and beyond",
+                    url="https://lunarcrush.com/mcp",
+                    tools=["Topic", "Topic_Posts", "Topic_Time_Series"],
+                ),
+                RegistryEntry(
+                    name="Amplitude",
+                    description="Analytics and insights",
+                    url="https://mcp.amplitude.com/mcp",
+                    tools=["query_dataset", "query_charts", "query_metric"],
+                ),
+            ],
+            # Business & Market Research
+            "market_research": [
+                RegistryEntry(
+                    name="Harmonic",
+                    description="Discover, research, and enrich companies",
+                    url="https://mcp.api.harmonic.ai",
+                    tools=[
+                        "enrich_company",
+                        "enrich_person",
+                        "get_saved_search_companies_results",
+                    ],
+                ),
+                RegistryEntry(
+                    name="S&P Global",
+                    description="Query S&P Global datasets",
+                    url="https://kfinance.kensho.com/integrations/mcp",
+                    tools=[
+                        "get_company_summary_from_identifiers",
+                        "get_info_from_identifiers",
+                    ],
+                ),
+            ],
+            "competitor_analysis": [
+                RegistryEntry(
+                    name="Similarweb",
+                    description="Competitor traffic and engagement",
+                    url="https://mcp.similarweb.com",
+                    tools=[
+                        "get-websites-traffic-and-engagement",
+                        "get-websites-similar-sites-agg",
+                    ],
+                ),
+                RegistryEntry(
+                    name="Ahrefs",
+                    description="Competitor backlink analysis",
+                    url="https://api.ahrefs.com/mcp/mcp",
+                    tools=["batch-analysis", "competing-domains"],
+                ),
+            ],
+            # Data Analysis
+            "data_analysis": [
+                RegistryEntry(
+                    name="Amplitude",
+                    description="Analytics queries",
+                    url="https://mcp.amplitude.com/mcp",
+                    tools=["query_dataset", "query_charts"],
+                ),
+                RegistryEntry(
+                    name="Windsor.ai",
+                    description="Connect 325+ data sources",
+                    url="https://mcp.windsor.ai",
+                    tools=["get_data", "get_schema"],
+                ),
+            ],
+            # Content & Media
+            "image_generation": [
+                RegistryEntry(
+                    name="OpenAI Images",
+                    description="DALL-E image generation",
+                    url="",  # Built-in to OpenAI
+                    tools=["generate_image"],
+                ),
+            ],
+            "text_generation": [
+                # This is handled by the LLM itself, not an external tool
+            ],
+            # CRM & Business
+            "crm": [
+                RegistryEntry(
+                    name="HubSpot",
+                    description="Chat with your CRM data",
+                    url="https://mcp.hubspot.com/anthropic",
+                    tools=["search_crm_objects", "get_crm_objects"],
+                ),
+                RegistryEntry(
+                    name="Day AI",
+                    description="Analyze & update CRM records",
+                    url="https://day.ai/api/mcp",
+                    tools=["create_or_update_person_organization", "read_crm_schema"],
+                ),
+            ],
+            # Communication
+            "messaging": [
+                # Slack, Discord - typically handled via native integrations
+            ],
+            "analytics": [
+                RegistryEntry(
+                    name="Amplitude",
+                    description="Product analytics",
+                    url="https://mcp.amplitude.com/mcp",
+                    tools=["get_charts", "query_metric"],
+                ),
+            ],
+            "reporting": [
+                RegistryEntry(
+                    name="Gamma",
+                    description="Generate presentations and docs",
+                    url="https://gamma.app/mcp",
+                    tools=["generate"],
+                ),
+            ],
+        }
+    )
 
     def __post_init__(self):
         """Initialize the registry."""
@@ -271,7 +277,7 @@ class MCPRegistry:
         """
         return self.BUILTIN_MAPPINGS.get(category, [])
 
-    def resolve_tool(self, tool_name: str) -> Optional[RegistryEntry]:
+    def resolve_tool(self, tool_name: str) -> RegistryEntry | None:
         """
         Resolve a single tool name to an MCP entry.
 
@@ -312,7 +318,7 @@ class MCPRegistry:
     def get_connection_status(self) -> dict[str, bool]:
         """Get connection status for all known servers."""
         status = {}
-        for category, entries in self.BUILTIN_MAPPINGS.items():
+        for _category, entries in self.BUILTIN_MAPPINGS.items():
             for entry in entries:
                 status[entry.name] = self.is_connected(entry.name)
         return status

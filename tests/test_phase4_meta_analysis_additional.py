@@ -4,9 +4,9 @@
 import asyncio
 from datetime import datetime
 
-from orchestration.diagnostics.meta_analyzer import MetaAnalyzer
+from orchestration.diagnostics.capture import ConsoleMessage, DiagnosticCapture
 from orchestration.diagnostics.iteration_monitor import IterationRecord
-from orchestration.diagnostics.capture import DiagnosticCapture, ConsoleMessage
+from orchestration.diagnostics.meta_analyzer import MetaAnalyzer
 from orchestration.integrations.unified import auto_setup_executor
 
 
@@ -42,11 +42,11 @@ async def test_meta_analysis():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="Uncaught TypeError: Cannot read property 'click' of null at login.js:15"
+                        text="Uncaught TypeError: Cannot read property 'click' of null at login.js:15",
                     ),
                     ConsoleMessage(
                         type="error",
-                        text="Failed to load resource: the server responded with a status of 404 ()"
+                        text="Failed to load resource: the server responded with a status of 404 ()",
                     ),
                 ],
             ),
@@ -64,7 +64,7 @@ async def test_meta_analysis():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="Uncaught TypeError: Cannot read property 'click' of null at login.js:15"
+                        text="Uncaught TypeError: Cannot read property 'click' of null at login.js:15",
                     ),
                 ],
             ),
@@ -82,7 +82,7 @@ async def test_meta_analysis():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="Uncaught TypeError: Cannot read property 'click' of null at login.js:15"
+                        text="Uncaught TypeError: Cannot read property 'click' of null at login.js:15",
                     ),
                 ],
             ),
@@ -91,7 +91,7 @@ async def test_meta_analysis():
     ]
 
     print(f"   Created {len(iterations)} failure iterations")
-    print(f"   All failures involve: Element '#login-button' not found")
+    print("   All failures involve: Element '#login-button' not found")
     print()
 
     # Create analyzer
@@ -139,7 +139,9 @@ async def test_meta_analysis():
         print(f"   Total iterations: {result.metadata.get('total_iterations')}")
         if "llm_tokens" in result.metadata:
             tokens = result.metadata["llm_tokens"]
-            print(f"   LLM tokens: {tokens.get('input_tokens', 0)} in, {tokens.get('output_tokens', 0)} out")
+            print(
+                f"   LLM tokens: {tokens.get('input_tokens', 0)} in, {tokens.get('output_tokens', 0)} out"
+            )
         print()
 
         print("=" * 60)
@@ -149,6 +151,7 @@ async def test_meta_analysis():
     except Exception as e:
         print(f"❌ Error during analysis: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -184,7 +187,7 @@ async def test_different_error_pattern():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="Access to fetch at 'https://api.example.com/data' from origin 'http://localhost:3000' has been blocked by CORS policy"
+                        text="Access to fetch at 'https://api.example.com/data' from origin 'http://localhost:3000' has been blocked by CORS policy",
                     ),
                 ],
             ),
@@ -202,7 +205,7 @@ async def test_different_error_pattern():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="Access to fetch at 'https://api.example.com/data' from origin 'http://localhost:3000' has been blocked by CORS policy"
+                        text="Access to fetch at 'https://api.example.com/data' from origin 'http://localhost:3000' has been blocked by CORS policy",
                     ),
                 ],
             ),
@@ -242,6 +245,7 @@ async def test_different_error_pattern():
     except Exception as e:
         print(f"❌ Error during analysis: {e}")
         import traceback
+
         traceback.print_exc()
 
 

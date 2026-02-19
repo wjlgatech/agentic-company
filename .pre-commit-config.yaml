@@ -1,0 +1,42 @@
+repos:
+  # Standard file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: debug-statements        # Catch leftover breakpoint()/pdb calls
+      - id: detect-private-key      # Block accidental secret commits
+
+  # Ruff — fast linter + import sorter (replaces isort, flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Black — code formatter (double-check after ruff-format)
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3
+
+  # Mypy — type checking (runs on changed files only for speed)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.0
+          - fastapi>=0.109.0
+        args: [--ignore-missing-imports]
+        # Only type-check orchestration and agenticom packages
+        files: ^(orchestration|agenticom)/

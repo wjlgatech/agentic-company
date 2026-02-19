@@ -1,0 +1,30 @@
+# CODEOWNERS — automatic review requests on PRs
+# Syntax: <pattern>  <owner(s)>
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: repo owner reviews everything not matched below
+*                                   @wjlgatech
+
+# CI / DevOps — anyone touching pipelines needs repo-owner sign-off
+.github/                            @wjlgatech
+
+# LLM integrations — route to LLM-integration owners
+orchestration/integrations/         @wjlgatech
+
+# Security-sensitive code — always requires repo-owner review
+orchestration/security.py           @wjlgatech
+orchestration/guardrails.py         @wjlgatech
+orchestration/approval.py           @wjlgatech
+
+# Diagnostics subsystem
+orchestration/diagnostics/          @wjlgatech
+
+# Frontend — route to frontend owners
+frontend/                           @wjlgatech
+
+# Bundled workflows — changes here affect all end users
+agenticom/bundled_workflows/        @wjlgatech
+
+# Add team-specific owners below as the team grows, e.g.:
+# orchestration/agents/             @wjlgatech @agent-team
+# orchestration/memory*.py          @wjlgatech @infra-team

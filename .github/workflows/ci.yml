@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch on new push
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-type-check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev,anthropic,openai]"
+
+      - name: Ruff — lint
+        run: ruff check orchestration/ agenticom/ tests/
+
+      - name: Black — format check
+        run: black --check orchestration/ agenticom/ tests/
+
+      - name: Mypy — type check
+        run: mypy orchestration/ --ignore-missing-imports
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev,anthropic,openai]"
+
+      - name: Run unit tests
+        # Integration tests require live API keys — mark them @pytest.mark.integration
+        run: pytest tests/ -v -m "not integration" --tb=short
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev,anthropic,openai]"
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -m "not integration" \
+            --cov=orchestration \
+            --cov=agenticom \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --tb=short
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      # Once you know the baseline, set --cov-fail-under=N in the pytest command above
+      # to enforce a minimum coverage threshold on every PR.

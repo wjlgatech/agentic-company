@@ -6,11 +6,11 @@ One-click launcher for Agenticom with GUI interface.
 Automatically sets up LLM backends and provides easy access to all features.
 """
 
-import sys
 import os
-import webbrowser
+import sys
 import threading
 import time
+import webbrowser
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -58,6 +58,7 @@ def print_status():
 def start_server(port: int = 8000):
     """Start the API server"""
     import uvicorn
+
     from orchestration.api import app
 
     print(f"🚀 Starting Agenticom server on http://localhost:{port}")
@@ -131,6 +132,7 @@ def run_conversation_builder():
 
     try:
         from orchestration.conversation import run_conversation
+
         run_conversation(voice_mode=voice_mode)
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -250,7 +252,7 @@ def main():
     print_banner()
 
     # Check status
-    has_keys = print_status()
+    print_status()
 
     # Parse command line args
     if len(sys.argv) > 1:

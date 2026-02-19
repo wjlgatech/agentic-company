@@ -36,34 +36,33 @@ Architecture:
 └─────────────────────────────────────────────────────────────────┘
 """
 
-import json
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Callable
 from enum import Enum
 
 from .intent_refiner import (
-    IntentRefiner,
-    IntentClassification,
-    ExtractedSpecifics,
-    QualityScore,
-    TaskType,
     Domain,
+    ExtractedSpecifics,
+    IntentClassification,
+    IntentRefiner,
+    TaskType,
 )
 
 
 class ConversationState(Enum):
     """States in the refinement conversation."""
-    INITIAL = "initial"              # Just received first input
-    CLARIFYING = "clarifying"        # Asking clarification questions
-    DRAFT_READY = "draft_ready"      # Have enough to generate draft
-    REFINING = "refining"            # User is refining the draft
-    COMPLETE = "complete"            # User accepted the output
+
+    INITIAL = "initial"  # Just received first input
+    CLARIFYING = "clarifying"  # Asking clarification questions
+    DRAFT_READY = "draft_ready"  # Have enough to generate draft
+    REFINING = "refining"  # User is refining the draft
+    COMPLETE = "complete"  # User accepted the output
 
 
 @dataclass
 class QuickOption:
     """A clickable option in the chat UI."""
+
     label: str
     value: str
     description: str = ""
@@ -73,8 +72,9 @@ class QuickOption:
 @dataclass
 class ClarificationCard:
     """An inline clarification card for the chat UI."""
+
     question: str
-    options: List[QuickOption] = field(default_factory=list)
+    options: list[QuickOption] = field(default_factory=list)
     allow_freeform: bool = True
     priority: int = 1  # 1=critical, 2=helpful, 3=optional
     dimension: str = ""  # What this clarifies
@@ -83,36 +83,39 @@ class ClarificationCard:
 @dataclass
 class DraftPreview:
     """A preview of the generated output."""
-    summary: str           # Short summary of what will be done
-    approach: List[str]    # Key steps
-    output_type: str       # What will be delivered
-    confidence: float      # How confident we are this is right
-    can_proceed: bool      # Whether we have enough to proceed
+
+    summary: str  # Short summary of what will be done
+    approach: list[str]  # Key steps
+    output_type: str  # What will be delivered
+    confidence: float  # How confident we are this is right
+    can_proceed: bool  # Whether we have enough to proceed
 
 
 @dataclass
 class ConversationTurn:
     """A single turn in the conversation."""
+
     turn_id: str
     user_input: str
     ai_response: str
-    cards: List[ClarificationCard] = field(default_factory=list)
-    draft: Optional[DraftPreview] = None
+    cards: list[ClarificationCard] = field(default_factory=list)
+    draft: DraftPreview | None = None
     state: ConversationState = ConversationState.INITIAL
-    extracted: Optional[Dict] = None
+    extracted: dict | None = None
 
 
 @dataclass
 class RefinementSession:
     """Tracks an entire refinement conversation."""
+
     session_id: str
-    turns: List[ConversationTurn] = field(default_factory=list)
+    turns: list[ConversationTurn] = field(default_factory=list)
     state: ConversationState = ConversationState.INITIAL
 
     # Accumulated context
-    classification: Optional[IntentClassification] = None
-    specifics: Optional[ExtractedSpecifics] = None
-    answers: Dict[str, str] = field(default_factory=dict)
+    classification: IntentClassification | None = None
+    specifics: ExtractedSpecifics | None = None
+    answers: dict[str, str] = field(default_factory=dict)
 
     # Quality tracking
     quality_score: float = 0.0
@@ -165,7 +168,7 @@ class ConversationalRefiner:
     def __init__(self, quality_threshold: float = 0.7):
         self.refiner = IntentRefiner()
         self.quality_threshold = quality_threshold
-        self.sessions: Dict[str, RefinementSession] = {}
+        self.sessions: dict[str, RefinementSession] = {}
 
     # =========================================================================
     # SESSION MANAGEMENT
@@ -181,7 +184,7 @@ class ConversationalRefiner:
         self.sessions[session_id] = session
         return session
 
-    def get_session(self, session_id: str) -> Optional[RefinementSession]:
+    def get_session(self, session_id: str) -> RefinementSession | None:
         """Retrieve an existing session."""
         return self.sessions.get(session_id)
 
@@ -217,11 +220,17 @@ class ConversationalRefiner:
         input_lower = user_input.lower().strip()
 
         # Check for acceptance signals
-        if self._is_acceptance(input_lower) and session.state == ConversationState.DRAFT_READY:
+        if (
+            self._is_acceptance(input_lower)
+            and session.state == ConversationState.DRAFT_READY
+        ):
             return self._handle_acceptance(session, turn_id, user_input)
 
         # Check for refinement requests
-        if self._is_refinement_request(input_lower) and session.state == ConversationState.DRAFT_READY:
+        if (
+            self._is_refinement_request(input_lower)
+            and session.state == ConversationState.DRAFT_READY
+        ):
             return self._handle_refinement_request(session, turn_id, user_input)
 
         # Otherwise, process as new/additional context
@@ -279,8 +288,8 @@ class ConversationalRefiner:
         response = f"""Perfect! I've prepared your optimized prompt.
 
 **What I understood:**
-- Task: {session.classification.task_type.value if session.classification else 'general'}
-- Domain: {session.classification.domain.value if session.classification else 'general'}
+- Task: {session.classification.task_type.value if session.classification else "general"}
+- Domain: {session.classification.domain.value if session.classification else "general"}
 - Confidence: {session.quality_score:.0%}
 
 Your prompt is ready to use. It includes:
@@ -364,7 +373,7 @@ Or just describe what you'd like different."""
             extracted={
                 "entities": session.specifics.entities if session.specifics else [],
                 "goals": session.specifics.goals[:2] if session.specifics else [],
-            }
+            },
         )
         session.turns.append(turn)
         return turn
@@ -394,7 +403,7 @@ Or just describe what you'd like different."""
             extracted={
                 "entities": session.specifics.entities if session.specifics else [],
                 "goals": session.specifics.goals[:2] if session.specifics else [],
-            }
+            },
         )
         session.turns.append(turn)
         return turn
@@ -406,20 +415,51 @@ Or just describe what you'd like different."""
     def _is_acceptance(self, input_lower: str) -> bool:
         """Check if user is accepting the draft."""
         acceptance_signals = [
-            "yes", "yep", "yeah", "sure", "ok", "okay", "go ahead",
-            "proceed", "do it", "looks good", "perfect", "great",
-            "that works", "sounds good", "let's go", "approved",
-            "continue", "execute", "run it", "make it so"
+            "yes",
+            "yep",
+            "yeah",
+            "sure",
+            "ok",
+            "okay",
+            "go ahead",
+            "proceed",
+            "do it",
+            "looks good",
+            "perfect",
+            "great",
+            "that works",
+            "sounds good",
+            "let's go",
+            "approved",
+            "continue",
+            "execute",
+            "run it",
+            "make it so",
         ]
         return any(signal in input_lower for signal in acceptance_signals)
 
     def _is_refinement_request(self, input_lower: str) -> bool:
         """Check if user wants to refine the draft."""
         refinement_signals = [
-            "change", "modify", "adjust", "refine", "tweak",
-            "actually", "wait", "hold on", "not quite", "almost",
-            "can you", "could you", "what if", "instead",
-            "more", "less", "different", "add", "remove"
+            "change",
+            "modify",
+            "adjust",
+            "refine",
+            "tweak",
+            "actually",
+            "wait",
+            "hold on",
+            "not quite",
+            "almost",
+            "can you",
+            "could you",
+            "what if",
+            "instead",
+            "more",
+            "less",
+            "different",
+            "add",
+            "remove",
         ]
         return any(signal in input_lower for signal in refinement_signals)
 
@@ -440,10 +480,10 @@ Or just describe what you'd like different."""
         if session.specifics:
             # More specifics = more ready
             specifics_count = (
-                len(session.specifics.entities) +
-                len(session.specifics.goals) +
-                len(session.specifics.constraints) +
-                len(session.specifics.pain_points)
+                len(session.specifics.entities)
+                + len(session.specifics.goals)
+                + len(session.specifics.constraints)
+                + len(session.specifics.pain_points)
             )
             score += min(specifics_count * 0.08, 0.35)
 
@@ -472,7 +512,7 @@ Or just describe what you'd like different."""
     def _generate_clarification_cards(
         self,
         session: RefinementSession,
-    ) -> List[ClarificationCard]:
+    ) -> list[ClarificationCard]:
         """Generate smart clarification cards based on current state."""
         cards = []
 
@@ -482,58 +522,76 @@ Or just describe what you'd like different."""
         # If we don't know the domain well
         if classification and classification.confidence < 0.6:
             if classification.domain == Domain.BUSINESS:
-                cards.append(ClarificationCard(
-                    question="What type of business is this for?",
-                    options=[
-                        QuickOption("B2B", "b2b", "Business to business"),
-                        QuickOption("B2C", "b2c", "Business to consumer"),
-                        QuickOption("SaaS", "saas", "Software as a service"),
-                        QuickOption("E-commerce", "ecommerce", "Online retail"),
-                    ],
-                    dimension="business_type",
-                    priority=1,
-                ))
+                cards.append(
+                    ClarificationCard(
+                        question="What type of business is this for?",
+                        options=[
+                            QuickOption("B2B", "b2b", "Business to business"),
+                            QuickOption("B2C", "b2c", "Business to consumer"),
+                            QuickOption("SaaS", "saas", "Software as a service"),
+                            QuickOption("E-commerce", "ecommerce", "Online retail"),
+                        ],
+                        dimension="business_type",
+                        priority=1,
+                    )
+                )
 
         # If we don't have clear goals
         if not specifics or not specifics.goals:
             if classification and classification.task_type == TaskType.ANALYSIS:
-                cards.append(ClarificationCard(
-                    question="What decision will this analysis inform?",
-                    options=[
-                        QuickOption("Strategy", "strategy", "Strategic planning"),
-                        QuickOption("Investment", "investment", "Investment decision"),
-                        QuickOption("Process", "process", "Process improvement"),
-                        QuickOption("Hiring", "hiring", "Hiring decision"),
-                    ],
-                    dimension="goal",
-                    priority=1,
-                ))
+                cards.append(
+                    ClarificationCard(
+                        question="What decision will this analysis inform?",
+                        options=[
+                            QuickOption("Strategy", "strategy", "Strategic planning"),
+                            QuickOption(
+                                "Investment", "investment", "Investment decision"
+                            ),
+                            QuickOption("Process", "process", "Process improvement"),
+                            QuickOption("Hiring", "hiring", "Hiring decision"),
+                        ],
+                        dimension="goal",
+                        priority=1,
+                    )
+                )
             else:
-                cards.append(ClarificationCard(
-                    question="What's the main outcome you're looking for?",
-                    options=[
-                        QuickOption("Quick answer", "quick", "Fast, focused response"),
-                        QuickOption("Deep analysis", "deep", "Comprehensive analysis"),
-                        QuickOption("Action plan", "plan", "Step-by-step plan"),
-                        QuickOption("Creative ideas", "creative", "Brainstorming/ideation"),
-                    ],
-                    dimension="outcome",
-                    priority=1,
-                ))
+                cards.append(
+                    ClarificationCard(
+                        question="What's the main outcome you're looking for?",
+                        options=[
+                            QuickOption(
+                                "Quick answer", "quick", "Fast, focused response"
+                            ),
+                            QuickOption(
+                                "Deep analysis", "deep", "Comprehensive analysis"
+                            ),
+                            QuickOption("Action plan", "plan", "Step-by-step plan"),
+                            QuickOption(
+                                "Creative ideas", "creative", "Brainstorming/ideation"
+                            ),
+                        ],
+                        dimension="outcome",
+                        priority=1,
+                    )
+                )
 
         # If we don't know the audience
         if not specifics or not specifics.stakeholders:
-            cards.append(ClarificationCard(
-                question="Who will use this output?",
-                options=[
-                    QuickOption("Just me", "self", "Personal use"),
-                    QuickOption("My team", "team", "Internal team"),
-                    QuickOption("Leadership", "leadership", "Executives/management"),
-                    QuickOption("Clients", "clients", "External clients"),
-                ],
-                dimension="audience",
-                priority=2,
-            ))
+            cards.append(
+                ClarificationCard(
+                    question="Who will use this output?",
+                    options=[
+                        QuickOption("Just me", "self", "Personal use"),
+                        QuickOption("My team", "team", "Internal team"),
+                        QuickOption(
+                            "Leadership", "leadership", "Executives/management"
+                        ),
+                        QuickOption("Clients", "clients", "External clients"),
+                    ],
+                    dimension="audience",
+                    priority=2,
+                )
+            )
 
         # Limit to most important cards
         cards.sort(key=lambda c: c.priority)
@@ -542,7 +600,7 @@ Or just describe what you'd like different."""
     def _build_initial_response(
         self,
         session: RefinementSession,
-        cards: List[ClarificationCard],
+        cards: list[ClarificationCard],
     ) -> str:
         """Build the initial response with clarification cards."""
 
@@ -551,12 +609,20 @@ Or just describe what you'd like different."""
         if session.classification:
             task = session.classification.task_type.value
             domain = session.classification.domain.value
-            understood_parts.append(f"I can help you {task} something in the {domain} area")
+            understood_parts.append(
+                f"I can help you {task} something in the {domain} area"
+            )
 
         if session.specifics and session.specifics.entities:
-            understood_parts.append(f"I see this involves: {', '.join(session.specifics.entities[:3])}")
+            understood_parts.append(
+                f"I see this involves: {', '.join(session.specifics.entities[:3])}"
+            )
 
-        understood = ". ".join(understood_parts) + "." if understood_parts else "I'd love to help!"
+        understood = (
+            ". ".join(understood_parts) + "."
+            if understood_parts
+            else "I'd love to help!"
+        )
 
         # Build card questions as conversational text
         questions = []
@@ -579,7 +645,7 @@ Feel free to click an option or just tell me more in your own words!"""
     def _build_followup_response(
         self,
         session: RefinementSession,
-        cards: List[ClarificationCard],
+        cards: list[ClarificationCard],
     ) -> str:
         """Build follow-up response acknowledging progress."""
 
@@ -629,17 +695,36 @@ I think I have enough to work with. Let me put together a draft..."""
             TaskType.AUTOMATION: "Process design with steps",
         }
 
-        task_type = session.classification.task_type if session.classification else TaskType.CREATION
+        task_type = (
+            session.classification.task_type
+            if session.classification
+            else TaskType.CREATION
+        )
         output_type = task_outputs.get(task_type, "Helpful response")
 
         # Build approach steps
         approach = []
         if task_type == TaskType.ANALYSIS:
-            approach = ["Understand your context", "Analyze key factors", "Identify insights", "Provide recommendations"]
+            approach = [
+                "Understand your context",
+                "Analyze key factors",
+                "Identify insights",
+                "Provide recommendations",
+            ]
         elif task_type == TaskType.CREATION:
-            approach = ["Understand requirements", "Plan structure", "Generate content", "Refine and polish"]
+            approach = [
+                "Understand requirements",
+                "Plan structure",
+                "Generate content",
+                "Refine and polish",
+            ]
         elif task_type == TaskType.RESEARCH:
-            approach = ["Define scope", "Gather information", "Evaluate sources", "Synthesize findings"]
+            approach = [
+                "Define scope",
+                "Gather information",
+                "Evaluate sources",
+                "Synthesize findings",
+            ]
         else:
             approach = ["Understand request", "Process information", "Generate output"]
 
@@ -672,9 +757,15 @@ I think I have enough to work with. Let me put together a draft..."""
     ) -> str:
         """Build response showing draft preview."""
 
-        approach_text = "\n".join([f"  {i+1}. {step}" for i, step in enumerate(draft.approach)])
+        approach_text = "\n".join(
+            [f"  {i + 1}. {step}" for i, step in enumerate(draft.approach)]
+        )
 
-        confidence_emoji = "🟢" if draft.confidence >= 0.8 else "🟡" if draft.confidence >= 0.6 else "🔴"
+        confidence_emoji = (
+            "🟢"
+            if draft.confidence >= 0.8
+            else "🟡" if draft.confidence >= 0.6 else "🔴"
+        )
 
         response = f"""Great, I think I understand what you need!
 
@@ -716,7 +807,11 @@ I think I have enough to work with. Let me put together a draft..."""
                         {
                             "question": card.question,
                             "options": [
-                                {"label": o.label, "value": o.value, "description": o.description}
+                                {
+                                    "label": o.label,
+                                    "value": o.value,
+                                    "description": o.description,
+                                }
                                 for o in card.options
                             ],
                             "allow_freeform": card.allow_freeform,
@@ -724,24 +819,33 @@ I think I have enough to work with. Let me put together a draft..."""
                         }
                         for card in turn.cards
                     ],
-                    "draft": {
-                        "summary": turn.draft.summary,
-                        "approach": turn.draft.approach,
-                        "output_type": turn.draft.output_type,
-                        "confidence": turn.draft.confidence,
-                        "can_proceed": turn.draft.can_proceed,
-                    } if turn.draft else None,
+                    "draft": (
+                        {
+                            "summary": turn.draft.summary,
+                            "approach": turn.draft.approach,
+                            "output_type": turn.draft.output_type,
+                            "confidence": turn.draft.confidence,
+                            "can_proceed": turn.draft.can_proceed,
+                        }
+                        if turn.draft
+                        else None
+                    ),
                     "state": turn.state.value,
                 }
                 for turn in session.turns
             ],
-            "final_prompt": session.final_prompt if session.state == ConversationState.COMPLETE else None,
+            "final_prompt": (
+                session.final_prompt
+                if session.state == ConversationState.COMPLETE
+                else None
+            ),
         }
 
 
 # =============================================================================
 # CONVENIENCE FUNCTIONS
 # =============================================================================
+
 
 def create_refiner() -> ConversationalRefiner:
     """Create a new conversational refiner instance."""
@@ -756,5 +860,5 @@ def quick_refine(user_input: str) -> dict:
     """
     refiner = ConversationalRefiner()
     session = refiner.start_session()
-    turn = refiner.process_input(session, user_input)
+    refiner.process_input(session, user_input)
     return refiner.session_to_dict(session)

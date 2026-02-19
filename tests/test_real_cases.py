@@ -5,7 +5,9 @@ Each test simulates actual user scenarios.
 """
 
 import sys
-sys.path.insert(0, '/sessions/upbeat-trusting-turing/mnt/startup/agentic-company-final')
+
+sys.path.insert(0, "/sessions/upbeat-trusting-turing/mnt/startup/agentic-company-final")
+
 
 def test_guardrails():
     """CASE: Block sensitive data from being sent to LLM"""
@@ -14,16 +16,20 @@ def test_guardrails():
     print("Scenario: Block API keys and passwords from LLM prompts")
     print("=" * 60)
 
-    from orchestration.guardrails import ContentFilter, RateLimiter, GuardrailPipeline
+    from orchestration.guardrails import ContentFilter, GuardrailPipeline
 
     # Create pipeline that blocks sensitive patterns
-    pipeline = GuardrailPipeline([
-        ContentFilter(blocked_patterns=[
-            r"sk-[a-zA-Z0-9]{20,}",  # OpenAI API keys
-            r"password\s*[:=]\s*\S+",  # Passwords
-            r"api[_-]?key\s*[:=]\s*\S+",  # API keys
-        ])
-    ])
+    pipeline = GuardrailPipeline(
+        [
+            ContentFilter(
+                blocked_patterns=[
+                    r"sk-[a-zA-Z0-9]{20,}",  # OpenAI API keys
+                    r"password\s*[:=]\s*\S+",  # Passwords
+                    r"api[_-]?key\s*[:=]\s*\S+",  # API keys
+                ]
+            )
+        ]
+    )
 
     # Test 1: Safe input
     safe_input = "Please help me write a Python function to sort a list"
@@ -65,10 +71,15 @@ def test_memory():
     memory = LocalMemoryStore()
 
     # Store user preferences
-    memory.remember("User prefers Python over JavaScript for backend", tags=["preference", "language"])
+    memory.remember(
+        "User prefers Python over JavaScript for backend",
+        tags=["preference", "language"],
+    )
     memory.remember("Project uses FastAPI and PostgreSQL", tags=["tech-stack"])
     memory.remember("Deadline is March 15, 2025", tags=["schedule"])
-    memory.remember("User's name is Alice and she works at TechCorp", tags=["user-info"])
+    memory.remember(
+        "User's name is Alice and she works at TechCorp", tags=["user-info"]
+    )
 
     print("\n📝 Stored 4 memories")
 
@@ -76,17 +87,17 @@ def test_memory():
     print("\n🔍 Query: 'what programming language'")
     results = memory.recall("what programming language", limit=2)
     for i, r in enumerate(results):
-        print(f"   {i+1}. {r.content[:60]}...")
+        print(f"   {i + 1}. {r.content[:60]}...")
 
     print("\n🔍 Query: 'project deadline'")
     results = memory.recall("project deadline", limit=2)
     for i, r in enumerate(results):
-        print(f"   {i+1}. {r.content[:60]}...")
+        print(f"   {i + 1}. {r.content[:60]}...")
 
     print("\n🔍 Query: 'database'")
     results = memory.recall("database", limit=2)
     for i, r in enumerate(results):
-        print(f"   {i+1}. {r.content[:60]}...")
+        print(f"   {i + 1}. {r.content[:60]}...")
 
     print("\n" + "-" * 60)
     print("RESULT: Memory recalls relevant context for queries")
@@ -101,8 +112,9 @@ def test_approval_gates():
     print("=" * 60)
 
     from orchestration.approval import (
-        AutoApprovalGate, HumanApprovalGate, HybridApprovalGate,
-        ApprovalRequest, ApprovalStatus
+        AutoApprovalGate,
+        HumanApprovalGate,
+        HybridApprovalGate,
     )
 
     # Show available gate types
@@ -123,9 +135,9 @@ def test_approval_gates():
     print("   - Example: risk_scorer function evaluates each request")
 
     # Create gates to verify they work
-    auto = AutoApprovalGate()
-    human = HumanApprovalGate()
-    hybrid = HybridApprovalGate(risk_scorer=lambda req: 0.5)  # Simple scorer
+    AutoApprovalGate()
+    HumanApprovalGate()
+    HybridApprovalGate(risk_scorer=lambda req: 0.5)  # Simple scorer
     print("\n✅ All 3 gate types instantiated successfully")
 
     print("\n" + "-" * 60)
@@ -154,13 +166,13 @@ def test_observability():
     metrics.increment("steps_completed", labels={"status": "failed"})
 
     print("\n📊 Recorded Metrics:")
-    print(f"   workflow_runs_total{{workflow='feature-dev'}}: 2")
-    print(f"   workflow_runs_total{{workflow='marketing'}}: 1")
-    print(f"   steps_completed{{status='success'}}: 2")
-    print(f"   steps_completed{{status='failed'}}: 1")
+    print("   workflow_runs_total{workflow='feature-dev'}: 2")
+    print("   workflow_runs_total{workflow='marketing'}: 1")
+    print("   steps_completed{status='success'}: 2")
+    print("   steps_completed{status='failed'}: 1")
 
     # Tracer
-    tracer = Tracer()
+    Tracer()
     print("\n🔍 Tracing:")
     print("   Span: workflow.run (id: abc123)")
     print("   └── Span: step.plan (duration: 1.2s)")
@@ -182,7 +194,9 @@ def test_multi_backend():
     print("Scenario: Switch between Ollama (FREE), Claude, and GPT")
     print("=" * 60)
 
-    from orchestration.integrations import OllamaExecutor, OpenClawExecutor, NanobotExecutor
+    from orchestration.integrations import (
+        OllamaExecutor,
+    )
 
     print("\n🦙 Ollama (FREE - Local)")
     print("   executor = OllamaExecutor(model='llama3.2')")
@@ -206,10 +220,12 @@ def test_multi_backend():
 
     # Check if Ollama is available
     try:
-        ollama = OllamaExecutor()
+        OllamaExecutor()
         print("\n✅ Ollama detected and ready")
     except:
-        print("\n⚠️  Ollama not running (install with: curl -fsSL https://ollama.ai/install.sh | sh)")
+        print(
+            "\n⚠️  Ollama not running (install with: curl -fsSL https://ollama.ai/install.sh | sh)"
+        )
 
     print("\n" + "-" * 60)
     print("RESULT: Multiple backends available, FREE option included")
@@ -224,7 +240,6 @@ def test_cache():
     print("=" * 60)
 
     from orchestration.cache import LocalCache
-    import time
 
     cache = LocalCache()
 
@@ -244,7 +259,7 @@ def test_cache():
     # Second call - cache hit
     print("\n2️⃣ Second call (cache HIT):")
     cached = cache.get(cache_key)
-    print(f"   → Retrieved from cache instantly")
+    print("   → Retrieved from cache instantly")
     print(f"   → Response: '{cached[:40]}...'")
     print("   → Cost: $0.00 (no API call)")
 
@@ -266,26 +281,30 @@ def test_security():
     print("Scenario: JWT auth, audit logging, input sanitization")
     print("=" * 60)
 
-    from orchestration.security import (
-        create_jwt_token,
-        AuditLogger, sanitize_input
-    )
+    from orchestration.security import AuditLogger, create_jwt_token, sanitize_input
 
     # JWT Authentication
     print("\n🔐 JWT Authentication:")
     token = create_jwt_token({"user_id": "alice", "role": "admin"})
     print(f"   Token: {token[:50]}...")
     print(f"   Token length: {len(token)} chars")
-    print(f"   ✅ Token created successfully")
+    print("   ✅ Token created successfully")
 
     # Audit Logging
     print("\n📋 Audit Logging:")
     audit = AuditLogger()
     audit.log("workflow_started", user_id="alice", resource="feature-dev")
-    audit.log("step_completed", user_id="alice", resource="plan", details={"status": "success"})
+    audit.log(
+        "step_completed",
+        user_id="alice",
+        resource="plan",
+        details={"status": "success"},
+    )
     print("   ✅ Events logged:")
     print("   [2026-02-11 03:15:22] workflow_started user=alice resource=feature-dev")
-    print("   [2026-02-11 03:15:25] step_completed user=alice resource=plan status=success")
+    print(
+        "   [2026-02-11 03:15:25] step_completed user=alice resource=plan status=success"
+    )
 
     # Input Sanitization
     print("\n🛡️ Input Sanitization:")
@@ -306,8 +325,8 @@ def test_cli():
     print("Scenario: Run feature-dev workflow from command line")
     print("=" * 60)
 
-    import subprocess
     import os
+    import subprocess
 
     env = os.environ.copy()
     env["PATH"] = f"{os.path.expanduser('~')}/.local/bin:{env.get('PATH', '')}"
@@ -315,8 +334,7 @@ def test_cli():
     # Run workflow list
     print("\n$ agenticom workflow list")
     result = subprocess.run(
-        ["agenticom", "workflow", "list"],
-        capture_output=True, text=True, env=env
+        ["agenticom", "workflow", "list"], capture_output=True, text=True, env=env
     )
     print(result.stdout)
 
@@ -324,15 +342,16 @@ def test_cli():
     print("$ agenticom workflow run feature-dev 'Add error handling to API'")
     result = subprocess.run(
         ["agenticom", "workflow", "run", "feature-dev", "Add error handling to API"],
-        capture_output=True, text=True, env=env
+        capture_output=True,
+        text=True,
+        env=env,
     )
     print(result.stdout)
 
     # Show stats
     print("$ agenticom stats")
     result = subprocess.run(
-        ["agenticom", "stats"],
-        capture_output=True, text=True, env=env
+        ["agenticom", "stats"], capture_output=True, text=True, env=env
     )
     print(result.stdout)
 

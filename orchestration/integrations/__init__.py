@@ -10,32 +10,32 @@ Three ways to run:
 3. Ollama (Local) - 100% FREE, no API key, runs on your machine!
 """
 
-from orchestration.integrations.openclaw import (
-    OpenClawExecutor,
-    OpenClawConfig,
-    install_openclaw,
-    is_openclaw_installed,
-)
 from orchestration.integrations.nanobot import (
-    NanobotExecutor,
     NanobotConfig,
+    NanobotExecutor,
     install_nanobot,
     is_nanobot_installed,
 )
 from orchestration.integrations.ollama import (
-    OllamaExecutor,
-    OllamaConfig,
-    LMStudioExecutor,
-    is_ollama_running,
-    is_ollama_installed,
-    get_available_models,
-    pull_model,
     RECOMMENDED_MODELS,
+    LMStudioExecutor,
+    OllamaConfig,
+    OllamaExecutor,
+    get_available_models,
+    is_ollama_installed,
+    is_ollama_running,
+    pull_model,
+)
+from orchestration.integrations.openclaw import (
+    OpenClawConfig,
+    OpenClawExecutor,
+    install_openclaw,
+    is_openclaw_installed,
 )
 from orchestration.integrations.unified import (
-    UnifiedExecutor,
-    UnifiedConfig,
     Backend,
+    UnifiedConfig,
+    UnifiedExecutor,
     auto_setup_executor,
     get_available_backends,
     get_ready_backends,

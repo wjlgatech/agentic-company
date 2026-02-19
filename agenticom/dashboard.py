@@ -3,33 +3,36 @@ Agenticom Web Dashboard - Beautiful UI for non-technical users
 Run with: agenticom dashboard
 """
 
-import json
-import os
 import asyncio
-from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+import json
 import threading
 import webbrowser
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
 
 # Import core functions
 try:
-    from agenticom.state import StateManager
     from agenticom.core import AgenticomCore
+    from agenticom.state import StateManager
 except ImportError:
-    from .state import StateManager
     from .core import AgenticomCore
+    from .state import StateManager
 
 # Import SmartRefiner for guided workflow creation
 try:
+    from orchestration.integrations.unified import (
+        Backend,
+        UnifiedConfig,
+        UnifiedExecutor,
+    )
     from orchestration.tools.smart_refiner import SmartRefiner
-    from orchestration.integrations.unified import UnifiedExecutor, UnifiedConfig, Backend
+
     SMARTREFINER_AVAILABLE = True
 except ImportError:
     SMARTREFINER_AVAILABLE = False
 
 
-DASHBOARD_HTML = '''<!DOCTYPE html>
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1581,7 +1584,7 @@ startAutoRefresh();
 </script>
 </body>
 </html>
-'''
+"""
 
 
 class DashboardHandler(SimpleHTTPRequestHandler):
@@ -1601,144 +1604,151 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
-        if path == '/' or path == '/index.html':
+        if path == "/" or path == "/index.html":
             self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
+            self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(DASHBOARD_HTML.encode())
 
-        elif path == '/api/workflows':
+        elif path == "/api/workflows":
             workflows = self.core.list_workflows()
             self.send_json(workflows)
 
-        elif path == '/api/runs':
+        elif path == "/api/runs":
             query = parse_qs(parsed.query)
-            workflow_id = query.get('workflow', [None])[0]
+            workflow_id = query.get("workflow", [None])[0]
             runs = self.state.list_runs(workflow_id=workflow_id)
             self.send_json([r.to_dict() for r in runs])
 
-        elif path.startswith('/api/runs/') and path.endswith('/artifacts'):
+        elif path.startswith("/api/runs/") and path.endswith("/artifacts"):
             # Get artifacts for a run
-            run_id = path.split('/')[-2]
+            run_id = path.split("/")[-2]
+
             from orchestration.artifact_manager import ArtifactManager
-            from pathlib import Path
 
             artifact_manager = ArtifactManager()
             artifacts = artifact_manager.list_artifacts(run_id)
 
             if artifacts:
-                self.send_json({
-                    'run_id': run_id,
-                    'artifacts': artifacts,
-                    'count': len(artifacts),
-                    'output_dir': str(artifact_manager.get_run_dir(run_id))
-                })
+                self.send_json(
+                    {
+                        "run_id": run_id,
+                        "artifacts": artifacts,
+                        "count": len(artifacts),
+                        "output_dir": str(artifact_manager.get_run_dir(run_id)),
+                    }
+                )
             else:
-                self.send_json({
-                    'run_id': run_id,
-                    'artifacts': [],
-                    'count': 0
-                })
+                self.send_json({"run_id": run_id, "artifacts": [], "count": 0})
 
-        elif path.startswith('/api/runs/') and not path.endswith('/resume'):
-            run_id = path.split('/')[-1]
+        elif path.startswith("/api/runs/") and not path.endswith("/resume"):
+            run_id = path.split("/")[-1]
             run = self.state.get_run(run_id)
             if run:
                 # Get step results and include them
                 steps = self.state.get_step_results(run_id)
                 run_dict = run.to_dict()
-                run_dict['steps'] = [s.to_dict() for s in steps]
+                run_dict["steps"] = [s.to_dict() for s in steps]
 
                 # Add artifact information
                 from orchestration.artifact_manager import ArtifactManager
+
                 artifact_manager = ArtifactManager()
                 artifacts = artifact_manager.list_artifacts(run_id)
-                run_dict['artifacts'] = artifacts
-                run_dict['artifact_count'] = len(artifacts)
+                run_dict["artifacts"] = artifacts
+                run_dict["artifact_count"] = len(artifacts)
 
                 self.send_json(run_dict)
             else:
-                self.send_error(404, 'Run not found')
+                self.send_error(404, "Run not found")
 
-        elif path.startswith('/api/refiner/session/'):
+        elif path.startswith("/api/refiner/session/"):
             # Get SmartRefiner session state
             if not SMARTREFINER_AVAILABLE or not self.refiner:
-                self.send_json({'error': 'SmartRefiner not available'}, status=503)
+                self.send_json({"error": "SmartRefiner not available"}, status=503)
                 return
 
-            session_id = path.split('/')[-1]
+            session_id = path.split("/")[-1]
             session = self.refiner.sessions.get(session_id)
 
             if session:
-                self.send_json({
-                    'session_id': session.session_id,
-                    'state': session.state.value,
-                    'understanding': {
-                        'summary': session.understanding.summary,
-                        'confidence': session.understanding.confidence,
-                        'key_points': session.understanding.key_points,
-                    },
-                    'questions_asked': session.questions_asked,
-                    'final_prompt': session.final_prompt if session.state.value == 'complete' else None
-                })
+                self.send_json(
+                    {
+                        "session_id": session.session_id,
+                        "state": session.state.value,
+                        "understanding": {
+                            "summary": session.understanding.summary,
+                            "confidence": session.understanding.confidence,
+                            "key_points": session.understanding.key_points,
+                        },
+                        "questions_asked": session.questions_asked,
+                        "final_prompt": (
+                            session.final_prompt
+                            if session.state.value == "complete"
+                            else None
+                        ),
+                    }
+                )
             else:
-                self.send_error(404, 'Session not found')
+                self.send_error(404, "Session not found")
 
         else:
-            self.send_error(404, 'Not found')
+            self.send_error(404, "Not found")
 
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
 
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length) if content_length else b'{}'
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length) if content_length else b"{}"
 
         try:
             data = json.loads(body)
-        except:
+        except Exception:
             data = {}
 
-        if path == '/api/runs':
-            workflow = data.get('workflow', 'feature-dev')
-            task = data.get('task', '')
+        if path == "/api/runs":
+            workflow = data.get("workflow", "feature-dev")
+            task = data.get("task", "")
 
             if not task:
-                self.send_json({'error': 'Task required'}, status=400)
+                self.send_json({"error": "Task required"}, status=400)
                 return
 
             result = self.core.run_workflow(workflow, task)
             self.send_json(result)
 
-        elif path.endswith('/resume'):
-            run_id = path.split('/')[-2]
+        elif path.endswith("/resume"):
+            run_id = path.split("/")[-2]
             result = self.core.resume_run(run_id)
             self.send_json(result)
 
-        elif path == '/api/refiner/session':
+        elif path == "/api/refiner/session":
             # Create new SmartRefiner session
             if not SMARTREFINER_AVAILABLE or not self.refiner:
-                self.send_json({'error': 'SmartRefiner not available'}, status=503)
+                self.send_json({"error": "SmartRefiner not available"}, status=503)
                 return
 
             session_id = self.refiner.create_session()
-            self.send_json({
-                'session_id': session_id,
-                'state': 'interviewing',
-                'message': 'Hi! I\'m here to help you create the perfect workflow. What would you like to accomplish?'
-            })
+            self.send_json(
+                {
+                    "session_id": session_id,
+                    "state": "interviewing",
+                    "message": "Hi! I'm here to help you create the perfect workflow. What would you like to accomplish?",
+                }
+            )
 
-        elif path == '/api/refiner/message':
+        elif path == "/api/refiner/message":
             # Process message in SmartRefiner session
             if not SMARTREFINER_AVAILABLE or not self.refiner:
-                self.send_json({'error': 'SmartRefiner not available'}, status=503)
+                self.send_json({"error": "SmartRefiner not available"}, status=503)
                 return
 
-            session_id = data.get('session_id')
-            message = data.get('message', '')
+            session_id = data.get("session_id")
+            message = data.get("message", "")
 
             if not session_id or not message:
-                self.send_json({'error': 'session_id and message required'}, status=400)
+                self.send_json({"error": "session_id and message required"}, status=400)
                 return
 
             try:
@@ -1752,24 +1762,26 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
                 self.send_json(result)
             except Exception as e:
-                self.send_json({'error': str(e)}, status=500)
+                self.send_json({"error": str(e)}, status=500)
 
         else:
-            self.send_error(404, 'Not found')
+            self.send_error(404, "Not found")
 
     def send_json(self, data, status=200):
         self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
 
 def create_handler(state, core, refiner=None):
     """Create handler class with state, core, and refiner injected"""
+
     class Handler(DashboardHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, state=state, core=core, refiner=refiner, **kwargs)
+
     return Handler
 
 
@@ -1783,11 +1795,11 @@ def start_dashboard(port=8081, open_browser=True):
     if SMARTREFINER_AVAILABLE:
         try:
             # Create LLM executor
-            executor = UnifiedExecutor(config=UnifiedConfig(
-                preferred_backend=Backend.AUTO,
-                temperature=0.7,
-                max_tokens=2000
-            ))
+            executor = UnifiedExecutor(
+                config=UnifiedConfig(
+                    preferred_backend=Backend.AUTO, temperature=0.7, max_tokens=2000
+                )
+            )
 
             # Create async LLM call function for SmartRefiner
             # Combines system and user prompts since UnifiedExecutor doesn't separate them
@@ -1797,20 +1809,24 @@ def start_dashboard(port=8081, open_browser=True):
                 result = await executor.execute(combined_prompt)
                 return result
 
-            refiner = SmartRefiner(llm_call=llm_call, max_questions=6, ready_threshold=0.85)
+            refiner = SmartRefiner(
+                llm_call=llm_call, max_questions=6, ready_threshold=0.85
+            )
             print("✨ SmartRefiner enabled - Guided workflow creation available!")
         except Exception as e:
             print(f"⚠️  SmartRefiner initialization failed: {e}")
             print("   Falling back to standard mode")
 
     handler = create_handler(state, core, refiner)
-    server = HTTPServer(('localhost', port), handler)
+    server = HTTPServer(("localhost", port), handler)
 
     print(f"🚀 Agenticom Dashboard running at http://localhost:{port}")
     print("   Press Ctrl+C to stop")
 
     if open_browser:
-        threading.Timer(0.5, lambda: webbrowser.open(f'http://localhost:{port}')).start()
+        threading.Timer(
+            0.5, lambda: webbrowser.open(f"http://localhost:{port}")
+        ).start()
 
     try:
         server.serve_forever()
@@ -1819,5 +1835,5 @@ def start_dashboard(port=8081, open_browser=True):
         server.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     start_dashboard()

@@ -2,14 +2,11 @@
 Agenticom Core - Main orchestration engine.
 """
 
-import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from .state import StateManager
 from .workflows import WorkflowDefinition, WorkflowRunner
-
 
 # Default installation paths
 AGENTICOM_HOME = Path.home() / ".agenticom"
@@ -24,7 +21,7 @@ class AgenticomCore:
     Manages workflow installation, execution, and state.
     """
 
-    def __init__(self, home_dir: Optional[Path] = None):
+    def __init__(self, home_dir: Path | None = None):
         self.home = home_dir or AGENTICOM_HOME
         self.workflows_dir = self.home / "workflows"
         self.agents_dir = self.home / "agents"
@@ -35,7 +32,7 @@ class AgenticomCore:
         self.workflows_dir.mkdir(exist_ok=True)
         self.agents_dir.mkdir(exist_ok=True)
 
-    def install(self, source_dir: Optional[Path] = None) -> dict:
+    def install(self, source_dir: Path | None = None) -> dict:
         """
         Install Agenticom workflows and agents.
 
@@ -73,7 +70,9 @@ class AgenticomCore:
                         shutil.copytree(agent_dir, dest)
                         results["agents"].append(agent_dir.name)
                     except Exception as e:
-                        results["errors"].append(f"Failed to install agent {agent_dir.name}: {e}")
+                        results["errors"].append(
+                            f"Failed to install agent {agent_dir.name}: {e}"
+                        )
 
         return results
 
@@ -82,7 +81,7 @@ class AgenticomCore:
         if not force:
             return {
                 "warning": "This will delete all workflows, agents, and state.",
-                "hint": "Use force=True to confirm"
+                "hint": "Use force=True to confirm",
             }
 
         try:
@@ -99,24 +98,24 @@ class AgenticomCore:
         for yaml_file in self.workflows_dir.glob("*.yaml"):
             try:
                 wf = WorkflowDefinition.from_yaml(yaml_file)
-                workflows.append({
-                    "id": wf.id,
-                    "name": wf.name,
-                    "description": wf.description,
-                    "steps": len(wf.steps),
-                    "agents": len(wf.agents),
-                    "file": yaml_file.name
-                })
+                workflows.append(
+                    {
+                        "id": wf.id,
+                        "name": wf.name,
+                        "description": wf.description,
+                        "steps": len(wf.steps),
+                        "agents": len(wf.agents),
+                        "file": yaml_file.name,
+                    }
+                )
             except Exception as e:
-                workflows.append({
-                    "id": yaml_file.stem,
-                    "error": str(e),
-                    "file": yaml_file.name
-                })
+                workflows.append(
+                    {"id": yaml_file.stem, "error": str(e), "file": yaml_file.name}
+                )
 
         return workflows
 
-    def get_workflow(self, workflow_id: str) -> Optional[WorkflowDefinition]:
+    def get_workflow(self, workflow_id: str) -> WorkflowDefinition | None:
         """Load a workflow by ID."""
         # Try direct file match
         yaml_file = self.workflows_dir / f"{workflow_id}.yaml"
@@ -129,7 +128,7 @@ class AgenticomCore:
                 wf = WorkflowDefinition.from_yaml(yaml_file)
                 if wf.id == workflow_id:
                     return wf
-            except:
+            except Exception:
                 continue
 
         return None
@@ -138,8 +137,12 @@ class AgenticomCore:
         """Create an LLM executor from available backends, or None."""
         try:
             from orchestration.integrations.unified import (
-                get_ready_backends, UnifiedExecutor, Backend, UnifiedConfig,
+                Backend,
+                UnifiedConfig,
+                UnifiedExecutor,
+                get_ready_backends,
             )
+
             ready = get_ready_backends()
             if not ready:
                 return None
@@ -156,6 +159,7 @@ class AgenticomCore:
 
             def llm_executor(agent_prompt: str, task_context: str) -> str:
                 import asyncio
+
                 prompt = f"{agent_prompt}\n\n{task_context}"
                 try:
                     loop = asyncio.get_running_loop()
@@ -164,10 +168,9 @@ class AgenticomCore:
                 if loop and loop.is_running():
                     # Already in an async context — run in a new thread
                     import concurrent.futures
+
                     with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(
-                            asyncio.run, executor.execute(prompt)
-                        )
+                        future = pool.submit(asyncio.run, executor.execute(prompt))
                         return future.result()
                 else:
                     return asyncio.run(executor.execute(prompt))
@@ -177,10 +180,7 @@ class AgenticomCore:
             return None
 
     def run_workflow(
-        self,
-        workflow_id: str,
-        task: str,
-        context: Optional[dict] = None
+        self, workflow_id: str, task: str, context: dict | None = None
     ) -> dict:
         """Run a workflow with the given task."""
         workflow = self.get_workflow(workflow_id)
@@ -196,17 +196,21 @@ class AgenticomCore:
             "workflow": workflow.name,
             "status": run.status.value,
             "task": task,
-            "steps_completed": len([r for r in results if r.status.value == "completed"]),
+            "steps_completed": len(
+                [r for r in results if r.status.value == "completed"]
+            ),
             "total_steps": len(workflow.steps),
             "results": [
                 {
                     "step": r.step_id,
                     "agent": r.agent,
                     "status": r.status.value,
-                    "output_preview": r.output[:200] + "..." if len(r.output) > 200 else r.output
+                    "output_preview": (
+                        r.output[:200] + "..." if len(r.output) > 200 else r.output
+                    ),
                 }
                 for r in results
-            ]
+            ],
         }
 
     def get_run_status(self, run_id: str) -> dict:
@@ -230,8 +234,10 @@ class AgenticomCore:
         return {
             "run_id": updated_run.id,
             "status": updated_run.status.value,
-            "steps_completed": len([r for r in results if r.status.value == "completed"]),
-            "total_steps": updated_run.total_steps
+            "steps_completed": len(
+                [r for r in results if r.status.value == "completed"]
+            ),
+            "total_steps": updated_run.total_steps,
         }
 
     def inspect_run(self, run_id: str, step_id: str | None = None) -> dict:
@@ -246,16 +252,18 @@ class AgenticomCore:
         for r in results:
             if step_id and r.step_id != step_id:
                 continue
-            steps.append({
-                "step_id": r.step_id,
-                "agent": r.agent,
-                "status": r.status.value,
-                "input": r.input_context,
-                "output": r.output,
-                "error": r.error,
-                "started_at": r.started_at,
-                "completed_at": r.completed_at,
-            })
+            steps.append(
+                {
+                    "step_id": r.step_id,
+                    "agent": r.agent,
+                    "status": r.status.value,
+                    "input": r.input_context,
+                    "output": r.output,
+                    "error": r.error,
+                    "started_at": r.started_at,
+                    "completed_at": r.completed_at,
+                }
+            )
 
         return {
             "run_id": run.id,
@@ -273,5 +281,5 @@ class AgenticomCore:
         return {
             "installed_workflows": len(workflows),
             "workflow_names": [w.get("name", w.get("id")) for w in workflows],
-            **state_stats
+            **state_stats,
         }

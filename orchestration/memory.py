@@ -10,7 +10,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -20,10 +20,10 @@ class MemoryEntry:
     id: str
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
-    embedding: Optional[list[float]] = None
+    embedding: list[float] | None = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     tags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -47,9 +47,21 @@ class MemoryEntry:
             content=data["content"],
             metadata=data.get("metadata", {}),
             embedding=data.get("embedding"),
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
-            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
-            expires_at=datetime.fromisoformat(data["expires_at"]) if data.get("expires_at") else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else datetime.now()
+            ),
+            updated_at=(
+                datetime.fromisoformat(data["updated_at"])
+                if data.get("updated_at")
+                else datetime.now()
+            ),
+            expires_at=(
+                datetime.fromisoformat(data["expires_at"])
+                if data.get("expires_at")
+                else None
+            ),
             tags=data.get("tags", []),
         )
 
@@ -63,7 +75,7 @@ class MemoryStore(ABC):
         pass
 
     @abstractmethod
-    def retrieve(self, entry_id: str) -> Optional[MemoryEntry]:
+    def retrieve(self, entry_id: str) -> MemoryEntry | None:
         """Retrieve a memory entry by ID."""
         pass
 
@@ -86,7 +98,9 @@ class MemoryStore(ABC):
         """Alias for search - recall memories matching query."""
         return self.search(query, limit)
 
-    def remember(self, content: str, metadata: Optional[dict] = None, tags: Optional[list[str]] = None) -> str:
+    def remember(
+        self, content: str, metadata: dict | None = None, tags: list[str] | None = None
+    ) -> str:
         """Store content as a memory entry."""
         entry_id = hashlib.sha256(f"{content}{time.time()}".encode()).hexdigest()[:16]
         entry = MemoryEntry(
@@ -110,15 +124,14 @@ class LocalMemoryStore(MemoryStore):
         # Evict oldest if at capacity
         if len(self.entries) >= self.max_entries:
             oldest_id = min(
-                self.entries.keys(),
-                key=lambda k: self.entries[k].created_at
+                self.entries.keys(), key=lambda k: self.entries[k].created_at
             )
             del self.entries[oldest_id]
 
         self.entries[entry.id] = entry
         return entry.id
 
-    def retrieve(self, entry_id: str) -> Optional[MemoryEntry]:
+    def retrieve(self, entry_id: str) -> MemoryEntry | None:
         """Retrieve entry by ID."""
         return self.entries.get(entry_id)
 
@@ -166,11 +179,9 @@ class LocalMemoryStore(MemoryStore):
     def list_all(self, limit: int = 100, offset: int = 0) -> list[MemoryEntry]:
         """List all entries."""
         entries = sorted(
-            self.entries.values(),
-            key=lambda e: e.created_at,
-            reverse=True
+            self.entries.values(), key=lambda e: e.created_at, reverse=True
         )
-        return entries[offset:offset + limit]
+        return entries[offset : offset + limit]
 
     def clear(self) -> None:
         """Clear all entries."""
@@ -188,7 +199,11 @@ class LocalMemoryStore(MemoryStore):
 class RedisMemoryStore(MemoryStore):
     """Redis-backed memory store."""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379/0", prefix: str = "agentic:memory:"):
+    def __init__(
+        self,
+        redis_url: str = "redis://localhost:6379/0",
+        prefix: str = "agentic:memory:",
+    ):
         self.redis_url = redis_url
         self.prefix = prefix
         self._client = None
@@ -199,6 +214,7 @@ class RedisMemoryStore(MemoryStore):
         if self._client is None:
             try:
                 import redis
+
                 self._client = redis.from_url(self.redis_url, decode_responses=True)
             except ImportError:
                 raise ImportError("Redis support requires: pip install redis")
@@ -225,7 +241,7 @@ class RedisMemoryStore(MemoryStore):
         self.client.sadd(f"{self.prefix}index", entry.id)
         return entry.id
 
-    def retrieve(self, entry_id: str) -> Optional[MemoryEntry]:
+    def retrieve(self, entry_id: str) -> MemoryEntry | None:
         """Retrieve entry from Redis."""
         key = self._key(entry_id)
         data = self.client.get(key)
@@ -260,7 +276,7 @@ class RedisMemoryStore(MemoryStore):
     def list_all(self, limit: int = 100, offset: int = 0) -> list[MemoryEntry]:
         """List all entries."""
         entry_ids = list(self.client.smembers(f"{self.prefix}index"))
-        entry_ids = entry_ids[offset:offset + limit]
+        entry_ids = entry_ids[offset : offset + limit]
 
         entries = []
         for entry_id in entry_ids:
@@ -311,11 +327,14 @@ class PostgresMemoryStore(MemoryStore):
 
             self._initialized = True
         except ImportError:
-            raise ImportError("PostgreSQL support requires: pip install asyncpg sqlalchemy[asyncio]")
+            raise ImportError(
+                "PostgreSQL support requires: pip install asyncpg sqlalchemy[asyncio]"
+            )
 
     def store(self, entry: MemoryEntry) -> str:
         """Store entry (sync wrapper)."""
         import asyncio
+
         return asyncio.get_event_loop().run_until_complete(self._async_store(entry))
 
     async def _async_store(self, entry: MemoryEntry) -> str:
@@ -340,16 +359,19 @@ class PostgresMemoryStore(MemoryStore):
                     "metadata": json.dumps(entry.metadata),
                     "tags": entry.tags,
                     "expires_at": entry.expires_at,
-                }
+                },
             )
         return entry.id
 
-    def retrieve(self, entry_id: str) -> Optional[MemoryEntry]:
+    def retrieve(self, entry_id: str) -> MemoryEntry | None:
         """Retrieve entry (sync wrapper)."""
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(self._async_retrieve(entry_id))
 
-    async def _async_retrieve(self, entry_id: str) -> Optional[MemoryEntry]:
+        return asyncio.get_event_loop().run_until_complete(
+            self._async_retrieve(entry_id)
+        )
+
+    async def _async_retrieve(self, entry_id: str) -> MemoryEntry | None:
         """Retrieve entry asynchronously."""
         await self._ensure_table()
         from sqlalchemy import text
@@ -357,7 +379,7 @@ class PostgresMemoryStore(MemoryStore):
         async with self._engine.connect() as conn:
             result = await conn.execute(
                 text(f"SELECT * FROM {self.table_name} WHERE id = :id"),
-                {"id": entry_id}
+                {"id": entry_id},
             )
             row = result.fetchone()
             if row:
@@ -375,7 +397,10 @@ class PostgresMemoryStore(MemoryStore):
     def search(self, query: str, limit: int = 10) -> list[MemoryEntry]:
         """Search entries (sync wrapper)."""
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(self._async_search(query, limit))
+
+        return asyncio.get_event_loop().run_until_complete(
+            self._async_search(query, limit)
+        )
 
     async def _async_search(self, query: str, limit: int = 10) -> list[MemoryEntry]:
         """Search entries using full-text search."""
@@ -391,24 +416,27 @@ class PostgresMemoryStore(MemoryStore):
                     ORDER BY created_at DESC
                     LIMIT :limit
                 """),
-                {"pattern": f"%{query}%", "query": query, "limit": limit}
+                {"pattern": f"%{query}%", "query": query, "limit": limit},
             )
             entries = []
             for row in result.fetchall():
-                entries.append(MemoryEntry(
-                    id=row.id,
-                    content=row.content,
-                    metadata=row.metadata or {},
-                    tags=row.tags or [],
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                    expires_at=row.expires_at,
-                ))
+                entries.append(
+                    MemoryEntry(
+                        id=row.id,
+                        content=row.content,
+                        metadata=row.metadata or {},
+                        tags=row.tags or [],
+                        created_at=row.created_at,
+                        updated_at=row.updated_at,
+                        expires_at=row.expires_at,
+                    )
+                )
             return entries
 
     def delete(self, entry_id: str) -> bool:
         """Delete entry (sync wrapper)."""
         import asyncio
+
         return asyncio.get_event_loop().run_until_complete(self._async_delete(entry_id))
 
     async def _async_delete(self, entry_id: str) -> bool:
@@ -418,17 +446,21 @@ class PostgresMemoryStore(MemoryStore):
 
         async with self._engine.begin() as conn:
             result = await conn.execute(
-                text(f"DELETE FROM {self.table_name} WHERE id = :id"),
-                {"id": entry_id}
+                text(f"DELETE FROM {self.table_name} WHERE id = :id"), {"id": entry_id}
             )
             return result.rowcount > 0
 
     def list_all(self, limit: int = 100, offset: int = 0) -> list[MemoryEntry]:
         """List all entries (sync wrapper)."""
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(self._async_list_all(limit, offset))
 
-    async def _async_list_all(self, limit: int = 100, offset: int = 0) -> list[MemoryEntry]:
+        return asyncio.get_event_loop().run_until_complete(
+            self._async_list_all(limit, offset)
+        )
+
+    async def _async_list_all(
+        self, limit: int = 100, offset: int = 0
+    ) -> list[MemoryEntry]:
         """List all entries asynchronously."""
         await self._ensure_table()
         from sqlalchemy import text
@@ -440,19 +472,21 @@ class PostgresMemoryStore(MemoryStore):
                     ORDER BY created_at DESC
                     LIMIT :limit OFFSET :offset
                 """),
-                {"limit": limit, "offset": offset}
+                {"limit": limit, "offset": offset},
             )
             entries = []
             for row in result.fetchall():
-                entries.append(MemoryEntry(
-                    id=row.id,
-                    content=row.content,
-                    metadata=row.metadata or {},
-                    tags=row.tags or [],
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                    expires_at=row.expires_at,
-                ))
+                entries.append(
+                    MemoryEntry(
+                        id=row.id,
+                        content=row.content,
+                        metadata=row.metadata or {},
+                        tags=row.tags or [],
+                        created_at=row.created_at,
+                        updated_at=row.updated_at,
+                        expires_at=row.expires_at,
+                    )
+                )
             return entries
 
 

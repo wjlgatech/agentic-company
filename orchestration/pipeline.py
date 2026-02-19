@@ -7,15 +7,16 @@ Provides a flexible framework for building complex agent pipelines.
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
-from orchestration.guardrails import GuardrailPipeline, GuardrailResult
-from orchestration.evaluator import BaseEvaluator, EvaluationResult
-from orchestration.memory import MemoryStore
 from orchestration.approval import ApprovalGate, ApprovalRequest
+from orchestration.evaluator import BaseEvaluator, EvaluationResult
+from orchestration.guardrails import GuardrailPipeline, GuardrailResult
+from orchestration.memory import MemoryStore
 from orchestration.observability import ObservabilityStack, get_observability
 
 
@@ -37,11 +38,11 @@ class StepResult:
     step_name: str
     status: StepStatus
     output: Any = None
-    error: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    error: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     guardrail_results: list[GuardrailResult] = field(default_factory=list)
-    evaluation_result: Optional[EvaluationResult] = None
+    evaluation_result: EvaluationResult | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -57,7 +58,9 @@ class StepResult:
             "output": self.output,
             "error": self.error,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
             "duration_ms": self.duration_ms,
             "metadata": self.metadata,
         }
@@ -108,7 +111,7 @@ class LLMStep(PipelineStep):
         self,
         name: str,
         prompt_template: str,
-        llm_client: Optional[Any] = None,
+        llm_client: Any | None = None,
         model: str = "claude-sonnet-4-20250514",
     ):
         self.name = name
@@ -137,7 +140,7 @@ class ConditionalStep(PipelineStep):
         name: str,
         condition: Callable[[Any, dict], bool],
         true_step: PipelineStep,
-        false_step: Optional[PipelineStep] = None,
+        false_step: PipelineStep | None = None,
     ):
         self.name = name
         self.condition = condition
@@ -185,12 +188,12 @@ class Pipeline:
     def __init__(
         self,
         config: PipelineConfig,
-        steps: Optional[list[PipelineStep]] = None,
-        guardrails: Optional[GuardrailPipeline] = None,
-        evaluator: Optional[BaseEvaluator] = None,
-        memory: Optional[MemoryStore] = None,
-        approval_gate: Optional[ApprovalGate] = None,
-        observability: Optional[ObservabilityStack] = None,
+        steps: list[PipelineStep] | None = None,
+        guardrails: GuardrailPipeline | None = None,
+        evaluator: BaseEvaluator | None = None,
+        memory: MemoryStore | None = None,
+        approval_gate: ApprovalGate | None = None,
+        observability: ObservabilityStack | None = None,
     ):
         self.config = config
         self.steps = steps or []
@@ -209,7 +212,7 @@ class Pipeline:
     async def run(
         self,
         input_data: Any,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> tuple[Any, list[StepResult]]:
         """Run the pipeline."""
         context = context or {}
@@ -272,7 +275,9 @@ class Pipeline:
                     approval = await self._request_approval(step, input_data, context)
                     if approval.status.value not in ["approved", "auto_approved"]:
                         result.status = StepStatus.BLOCKED
-                        result.error = f"Approval {approval.status.value}: {approval.reason}"
+                        result.error = (
+                            f"Approval {approval.status.value}: {approval.reason}"
+                        )
                         result.completed_at = datetime.now()
                         return result
 
@@ -297,7 +302,9 @@ class Pipeline:
             except Exception as e:
                 result.status = StepStatus.FAILED
                 result.error = str(e)
-                self.obs.logger.error("Step execution failed", step=step.name, error=str(e))
+                self.obs.logger.error(
+                    "Step execution failed", step=step.name, error=str(e)
+                )
 
             finally:
                 result.completed_at = datetime.now()
@@ -342,10 +349,10 @@ class PipelineBuilder:
     def __init__(self, name: str):
         self.config = PipelineConfig(name=name)
         self.steps: list[PipelineStep] = []
-        self.guardrails: Optional[GuardrailPipeline] = None
-        self.evaluator: Optional[BaseEvaluator] = None
-        self.memory: Optional[MemoryStore] = None
-        self.approval_gate: Optional[ApprovalGate] = None
+        self.guardrails: GuardrailPipeline | None = None
+        self.evaluator: BaseEvaluator | None = None
+        self.memory: MemoryStore | None = None
+        self.approval_gate: ApprovalGate | None = None
 
     def with_description(self, description: str) -> "PipelineBuilder":
         self.config.description = description
@@ -405,8 +412,8 @@ class PipelineBuilder:
 # Factory for common pipelines
 def create_content_pipeline(
     name: str = "content",
-    guardrails: Optional[GuardrailPipeline] = None,
-    evaluator: Optional[BaseEvaluator] = None,
+    guardrails: GuardrailPipeline | None = None,
+    evaluator: BaseEvaluator | None = None,
 ) -> Pipeline:
     """Create a standard content processing pipeline."""
     return (

@@ -11,43 +11,43 @@ Supports:
 """
 
 import os
-from typing import Optional, Any, Literal
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Literal
 
-from orchestration.integrations.openclaw import (
-    OpenClawExecutor,
-    OpenClawConfig,
-    is_openclaw_installed,
-    install_openclaw,
-)
 from orchestration.integrations.nanobot import (
-    NanobotExecutor,
     NanobotConfig,
-    is_nanobot_installed,
+    NanobotExecutor,
     install_nanobot,
+    is_nanobot_installed,
 )
 from orchestration.integrations.ollama import (
-    OllamaExecutor,
     OllamaConfig,
+    OllamaExecutor,
     is_ollama_running,
-    is_ollama_installed,
-    get_available_models,
+)
+from orchestration.integrations.openclaw import (
+    OpenClawConfig,
+    OpenClawExecutor,
+    install_openclaw,
+    is_openclaw_installed,
 )
 
 
 class Backend(Enum):
     """Available LLM backends"""
+
     OPENCLAW = "openclaw"  # Anthropic Claude (cloud)
-    NANOBOT = "nanobot"    # OpenAI GPT (cloud)
-    OLLAMA = "ollama"      # Local LLMs (free!)
-    LOCAL = "local"        # Alias for Ollama
-    AUTO = "auto"          # Auto-detect best available
+    NANOBOT = "nanobot"  # OpenAI GPT (cloud)
+    OLLAMA = "ollama"  # Local LLMs (free!)
+    LOCAL = "local"  # Alias for Ollama
+    AUTO = "auto"  # Auto-detect best available
 
 
 @dataclass
 class UnifiedConfig:
     """Configuration for unified executor"""
+
     preferred_backend: Backend = Backend.AUTO
     openclaw_model: str = "claude-sonnet-4-20250514"
     nanobot_model: str = "gpt-4-turbo-preview"
@@ -140,9 +140,9 @@ class UnifiedExecutor:
 
     def __init__(
         self,
-        config: Optional[UnifiedConfig] = None,
-        backend: Optional[Backend] = None,
-        eager_init: bool = False
+        config: UnifiedConfig | None = None,
+        backend: Backend | None = None,
+        eager_init: bool = False,
     ):
         self.config = config or UnifiedConfig()
 
@@ -150,7 +150,7 @@ class UnifiedExecutor:
             self.config.preferred_backend = backend
 
         self._executor = None
-        self._active_backend: Optional[Backend] = None
+        self._active_backend: Backend | None = None
 
         # Eagerly initialize if requested (useful to verify backend before execution)
         if eager_init:
@@ -165,24 +165,30 @@ class UnifiedExecutor:
         self._active_backend = backend
 
         if backend == Backend.OPENCLAW:
-            self._executor = OpenClawExecutor(OpenClawConfig(
-                model=self.config.openclaw_model,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-            ))
+            self._executor = OpenClawExecutor(
+                OpenClawConfig(
+                    model=self.config.openclaw_model,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature,
+                )
+            )
         elif backend == Backend.NANOBOT:
-            self._executor = NanobotExecutor(NanobotConfig(
-                model=self.config.nanobot_model,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-            ))
+            self._executor = NanobotExecutor(
+                NanobotConfig(
+                    model=self.config.nanobot_model,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature,
+                )
+            )
         elif backend in (Backend.OLLAMA, Backend.LOCAL):
-            self._executor = OllamaExecutor(OllamaConfig(
-                model=self.config.ollama_model,
-                base_url=self.config.ollama_url,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-            ))
+            self._executor = OllamaExecutor(
+                OllamaConfig(
+                    model=self.config.ollama_model,
+                    base_url=self.config.ollama_url,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature,
+                )
+            )
         else:
             raise RuntimeError("No LLM backend available")
 
@@ -259,7 +265,7 @@ class UnifiedExecutor:
         )
 
     @property
-    def active_backend(self) -> Optional[Backend]:
+    def active_backend(self) -> Backend | None:
         """Get the currently active backend"""
         return self._active_backend
 
@@ -298,7 +304,7 @@ class UnifiedExecutor:
 def auto_setup_executor(
     preferred: Literal["openclaw", "nanobot", "ollama", "local", "auto"] = "auto",
     eager_init: bool = True,
-    **kwargs
+    **kwargs,
 ) -> UnifiedExecutor:
     """
     Automatically setup the best available LLM executor.

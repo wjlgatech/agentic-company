@@ -52,10 +52,13 @@ class TestWorkflowEndpoints:
 
     def test_run_workflow(self, client):
         """Should run a workflow and return result."""
-        response = client.post("/workflows/run", json={
-            "workflow_name": "content-research",
-            "input_data": "AI trends 2024",
-        })
+        response = client.post(
+            "/workflows/run",
+            json={
+                "workflow_name": "content-research",
+                "input_data": "AI trends 2024",
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["workflow_name"] == "content-research"
@@ -76,10 +79,13 @@ class TestMemoryEndpoints:
 
     def test_store_memory(self, client):
         """Should store content in memory."""
-        response = client.post("/memory/store", json={
-            "content": "Important information to remember",
-            "tags": ["test", "important"],
-        })
+        response = client.post(
+            "/memory/store",
+            json={
+                "content": "Important information to remember",
+                "tags": ["test", "important"],
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "id" in data
@@ -88,16 +94,22 @@ class TestMemoryEndpoints:
     def test_search_memory(self, client):
         """Should search memory for content."""
         # First store something
-        client.post("/memory/store", json={
-            "content": "Python programming tutorial",
-            "tags": ["python"],
-        })
+        client.post(
+            "/memory/store",
+            json={
+                "content": "Python programming tutorial",
+                "tags": ["python"],
+            },
+        )
 
         # Then search
-        response = client.post("/memory/search", json={
-            "query": "Python",
-            "limit": 5,
-        })
+        response = client.post(
+            "/memory/search",
+            json={
+                "query": "Python",
+                "limit": 5,
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "results" in data
@@ -127,11 +139,14 @@ class TestApprovalEndpoints:
 
     def test_create_approval_request(self, client):
         """Should create approval request."""
-        response = client.post("/approvals", params={
-            "workflow_id": "test-workflow",
-            "step_name": "publish",
-            "content": "Content to approve",
-        })
+        response = client.post(
+            "/approvals",
+            params={
+                "workflow_id": "test-workflow",
+                "step_name": "publish",
+                "content": "Content to approve",
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "id" in data

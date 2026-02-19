@@ -7,7 +7,6 @@ Use `init_workflow` to create a new workflow file from a template.
 
 from pathlib import Path
 
-
 FEATURE_DEV_TEMPLATE = """# Feature Development Workflow
 # Agents work together to implement new features safely
 
@@ -445,9 +444,7 @@ steps:
 
 
 def init_workflow(
-    template_name: str,
-    output_path: str | Path,
-    overwrite: bool = False
+    template_name: str, output_path: str | Path, overwrite: bool = False
 ) -> Path:
     """
     Initialize a new workflow file from a template.
@@ -461,24 +458,22 @@ def init_workflow(
         Path to created file
     """
     templates = {
-        'feature-dev': FEATURE_DEV_TEMPLATE,
-        'bug-fix': BUG_FIX_TEMPLATE,
-        'security-audit': SECURITY_AUDIT_TEMPLATE,
-        'content-research': CONTENT_RESEARCH_TEMPLATE,
+        "feature-dev": FEATURE_DEV_TEMPLATE,
+        "bug-fix": BUG_FIX_TEMPLATE,
+        "security-audit": SECURITY_AUDIT_TEMPLATE,
+        "content-research": CONTENT_RESEARCH_TEMPLATE,
     }
 
     if template_name not in templates:
         raise ValueError(
-            f"Unknown template: {template_name}. "
-            f"Available: {list(templates.keys())}"
+            f"Unknown template: {template_name}. Available: {list(templates.keys())}"
         )
 
     output_file = Path(output_path)
 
     if output_file.exists() and not overwrite:
         raise FileExistsError(
-            f"File already exists: {output_file}. "
-            f"Use overwrite=True to replace."
+            f"File already exists: {output_file}. Use overwrite=True to replace."
         )
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -489,4 +484,4 @@ def init_workflow(
 
 def list_templates() -> list[str]:
     """Return list of available template names"""
-    return ['feature-dev', 'bug-fix', 'security-audit', 'content-research']
+    return ["feature-dev", "bug-fix", "security-audit", "content-research"]

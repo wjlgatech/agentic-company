@@ -8,17 +8,19 @@ import hashlib
 import hmac
 import secrets
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 from fastapi import HTTPException, Request, Security
-from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
 # Try to import JWT library
 try:
     import jwt
+
     JWT_AVAILABLE = True
 except ImportError:
     JWT_AVAILABLE = False
@@ -26,6 +28,7 @@ except ImportError:
 
 
 # ============== Configuration ==============
+
 
 @dataclass
 class SecurityConfig:
@@ -53,10 +56,11 @@ def configure_security(config: SecurityConfig) -> None:
 
 # ============== JWT Authentication ==============
 
+
 def create_jwt_token(
     user_id: str,
     roles: list[str] = None,
-    expiry_hours: Optional[int] = None,
+    expiry_hours: int | None = None,
 ) -> str:
     """Create a JWT token."""
     if not JWT_AVAILABLE:
@@ -111,6 +115,7 @@ async def get_current_user(
 
 def require_roles(*required_roles: str):
     """Decorator to require specific roles."""
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, user: dict = None, **kwargs):
@@ -120,12 +125,13 @@ def require_roles(*required_roles: str):
             user_roles = set(user.get("roles", []))
             if not user_roles.intersection(required_roles):
                 raise HTTPException(
-                    status_code=403,
-                    detail=f"Requires one of roles: {required_roles}"
+                    status_code=403, detail=f"Requires one of roles: {required_roles}"
                 )
 
             return await func(*args, user=user, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -152,7 +158,7 @@ def generate_api_key(user_id: str, name: str = "default") -> str:
     return key
 
 
-def validate_api_key(key: str) -> Optional[dict]:
+def validate_api_key(key: str) -> dict | None:
     """Validate an API key."""
     if not key:
         return None
@@ -169,7 +175,7 @@ def validate_api_key(key: str) -> Optional[dict]:
 
 async def get_api_key_user(
     api_key: str = Security(api_key_header),
-) -> Optional[dict]:
+) -> dict | None:
     """Get user from API key."""
     if not api_key:
         return None
@@ -182,6 +188,7 @@ async def get_api_key_user(
 
 
 # ============== Rate Limiting ==============
+
 
 class RateLimiter:
     """Token bucket rate limiter."""
@@ -202,10 +209,7 @@ class RateLimiter:
 
         # Clean old requests
         if key in self.requests:
-            self.requests[key] = [
-                ts for ts in self.requests[key]
-                if ts > window_start
-            ]
+            self.requests[key] = [ts for ts in self.requests[key] if ts > window_start]
         else:
             self.requests[key] = []
 
@@ -264,6 +268,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 # ============== Input Validation ==============
 
+
 def sanitize_input(text: str, max_length: int = 10000) -> str:
     """Sanitize user input."""
     if not text:
@@ -281,10 +286,12 @@ def sanitize_input(text: str, max_length: int = 10000) -> str:
 def validate_workflow_name(name: str) -> bool:
     """Validate workflow name."""
     import re
-    return bool(re.match(r'^[a-zA-Z][a-zA-Z0-9_-]{0,63}$', name))
+
+    return bool(re.match(r"^[a-zA-Z][a-zA-Z0-9_-]{0,63}$", name))
 
 
 # ============== HMAC Signature Verification ==============
+
 
 def sign_payload(payload: str, secret: str) -> str:
     """Sign a payload with HMAC."""
@@ -303,6 +310,7 @@ def verify_signature(payload: str, signature: str, secret: str) -> bool:
 
 # ============== Audit Logging ==============
 
+
 class AuditLogger:
     """Audit logging for security events."""
 
@@ -312,10 +320,10 @@ class AuditLogger:
     def log(
         self,
         action: str,
-        user_id: Optional[str] = None,
-        resource: Optional[str] = None,
-        details: Optional[dict] = None,
-        ip_address: Optional[str] = None,
+        user_id: str | None = None,
+        resource: str | None = None,
+        details: dict | None = None,
+        ip_address: str | None = None,
     ) -> None:
         """Log an audit event."""
         event = {
@@ -334,8 +342,8 @@ class AuditLogger:
 
     def get_events(
         self,
-        user_id: Optional[str] = None,
-        action: Optional[str] = None,
+        user_id: str | None = None,
+        action: str | None = None,
         limit: int = 100,
     ) -> list[dict]:
         """Get audit events."""

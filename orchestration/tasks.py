@@ -6,10 +6,10 @@ Provides async task processing with retries, rate limiting, and monitoring.
 
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from celery import Celery, Task
-from celery.signals import task_prerun, task_postrun, task_failure
+from celery.signals import task_postrun, task_prerun
 
 from orchestration.config import get_config
 from orchestration.observability import get_observability
@@ -17,17 +17,17 @@ from orchestration.observability import get_observability
 # Initialize Celery
 config = get_config()
 app = Celery(
-    'agentic',
-    broker=os.getenv('CELERY_BROKER_URL', config.celery.broker_url),
-    backend=os.getenv('CELERY_RESULT_BACKEND', config.celery.result_backend),
+    "agentic",
+    broker=os.getenv("CELERY_BROKER_URL", config.celery.broker_url),
+    backend=os.getenv("CELERY_RESULT_BACKEND", config.celery.result_backend),
 )
 
 # Celery configuration
 app.conf.update(
-    task_serializer='json',
-    accept_content=['json'],
-    result_serializer='json',
-    timezone='UTC',
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
     enable_utc=True,
     task_track_started=True,
     task_time_limit=config.celery.task_timeout,
@@ -45,49 +45,58 @@ class ObservedTask(Task):
     """Base task class with observability."""
 
     def on_success(self, retval: Any, task_id: str, args: tuple, kwargs: dict) -> None:
-        obs.metrics.increment('celery_task_success', labels={'task': self.name})
+        obs.metrics.increment("celery_task_success", labels={"task": self.name})
 
-    def on_failure(self, exc: Exception, task_id: str, args: tuple, kwargs: dict, einfo: Any) -> None:
-        obs.metrics.increment('celery_task_failure', labels={'task': self.name})
+    def on_failure(
+        self, exc: Exception, task_id: str, args: tuple, kwargs: dict, einfo: Any
+    ) -> None:
+        obs.metrics.increment("celery_task_failure", labels={"task": self.name})
         obs.logger.error(
-            'Task failed',
+            "Task failed",
             task=self.name,
             task_id=task_id,
             error=str(exc),
         )
 
-    def on_retry(self, exc: Exception, task_id: str, args: tuple, kwargs: dict, einfo: Any) -> None:
-        obs.metrics.increment('celery_task_retry', labels={'task': self.name})
+    def on_retry(
+        self, exc: Exception, task_id: str, args: tuple, kwargs: dict, einfo: Any
+    ) -> None:
+        obs.metrics.increment("celery_task_retry", labels={"task": self.name})
 
 
 # Signal handlers for metrics
 @task_prerun.connect
 def task_prerun_handler(task_id: str, task: Task, **kwargs: Any) -> None:
     """Record task start."""
-    obs.metrics.increment('celery_task_started', labels={'task': task.name})
+    obs.metrics.increment("celery_task_started", labels={"task": task.name})
 
 
 @task_postrun.connect
-def task_postrun_handler(task_id: str, task: Task, retval: Any, state: str, **kwargs: Any) -> None:
+def task_postrun_handler(
+    task_id: str, task: Task, retval: Any, state: str, **kwargs: Any
+) -> None:
     """Record task completion."""
-    obs.metrics.increment('celery_task_completed', labels={'task': task.name, 'state': state})
+    obs.metrics.increment(
+        "celery_task_completed", labels={"task": task.name, "state": state}
+    )
 
 
 # ============== Workflow Tasks ==============
+
 
 @app.task(bind=True, base=ObservedTask, max_retries=3, default_retry_delay=60)
 def run_workflow(
     self,
     workflow_name: str,
     input_data: str,
-    config: Optional[dict] = None,
+    config: dict | None = None,
 ) -> dict[str, Any]:
     """Execute a workflow asynchronously."""
-    from orchestration.pipeline import Pipeline, PipelineConfig, FunctionStep
     from orchestration.guardrails import create_default_pipeline
+    from orchestration.pipeline import FunctionStep, Pipeline, PipelineConfig
 
     try:
-        with obs.observe('celery_workflow', {'workflow': workflow_name}):
+        with obs.observe("celery_workflow", {"workflow": workflow_name}):
             # Create simple pipeline
             pipeline = Pipeline(
                 config=PipelineConfig(name=workflow_name),
@@ -98,10 +107,11 @@ def run_workflow(
             def process(data: str, ctx: dict) -> str:
                 return f"Processed: {data}"
 
-            pipeline.add_step(FunctionStep('process', process))
+            pipeline.add_step(FunctionStep("process", process))
 
             # Run synchronously within task
             import asyncio
+
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -110,15 +120,15 @@ def run_workflow(
                 loop.close()
 
             return {
-                'workflow': workflow_name,
-                'status': 'completed',
-                'result': result,
-                'steps': [s.to_dict() for s in steps],
-                'completed_at': datetime.now().isoformat(),
+                "workflow": workflow_name,
+                "status": "completed",
+                "result": result,
+                "steps": [s.to_dict() for s in steps],
+                "completed_at": datetime.now().isoformat(),
             }
 
     except Exception as exc:
-        obs.logger.error('Workflow task failed', workflow=workflow_name, error=str(exc))
+        obs.logger.error("Workflow task failed", workflow=workflow_name, error=str(exc))
         raise self.retry(exc=exc)
 
 
@@ -126,13 +136,13 @@ def run_workflow(
 def evaluate_content(
     self,
     content: str,
-    criteria: Optional[list[str]] = None,
+    criteria: list[str] | None = None,
 ) -> dict[str, Any]:
     """Evaluate content asynchronously."""
     from orchestration.evaluator import RuleBasedEvaluator
 
     try:
-        with obs.observe('celery_evaluate'):
+        with obs.observe("celery_evaluate"):
             evaluator = RuleBasedEvaluator(
                 min_length=50,
                 required_elements=criteria or [],
@@ -140,14 +150,14 @@ def evaluate_content(
             result = evaluator.evaluate(content)
 
             return {
-                'passed': result.passed,
-                'score': result.score,
-                'feedback': result.feedback,
-                'suggestions': result.suggestions,
+                "passed": result.passed,
+                "score": result.score,
+                "feedback": result.feedback,
+                "suggestions": result.suggestions,
             }
 
     except Exception as exc:
-        obs.logger.error('Evaluation task failed', error=str(exc))
+        obs.logger.error("Evaluation task failed", error=str(exc))
         raise
 
 
@@ -155,24 +165,24 @@ def evaluate_content(
 def store_memory(
     self,
     content: str,
-    tags: Optional[list[str]] = None,
-    metadata: Optional[dict] = None,
+    tags: list[str] | None = None,
+    metadata: dict | None = None,
 ) -> dict[str, str]:
     """Store memory asynchronously."""
     from orchestration.memory import LocalMemoryStore
 
     try:
-        with obs.observe('celery_memory_store'):
+        with obs.observe("celery_memory_store"):
             memory = LocalMemoryStore()
             entry_id = memory.remember(content, metadata=metadata, tags=tags)
 
             return {
-                'id': entry_id,
-                'status': 'stored',
+                "id": entry_id,
+                "status": "stored",
             }
 
     except Exception as exc:
-        obs.logger.error('Memory store task failed', error=str(exc))
+        obs.logger.error("Memory store task failed", error=str(exc))
         raise
 
 
@@ -186,35 +196,36 @@ def search_memory(
     from orchestration.memory import LocalMemoryStore
 
     try:
-        with obs.observe('celery_memory_search'):
+        with obs.observe("celery_memory_search"):
             memory = LocalMemoryStore()
             results = memory.search(query, limit=limit)
 
             return {
-                'query': query,
-                'results': [
+                "query": query,
+                "results": [
                     {
-                        'id': entry.id,
-                        'content': entry.content,
-                        'tags': entry.tags,
+                        "id": entry.id,
+                        "content": entry.content,
+                        "tags": entry.tags,
                     }
                     for entry in results
                 ],
-                'count': len(results),
+                "count": len(results),
             }
 
     except Exception as exc:
-        obs.logger.error('Memory search task failed', error=str(exc))
+        obs.logger.error("Memory search task failed", error=str(exc))
         raise
 
 
 # ============== Batch Tasks ==============
 
+
 @app.task(bind=True, base=ObservedTask)
 def batch_process(
     self,
     items: list[str],
-    workflow_name: str = 'batch',
+    workflow_name: str = "batch",
 ) -> dict[str, Any]:
     """Process multiple items in batch."""
     results = []
@@ -226,26 +237,27 @@ def batch_process(
             result = run_workflow.apply(
                 args=[workflow_name, item],
             ).get(timeout=60)
-            results.append({'index': i, 'result': result})
+            results.append({"index": i, "result": result})
         except Exception as e:
-            errors.append({'index': i, 'error': str(e)})
+            errors.append({"index": i, "error": str(e)})
 
     return {
-        'total': len(items),
-        'successful': len(results),
-        'failed': len(errors),
-        'results': results,
-        'errors': errors,
+        "total": len(items),
+        "successful": len(results),
+        "failed": len(errors),
+        "results": results,
+        "errors": errors,
     }
 
 
 # ============== Scheduled Tasks ==============
 
+
 @app.task(bind=True, base=ObservedTask)
 def cleanup_expired_memory(self) -> dict[str, int]:
     """Clean up expired memory entries."""
     # Placeholder - would implement actual cleanup
-    return {'cleaned': 0}
+    return {"cleaned": 0}
 
 
 @app.task(bind=True, base=ObservedTask)
@@ -253,21 +265,21 @@ def aggregate_metrics(self) -> dict[str, Any]:
     """Aggregate metrics for reporting."""
     metrics = obs.metrics.get_all_metrics()
     return {
-        'timestamp': datetime.now().isoformat(),
-        'counters': len(metrics.get('counters', {})),
-        'gauges': len(metrics.get('gauges', {})),
-        'histograms': len(metrics.get('histograms', {})),
+        "timestamp": datetime.now().isoformat(),
+        "counters": len(metrics.get("counters", {})),
+        "gauges": len(metrics.get("gauges", {})),
+        "histograms": len(metrics.get("histograms", {})),
     }
 
 
 # Celery Beat schedule
 app.conf.beat_schedule = {
-    'cleanup-memory-hourly': {
-        'task': 'orchestration.tasks.cleanup_expired_memory',
-        'schedule': 3600.0,  # Every hour
+    "cleanup-memory-hourly": {
+        "task": "orchestration.tasks.cleanup_expired_memory",
+        "schedule": 3600.0,  # Every hour
     },
-    'aggregate-metrics-minutely': {
-        'task': 'orchestration.tasks.aggregate_metrics',
-        'schedule': 60.0,  # Every minute
+    "aggregate-metrics-minutely": {
+        "task": "orchestration.tasks.aggregate_metrics",
+        "schedule": 60.0,  # Every minute
     },
 }

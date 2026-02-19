@@ -1,14 +1,14 @@
 """Tests for Phase 4: Meta-Analysis."""
 
 import json
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
-from orchestration.diagnostics.meta_analyzer import MetaAnalyzer, MetaAnalysis
+import pytest
+
+from orchestration.diagnostics.capture import ConsoleMessage, DiagnosticCapture
 from orchestration.diagnostics.iteration_monitor import IterationRecord
-from orchestration.diagnostics.capture import DiagnosticCapture, ConsoleMessage
-
+from orchestration.diagnostics.meta_analyzer import MetaAnalysis, MetaAnalyzer
 
 # ============== Fixtures ==============
 
@@ -35,7 +35,10 @@ def sample_iterations():
                 success=False,
                 error="Timeout waiting for selector",
                 console_errors=[
-                    ConsoleMessage(type="error", text="Uncaught TypeError: Cannot read property 'click' of null")
+                    ConsoleMessage(
+                        type="error",
+                        text="Uncaught TypeError: Cannot read property 'click' of null",
+                    )
                 ],
             ),
             timestamp=datetime.utcnow(),
@@ -50,7 +53,10 @@ def sample_iterations():
                 success=False,
                 error="Timeout waiting for selector",
                 console_errors=[
-                    ConsoleMessage(type="error", text="Uncaught TypeError: Cannot read property 'click' of null")
+                    ConsoleMessage(
+                        type="error",
+                        text="Uncaught TypeError: Cannot read property 'click' of null",
+                    )
                 ],
             ),
             timestamp=datetime.utcnow(),
@@ -65,7 +71,10 @@ def sample_iterations():
                 success=False,
                 error="Timeout waiting for selector",
                 console_errors=[
-                    ConsoleMessage(type="error", text="Uncaught TypeError: Cannot read property 'click' of null")
+                    ConsoleMessage(
+                        type="error",
+                        text="Uncaught TypeError: Cannot read property 'click' of null",
+                    )
                 ],
             ),
             timestamp=datetime.utcnow(),
@@ -100,18 +109,20 @@ async def test_analyze_failures_with_mock_llm(mock_executor, sample_iterations):
     """Test analyze_failures with mocked LLM response."""
     # Mock LLM response
     mock_executor.execute.return_value = {
-        "content": json.dumps({
-            "pattern_detected": "Same element selector failing repeatedly",
-            "root_cause_hypothesis": "The login button selector is incorrect or the element loads dynamically",
-            "suggested_approaches": [
-                "Use a more specific CSS selector like button.login-btn",
-                "Add explicit wait for button to be clickable",
-                "Check if button is inside an iframe",
-                "Verify button exists in the DOM using browser console",
-            ],
-            "confidence": 0.85,
-            "reasoning": "The same selector error appears in all 3 iterations, indicating a persistent selector issue",
-        }),
+        "content": json.dumps(
+            {
+                "pattern_detected": "Same element selector failing repeatedly",
+                "root_cause_hypothesis": "The login button selector is incorrect or the element loads dynamically",
+                "suggested_approaches": [
+                    "Use a more specific CSS selector like button.login-btn",
+                    "Add explicit wait for button to be clickable",
+                    "Check if button is inside an iframe",
+                    "Verify button exists in the DOM using browser console",
+                ],
+                "confidence": 0.85,
+                "reasoning": "The same selector error appears in all 3 iterations, indicating a persistent selector issue",
+            }
+        ),
         "usage": {"input_tokens": 500, "output_tokens": 100},
     }
 
@@ -199,13 +210,15 @@ async def test_confidence_clamped_to_range(mock_executor, sample_iterations):
     """Test that confidence is clamped to [0.0, 1.0] range."""
     # Mock LLM response with out-of-range confidence
     mock_executor.execute.return_value = {
-        "content": json.dumps({
-            "pattern_detected": "Test pattern",
-            "root_cause_hypothesis": "Test cause",
-            "suggested_approaches": ["Approach 1"],
-            "confidence": 1.5,  # Out of range
-            "reasoning": "Test reasoning",
-        }),
+        "content": json.dumps(
+            {
+                "pattern_detected": "Test pattern",
+                "root_cause_hypothesis": "Test cause",
+                "suggested_approaches": ["Approach 1"],
+                "confidence": 1.5,  # Out of range
+                "reasoning": "Test reasoning",
+            }
+        ),
         "usage": {},
     }
 
@@ -246,6 +259,7 @@ async def test_analyze_failures_real_llm(sample_iterations):
 
     try:
         from orchestration.integrations.unified import auto_setup_executor
+
         executor = auto_setup_executor()
     except Exception:
         pytest.skip("No LLM executor available")
@@ -262,16 +276,16 @@ async def test_analyze_failures_real_llm(sample_iterations):
     assert "failure_count" in result.metadata
 
     # Log for manual inspection
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Real LLM Meta-Analysis Result")
-    print("="*60)
+    print("=" * 60)
     print(f"Pattern: {result.pattern_detected}")
     print(f"Root Cause: {result.root_cause_hypothesis}")
     print(f"Confidence: {result.confidence}")
     print("\nSuggested Approaches:")
     for i, approach in enumerate(result.suggested_approaches, 1):
         print(f"  {i}. {approach}")
-    print("="*60)
+    print("=" * 60)
 
 
 @pytest.mark.integration
@@ -282,6 +296,7 @@ async def test_meta_analysis_with_different_error_types():
 
     try:
         from orchestration.integrations.unified import auto_setup_executor
+
         executor = auto_setup_executor()
     except Exception:
         pytest.skip("No LLM executor available")
@@ -312,7 +327,7 @@ async def test_meta_analysis_with_different_error_types():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="CORS policy: No 'Access-Control-Allow-Origin' header"
+                        text="CORS policy: No 'Access-Control-Allow-Origin' header",
                     )
                 ],
             ),
@@ -330,7 +345,7 @@ async def test_meta_analysis_with_different_error_types():
                 console_errors=[
                     ConsoleMessage(
                         type="error",
-                        text="CORS policy: No 'Access-Control-Allow-Origin' header"
+                        text="CORS policy: No 'Access-Control-Allow-Origin' header",
                     )
                 ],
             ),
@@ -347,7 +362,11 @@ async def test_meta_analysis_with_different_error_types():
 
     # Pattern should mention CORS or network issues
     pattern_lower = result.pattern_detected.lower()
-    assert "cors" in pattern_lower or "network" in pattern_lower or "access" in pattern_lower
+    assert (
+        "cors" in pattern_lower
+        or "network" in pattern_lower
+        or "access" in pattern_lower
+    )
 
 
 # ============== MetaAnalysis Dataclass Tests ==============

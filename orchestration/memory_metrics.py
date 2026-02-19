@@ -10,36 +10,38 @@ This module provides comprehensive monitoring for adaptive memory systems to mea
 Philosophy: "You can't improve what you don't measure"
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
-import json
 from pathlib import Path
+from typing import Any
 
 
 class MetricType(str, Enum):
     """Types of metrics to track."""
+
     # Leading indicators (predictive)
-    RETRIEVAL_RELEVANCE = "retrieval_relevance"      # Are we finding the right lessons?
-    RETRIEVAL_LATENCY = "retrieval_latency"          # How fast?
-    LESSON_COVERAGE = "lesson_coverage"              # Do we have lessons for common tasks?
+    RETRIEVAL_RELEVANCE = "retrieval_relevance"  # Are we finding the right lessons?
+    RETRIEVAL_LATENCY = "retrieval_latency"  # How fast?
+    LESSON_COVERAGE = "lesson_coverage"  # Do we have lessons for common tasks?
 
     # Lagging indicators (outcome-based)
     WORKFLOW_SUCCESS_RATE = "workflow_success_rate"  # Did it complete successfully?
-    WORKFLOW_DURATION = "workflow_duration"          # How long did it take?
-    ERROR_REDUCTION = "error_reduction"              # Fewer errors over time?
-    HUMAN_SATISFACTION = "human_satisfaction"        # User feedback
+    WORKFLOW_DURATION = "workflow_duration"  # How long did it take?
+    ERROR_REDUCTION = "error_reduction"  # Fewer errors over time?
+    HUMAN_SATISFACTION = "human_satisfaction"  # User feedback
 
     # System health
-    MEMORY_BLOAT = "memory_bloat"                    # Is memory growing too large?
-    RETRIEVAL_LOAD = "retrieval_load"                # System performance
-    LESSON_STALENESS = "lesson_staleness"            # Are lessons outdated?
+    MEMORY_BLOAT = "memory_bloat"  # Is memory growing too large?
+    RETRIEVAL_LOAD = "retrieval_load"  # System performance
+    LESSON_STALENESS = "lesson_staleness"  # Are lessons outdated?
 
 
 @dataclass
 class WorkflowOutcome:
     """Record of a workflow execution outcome."""
+
     run_id: str
     workflow_id: str
     task_description: str
@@ -48,11 +50,11 @@ class WorkflowOutcome:
     success: bool
     duration_seconds: float
     error_count: int
-    error_types: List[str]
+    error_types: list[str]
 
-    lessons_retrieved: List[str]  # Lesson IDs that were provided
-    lessons_used_count: int       # How many were actually referenced
-    human_satisfaction: Optional[float] = None  # 0-1 rating
+    lessons_retrieved: list[str]  # Lesson IDs that were provided
+    lessons_used_count: int  # How many were actually referenced
+    human_satisfaction: float | None = None  # 0-1 rating
 
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -60,26 +62,28 @@ class WorkflowOutcome:
 @dataclass
 class RetrievalEvent:
     """Record of a memory retrieval operation."""
+
     timestamp: str
     workflow_id: str
     cluster: str
     query_context: str
 
-    retrieved_lesson_ids: List[str]
-    retrieval_scores: List[float]  # Similarity/relevance scores
+    retrieved_lesson_ids: list[str]
+    retrieval_scores: list[float]  # Similarity/relevance scores
     latency_ms: float
 
     # Ground truth (if available)
-    actually_helpful: Optional[List[str]] = None  # Which lessons were actually useful
+    actually_helpful: list[str] | None = None  # Which lessons were actually useful
 
 
 @dataclass
 class MetricSnapshot:
     """Point-in-time metric value."""
+
     metric_type: MetricType
     value: float
     timestamp: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class MemoryMetricsCollector:
@@ -92,7 +96,7 @@ class MemoryMetricsCollector:
     - What to change and by how much
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         """
         Initialize metrics collector.
 
@@ -105,9 +109,9 @@ class MemoryMetricsCollector:
         self.storage_path = Path(storage_path)
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.workflow_outcomes: List[WorkflowOutcome] = []
-        self.retrieval_events: List[RetrievalEvent] = []
-        self.metric_snapshots: List[MetricSnapshot] = []
+        self.workflow_outcomes: list[WorkflowOutcome] = []
+        self.retrieval_events: list[RetrievalEvent] = []
+        self.metric_snapshots: list[MetricSnapshot] = []
 
         self._load()
 
@@ -115,7 +119,7 @@ class MemoryMetricsCollector:
         """Load metrics from storage."""
         if self.storage_path.exists():
             try:
-                with open(self.storage_path, 'r') as f:
+                with open(self.storage_path) as f:
                     data = json.load(f)
 
                     # Load workflow outcomes
@@ -158,7 +162,7 @@ class MemoryMetricsCollector:
                 "updated_at": datetime.now().isoformat(),
             }
 
-            with open(self.storage_path, 'w') as f:
+            with open(self.storage_path, "w") as f:
                 json.dump(data, f, indent=2)
 
         except Exception as e:
@@ -178,13 +182,15 @@ class MemoryMetricsCollector:
         self.retrieval_events.append(event)
         self._save()
 
-    def record_metric(self, metric_type: MetricType, value: float, metadata: Optional[Dict] = None):
+    def record_metric(
+        self, metric_type: MetricType, value: float, metadata: dict | None = None
+    ):
         """Record a point-in-time metric value."""
         snapshot = MetricSnapshot(
             metric_type=metric_type,
             value=value,
             timestamp=datetime.now().isoformat(),
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
         self.metric_snapshots.append(snapshot)
         self._save()
@@ -193,10 +199,7 @@ class MemoryMetricsCollector:
     # LEADING INDICATORS - Predict future performance
     # =========================================================================
 
-    def measure_retrieval_relevance(
-        self,
-        lookback_hours: int = 24
-    ) -> Dict[str, float]:
+    def measure_retrieval_relevance(self, lookback_hours: int = 24) -> dict[str, float]:
         """
         Measure how relevant retrieved lessons are.
 
@@ -212,7 +215,8 @@ class MemoryMetricsCollector:
         """
         cutoff = datetime.now() - timedelta(hours=lookback_hours)
         recent_events = [
-            e for e in self.retrieval_events
+            e
+            for e in self.retrieval_events
             if datetime.fromisoformat(e.timestamp) > cutoff
         ]
 
@@ -231,13 +235,19 @@ class MemoryMetricsCollector:
         for event in recent_events:
             if event.actually_helpful is not None:
                 top3 = event.retrieved_lesson_ids[:3]
-                helpful_in_top3 = len([lid for lid in top3 if lid in event.actually_helpful])
+                helpful_in_top3 = len(
+                    [lid for lid in top3 if lid in event.actually_helpful]
+                )
                 precision_values.append(helpful_in_top3 / min(3, len(top3)))
 
-        precision_at_3 = sum(precision_values) / len(precision_values) if precision_values else 0.0
+        precision_at_3 = (
+            sum(precision_values) / len(precision_values) if precision_values else 0.0
+        )
 
         # Coverage (% of queries that found at least one lesson)
-        found_lessons = len([e for e in recent_events if len(e.retrieved_lesson_ids) > 0])
+        found_lessons = len(
+            [e for e in recent_events if len(e.retrieved_lesson_ids) > 0]
+        )
         coverage = found_lessons / len(recent_events) if recent_events else 0.0
 
         return {
@@ -246,10 +256,7 @@ class MemoryMetricsCollector:
             "coverage": coverage,
         }
 
-    def measure_retrieval_latency(
-        self,
-        lookback_hours: int = 24
-    ) -> Dict[str, float]:
+    def measure_retrieval_latency(self, lookback_hours: int = 24) -> dict[str, float]:
         """
         Measure how fast memory retrieval is.
 
@@ -265,7 +272,8 @@ class MemoryMetricsCollector:
         """
         cutoff = datetime.now() - timedelta(hours=lookback_hours)
         recent_events = [
-            e for e in self.retrieval_events
+            e
+            for e in self.retrieval_events
             if datetime.fromisoformat(e.timestamp) > cutoff
         ]
 
@@ -287,8 +295,8 @@ class MemoryMetricsCollector:
 
     def measure_workflow_success_rate(
         self,
-        lookback_hours: int = 168  # 1 week
-    ) -> Dict[str, Any]:
+        lookback_hours: int = 168,  # 1 week
+    ) -> dict[str, Any]:
         """
         Measure workflow success rates over time.
 
@@ -305,7 +313,8 @@ class MemoryMetricsCollector:
         """
         cutoff = datetime.now() - timedelta(hours=lookback_hours)
         recent_outcomes = [
-            o for o in self.workflow_outcomes
+            o
+            for o in self.workflow_outcomes
             if datetime.fromisoformat(o.timestamp) > cutoff
         ]
 
@@ -326,11 +335,13 @@ class MemoryMetricsCollector:
 
         with_rate = (
             len([o for o in with_lessons if o.success]) / len(with_lessons)
-            if with_lessons else 0.0
+            if with_lessons
+            else 0.0
         )
         without_rate = (
             len([o for o in without_lessons if o.success]) / len(without_lessons)
-            if without_lessons else 0.0
+            if without_lessons
+            else 0.0
         )
 
         return {
@@ -340,10 +351,7 @@ class MemoryMetricsCollector:
             "improvement": with_rate - without_rate,
         }
 
-    def measure_error_reduction(
-        self,
-        lookback_hours: int = 168
-    ) -> Dict[str, Any]:
+    def measure_error_reduction(self, lookback_hours: int = 168) -> dict[str, Any]:
         """
         Measure if errors are decreasing over time.
 
@@ -360,7 +368,8 @@ class MemoryMetricsCollector:
         """
         cutoff = datetime.now() - timedelta(hours=lookback_hours)
         recent_outcomes = [
-            o for o in self.workflow_outcomes
+            o
+            for o in self.workflow_outcomes
             if datetime.fromisoformat(o.timestamp) > cutoff
         ]
 
@@ -390,7 +399,9 @@ class MemoryMetricsCollector:
             for error_type in outcome.error_types:
                 error_type_counts[error_type] = error_type_counts.get(error_type, 0) + 1
 
-        common_errors = sorted(error_type_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        common_errors = sorted(
+            error_type_counts.items(), key=lambda x: x[1], reverse=True
+        )[:5]
 
         return {
             "current_error_rate": new_error_rate,
@@ -399,10 +410,7 @@ class MemoryMetricsCollector:
             "common_error_types": [e[0] for e in common_errors],
         }
 
-    def measure_human_satisfaction(
-        self,
-        lookback_hours: int = 168
-    ) -> Dict[str, float]:
+    def measure_human_satisfaction(self, lookback_hours: int = 168) -> dict[str, float]:
         """
         Measure user satisfaction with workflow outcomes.
 
@@ -417,7 +425,8 @@ class MemoryMetricsCollector:
         """
         cutoff = datetime.now() - timedelta(hours=lookback_hours)
         recent_outcomes = [
-            o for o in self.workflow_outcomes
+            o
+            for o in self.workflow_outcomes
             if datetime.fromisoformat(o.timestamp) > cutoff
         ]
 
@@ -428,7 +437,8 @@ class MemoryMetricsCollector:
 
         avg = (
             sum(o.human_satisfaction for o in with_ratings) / len(with_ratings)
-            if with_ratings else 0.0
+            if with_ratings
+            else 0.0
         )
 
         response_rate = len(with_ratings) / len(recent_outcomes)
@@ -461,7 +471,7 @@ class MemoryMetricsCollector:
     # ROOT CAUSE ANALYSIS
     # =========================================================================
 
-    def diagnose_retrieval_issues(self) -> Dict[str, Any]:
+    def diagnose_retrieval_issues(self) -> dict[str, Any]:
         """
         Analyze why retrieval might not be working well.
 
@@ -480,7 +490,9 @@ class MemoryMetricsCollector:
 
         if relevance["coverage"] < 0.5:
             issues.append("Low coverage - many queries find no lessons")
-            recommendations.append("Add more diverse lessons or lower retrieval threshold")
+            recommendations.append(
+                "Add more diverse lessons or lower retrieval threshold"
+            )
 
         # Check latency
         if latency["p95_ms"] > 500:
@@ -488,9 +500,15 @@ class MemoryMetricsCollector:
             recommendations.append("Add caching or optimize vector search indexes")
 
         # Check lesson usage
-        recent_outcomes = self.workflow_outcomes[-50:] if len(self.workflow_outcomes) > 50 else self.workflow_outcomes
+        recent_outcomes = (
+            self.workflow_outcomes[-50:]
+            if len(self.workflow_outcomes) > 50
+            else self.workflow_outcomes
+        )
         if recent_outcomes:
-            avg_usage = sum(o.lessons_used_count for o in recent_outcomes) / len(recent_outcomes)
+            avg_usage = sum(o.lessons_used_count for o in recent_outcomes) / len(
+                recent_outcomes
+            )
             if avg_usage < 0.5:
                 issues.append("Retrieved lessons are not being used")
                 recommendations.append("Improve lesson quality or presentation")
@@ -502,10 +520,10 @@ class MemoryMetricsCollector:
             "metrics": {
                 "relevance": relevance,
                 "latency": latency,
-            }
+            },
         }
 
-    def get_dashboard_summary(self) -> Dict[str, Any]:
+    def get_dashboard_summary(self) -> dict[str, Any]:
         """
         Get a comprehensive dashboard summary for monitoring.
 
@@ -526,7 +544,7 @@ class MemoryMetricsCollector:
                 "workflow_outcomes": len(self.workflow_outcomes),
                 "retrieval_events": len(self.retrieval_events),
                 "metric_snapshots": len(self.metric_snapshots),
-            }
+            },
         }
 
 
@@ -534,10 +552,11 @@ class MemoryMetricsCollector:
 # A/B TESTING FRAMEWORK
 # =============================================================================
 
+
 class ABTestConfig:
     """Configuration for A/B testing memory parameters."""
 
-    def __init__(self, name: str, variants: Dict[str, Dict[str, Any]]):
+    def __init__(self, name: str, variants: dict[str, dict[str, Any]]):
         """
         Initialize A/B test.
 
@@ -553,7 +572,7 @@ class ABTestConfig:
         """
         self.name = name
         self.variants = variants
-        self.assignment: Dict[str, str] = {}  # user_id -> variant_name
+        self.assignment: dict[str, str] = {}  # user_id -> variant_name
 
     def assign_variant(self, user_id: str) -> str:
         """Assign user to a variant (sticky assignment)."""
@@ -562,6 +581,7 @@ class ABTestConfig:
 
         # Simple hash-based assignment for consistency
         import hashlib
+
         hash_val = int(hashlib.md5(f"{self.name}:{user_id}".encode()).hexdigest(), 16)
         variant_names = list(self.variants.keys())
         assigned = variant_names[hash_val % len(variant_names)]
@@ -569,7 +589,7 @@ class ABTestConfig:
         self.assignment[user_id] = assigned
         return assigned
 
-    def get_parameters(self, user_id: str) -> Dict[str, Any]:
+    def get_parameters(self, user_id: str) -> dict[str, Any]:
         """Get parameters for this user's assigned variant."""
         variant = self.assign_variant(user_id)
         return self.variants[variant]

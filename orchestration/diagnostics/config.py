@@ -1,8 +1,7 @@
 """Configuration for automated diagnostics capture."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -49,7 +48,7 @@ class DiagnosticsConfig:
     max_iterations: int = 10
 
     # Output
-    output_dir: Optional[Path] = None  # Defaults to workflow run dir
+    output_dir: Path | None = None  # Defaults to workflow run dir
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -72,9 +71,7 @@ class DiagnosticsConfig:
             raise ValueError("Max iterations must be at least 1")
 
         if self.iteration_threshold > self.max_iterations:
-            raise ValueError(
-                "Iteration threshold cannot exceed max iterations"
-            )
+            raise ValueError("Iteration threshold cannot exceed max iterations")
 
         # Convert output_dir string to Path if needed
         if self.output_dir is not None and not isinstance(self.output_dir, Path):

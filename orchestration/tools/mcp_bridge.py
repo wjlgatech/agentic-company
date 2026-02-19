@@ -13,14 +13,13 @@ Architecture:
     Workflow YAML → MCPToolBridge → MCP Registry → MCP Servers → Real Data
 """
 
-import asyncio
 import json
 import logging
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Optional
 from enum import Enum
+from typing import Any
 
 from .registry import MCPRegistry, RegistryEntry, get_registry
 
@@ -29,13 +28,14 @@ logger = logging.getLogger(__name__)
 
 class ToolStatus(Enum):
     """Status of a tool binding."""
-    UNRESOLVED = "unresolved"      # Not yet looked up
-    RESOLVED = "resolved"          # Found in registry
-    CONNECTED = "connected"        # Authenticated and ready
-    UNAVAILABLE = "unavailable"    # Not found or not accessible
-    MOCK = "mock"                  # Using mock implementation
-    WAITING = "waiting"            # Waiting for user to connect/authenticate
-    FALLBACK = "fallback"          # Using fallback method (e.g., WebSearch)
+
+    UNRESOLVED = "unresolved"  # Not yet looked up
+    RESOLVED = "resolved"  # Found in registry
+    CONNECTED = "connected"  # Authenticated and ready
+    UNAVAILABLE = "unavailable"  # Not found or not accessible
+    MOCK = "mock"  # Using mock implementation
+    WAITING = "waiting"  # Waiting for user to connect/authenticate
+    FALLBACK = "fallback"  # Using fallback method (e.g., WebSearch)
 
 
 @dataclass
@@ -51,23 +51,29 @@ class MCPTool:
     declared_name: str  # e.g., "web_search"
 
     # From MCP registry
-    server_name: str = ""           # e.g., "Ahrefs"
-    server_url: str = ""            # e.g., "https://api.ahrefs.com/mcp/mcp"
+    server_name: str = ""  # e.g., "Ahrefs"
+    server_url: str = ""  # e.g., "https://api.ahrefs.com/mcp/mcp"
     available_tools: list[str] = field(default_factory=list)
 
     # Status
     status: ToolStatus = ToolStatus.UNRESOLVED
 
     # Execution
-    executor: Optional[Callable] = None
+    executor: Callable | None = None
 
     def __str__(self) -> str:
-        return f"MCPTool({self.declared_name} → {self.server_name} [{self.status.value}])"
+        return (
+            f"MCPTool({self.declared_name} → {self.server_name} [{self.status.value}])"
+        )
 
     @property
     def is_ready(self) -> bool:
         """Check if tool is ready for execution."""
-        return self.status in (ToolStatus.CONNECTED, ToolStatus.MOCK, ToolStatus.FALLBACK)
+        return self.status in (
+            ToolStatus.CONNECTED,
+            ToolStatus.MOCK,
+            ToolStatus.FALLBACK,
+        )
 
     @property
     def is_waiting(self) -> bool:
@@ -84,8 +90,8 @@ class ToolMapping:
     and have them automatically resolved to concrete MCP implementations.
     """
 
-    category: str           # e.g., "web_search"
-    primary: str            # Primary MCP server name
+    category: str  # e.g., "web_search"
+    primary: str  # Primary MCP server name
     fallbacks: list[str] = field(default_factory=list)  # Backup servers
 
     @classmethod
@@ -122,9 +128,9 @@ class MCPToolBridge:
 
     def __init__(
         self,
-        registry: Optional[MCPRegistry] = None,
+        registry: MCPRegistry | None = None,
         use_mocks: bool = False,
-        mcporter_path: Optional[str] = None,
+        mcporter_path: str | None = None,
         graceful_mode: bool = True,
     ):
         """
@@ -162,7 +168,7 @@ class MCPToolBridge:
             "competitor_analysis": self._fallback_competitor_analysis,
         }
 
-    def _find_mcporter(self) -> Optional[str]:
+    def _find_mcporter(self) -> str | None:
         """Find mcporter CLI in PATH."""
         try:
             result = subprocess.run(
@@ -324,41 +330,53 @@ class MCPToolBridge:
             tool = self.resolve_tool(name)
 
             if tool.status == ToolStatus.CONNECTED:
-                report["resolved"].append({
-                    "name": name,
-                    "server": tool.server_name,
-                    "url": tool.server_url,
-                    "tools": tool.available_tools,
-                })
+                report["resolved"].append(
+                    {
+                        "name": name,
+                        "server": tool.server_name,
+                        "url": tool.server_url,
+                        "tools": tool.available_tools,
+                    }
+                )
             elif tool.status == ToolStatus.FALLBACK:
-                report["fallback"].append({
-                    "name": name,
-                    "server": tool.server_name,
-                    "note": "Using fallback implementation",
-                })
+                report["fallback"].append(
+                    {
+                        "name": name,
+                        "server": tool.server_name,
+                        "note": "Using fallback implementation",
+                    }
+                )
             elif tool.status == ToolStatus.MOCK:
-                report["mocked"].append({
-                    "name": name,
-                    "note": "Using mock implementation",
-                })
+                report["mocked"].append(
+                    {
+                        "name": name,
+                        "note": "Using mock implementation",
+                    }
+                )
             elif tool.status == ToolStatus.WAITING:
-                report["waiting"].append({
-                    "name": name,
-                    "server": tool.server_name,
-                    "note": "Waiting for MCP connection",
-                })
+                report["waiting"].append(
+                    {
+                        "name": name,
+                        "server": tool.server_name,
+                        "note": "Waiting for MCP connection",
+                    }
+                )
             elif tool.status == ToolStatus.RESOLVED:
-                report["resolved"].append({
-                    "name": name,
-                    "server": tool.server_name,
-                    "url": tool.server_url,
-                    "note": "Found but not connected",
-                })
+                report["resolved"].append(
+                    {
+                        "name": name,
+                        "server": tool.server_name,
+                        "url": tool.server_url,
+                        "note": "Found but not connected",
+                    }
+                )
             else:
-                report["unresolved"].append({
-                    "name": name,
-                    "note": "No MCP server found",
-                })
+                report["unresolved"].append(
+                    {
+                        "name": name,
+                        "note": "No MCP server found",
+                    }
+                )
 
         report["summary"] = {
             "total": len(tool_names),
@@ -404,7 +422,9 @@ class MCPToolBridge:
                 "tool": tool_name,
                 "message": f"Tool '{tool_name}' is waiting for connection",
                 "server": waiting_info.get("server", "Unknown"),
-                "suggestion": waiting_info.get("suggestion", self._get_setup_suggestion(tool_name)),
+                "suggestion": waiting_info.get(
+                    "suggestion", self._get_setup_suggestion(tool_name)
+                ),
                 "action_required": "Please connect the MCP server to proceed",
                 "partial_result": self._get_partial_result(tool_name, kwargs),
             }
@@ -480,7 +500,8 @@ class MCPToolBridge:
             self.mcporter_path,
             "call",
             f"{entry.name.lower()}.{tool_name}",
-            "--output", "json",
+            "--output",
+            "json",
         ]
 
         # Add arguments
@@ -719,7 +740,11 @@ class MCPToolBridge:
             "metadata": {
                 "note": "Fallback mode - connect PubMed MCP for real papers",
                 "searched_for": query,
-                "expected_tools": ["search_articles", "get_article_metadata", "find_related_articles"],
+                "expected_tools": [
+                    "search_articles",
+                    "get_article_metadata",
+                    "find_related_articles",
+                ],
             },
             "suggestion": "Connect PubMed MCP to search real biomedical literature",
             "manual_search_url": f"https://pubmed.ncbi.nlm.nih.gov/?term={query.replace(' ', '+')}",
@@ -795,7 +820,6 @@ class MCPToolBridge:
         Returns:
             Enhanced executor with tool support
         """
-        bridge = self
 
         async def enhanced_executor(prompt: str, context: Any = None) -> str:
             # Check if prompt contains tool call markers
@@ -817,6 +841,7 @@ class MCPToolBridge:
 # =========================================================================
 # CONVENIENCE FUNCTIONS
 # =========================================================================
+
 
 def get_bridge(use_mocks: bool = False) -> MCPToolBridge:
     """Get the default MCP tool bridge instance."""

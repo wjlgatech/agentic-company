@@ -2,11 +2,9 @@
 """Manual test of Phase 3 auto-test loop."""
 
 import asyncio
-from pathlib import Path
 
 from orchestration.diagnostics import DiagnosticsConfig
 from orchestration.diagnostics.integration import DiagnosticsIntegrator
-from orchestration.diagnostics.capture import BrowserAction, ActionType
 
 
 async def test_simple_browser_automation():
@@ -50,9 +48,9 @@ async def test_simple_browser_automation():
     print(f"   Actions: {len(test_actions)}")
     for i, action in enumerate(test_actions, 1):
         print(f"     {i}. {action['type']}", end="")
-        if 'selector' in action:
+        if "selector" in action:
             print(f" ({action['selector']})", end="")
-        if 'value' in action:
+        if "value" in action:
             print(f" → {action['value']}", end="")
         print()
     print()
@@ -101,6 +99,7 @@ async def test_simple_browser_automation():
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 

@@ -5,12 +5,12 @@ Tests the automatic prompt improvement capabilities.
 """
 
 import pytest
-import asyncio
+
 from orchestration.tools.prompt_engineer import (
+    ImprovedPrompt,
+    PromptConfig,
     PromptEngineer,
     PromptStyle,
-    PromptConfig,
-    ImprovedPrompt,
     improve_prompt_sync,
 )
 
@@ -26,6 +26,7 @@ class TestPromptEngineer:
 
     def test_initialization_with_executor(self):
         """Should initialize with executor."""
+
         async def mock_executor(prompt: str) -> str:
             return '{"improved_prompt": "test", "improvements": []}'
 
@@ -40,10 +41,7 @@ class TestRuleBasedImprovement:
         """Should add role setting to prompts without one."""
         engineer = PromptEngineer()
         result = engineer._improve_rule_based(
-            "Find papers about AI.",
-            PromptStyle.AGENT,
-            "",
-            PromptConfig()
+            "Find papers about AI.", PromptStyle.AGENT, "", PromptConfig()
         )
 
         assert "You are" in result.improved
@@ -54,10 +52,7 @@ class TestRuleBasedImprovement:
         engineer = PromptEngineer()
         prompt = "You are a researcher. Find papers about AI."
         result = engineer._improve_rule_based(
-            prompt,
-            PromptStyle.AGENT,
-            "",
-            PromptConfig()
+            prompt, PromptStyle.AGENT, "", PromptConfig()
         )
 
         # Should not duplicate role setting
@@ -67,10 +62,7 @@ class TestRuleBasedImprovement:
         """Should add output format guidance."""
         engineer = PromptEngineer()
         result = engineer._improve_rule_based(
-            "Analyze this data.",
-            PromptStyle.ANALYSIS,
-            "",
-            PromptConfig()
+            "Analyze this data.", PromptStyle.ANALYSIS, "", PromptConfig()
         )
 
         assert "Added output format guidance" in result.improvements
@@ -80,10 +72,7 @@ class TestRuleBasedImprovement:
         engineer = PromptEngineer()
         config = PromptConfig(include_guardrails=True)
         result = engineer._improve_rule_based(
-            "Write some code.",
-            PromptStyle.CODING,
-            "",
-            config
+            "Write some code.", PromptStyle.CODING, "", config
         )
 
         assert "Guardrails" in result.improved
@@ -94,10 +83,7 @@ class TestRuleBasedImprovement:
         engineer = PromptEngineer()
         config = PromptConfig(include_guardrails=False)
         result = engineer._improve_rule_based(
-            "Write some code.",
-            PromptStyle.CODING,
-            "",
-            config
+            "Write some code.", PromptStyle.CODING, "", config
         )
 
         assert "Added guardrails" not in result.improvements
@@ -108,28 +94,19 @@ class TestRuleBasedImprovement:
 
         # Agent style
         agent_result = engineer._improve_rule_based(
-            "Help with tasks.",
-            PromptStyle.AGENT,
-            "",
-            PromptConfig()
+            "Help with tasks.", PromptStyle.AGENT, "", PromptConfig()
         )
         assert "specialized AI agent" in agent_result.improved
 
         # Analysis style
         analysis_result = engineer._improve_rule_based(
-            "Analyze data.",
-            PromptStyle.ANALYSIS,
-            "",
-            PromptConfig()
+            "Analyze data.", PromptStyle.ANALYSIS, "", PromptConfig()
         )
         assert "analyst" in analysis_result.improved
 
         # Coding style
         coding_result = engineer._improve_rule_based(
-            "Write code.",
-            PromptStyle.CODING,
-            "",
-            PromptConfig()
+            "Write code.", PromptStyle.CODING, "", PromptConfig()
         )
         assert "software engineer" in coding_result.improved
 
@@ -137,10 +114,7 @@ class TestRuleBasedImprovement:
         """Should return lower confidence for rule-based improvement."""
         engineer = PromptEngineer()
         result = engineer._improve_rule_based(
-            "Test prompt.",
-            PromptStyle.TASK,
-            "",
-            PromptConfig()
+            "Test prompt.", PromptStyle.TASK, "", PromptConfig()
         )
 
         assert result.confidence == 0.6  # Rule-based has lower confidence
@@ -153,8 +127,7 @@ class TestSyncImprovement:
     def test_improve_prompt_sync(self):
         """Should improve prompt synchronously."""
         result = improve_prompt_sync(
-            "Find information about AI.",
-            style=PromptStyle.AGENT
+            "Find information about AI.", style=PromptStyle.AGENT
         )
 
         assert "You are" in result
@@ -167,12 +140,13 @@ class TestAsyncImprovement:
     @pytest.mark.asyncio
     async def test_improve_with_executor(self):
         """Should use executor when available."""
+
         async def mock_executor(prompt: str) -> str:
-            return '''{
+            return """{
                 "improved_prompt": "IMPROVED: Test prompt with better structure.",
                 "improvements": ["Added structure", "Added clarity"],
                 "confidence": 0.9
-            }'''
+            }"""
 
         engineer = PromptEngineer(executor=mock_executor)
         result = await engineer.improve("Test prompt.", style=PromptStyle.TASK)
@@ -184,6 +158,7 @@ class TestAsyncImprovement:
     @pytest.mark.asyncio
     async def test_fallback_on_executor_error(self):
         """Should fallback to rule-based on executor error."""
+
         async def failing_executor(prompt: str) -> str:
             raise Exception("API error")
 
@@ -197,8 +172,9 @@ class TestAsyncImprovement:
     @pytest.mark.asyncio
     async def test_parse_json_from_markdown(self):
         """Should parse JSON from markdown code blocks."""
+
         async def markdown_executor(prompt: str) -> str:
-            return '''Here's the improved prompt:
+            return """Here's the improved prompt:
 
 ```json
 {
@@ -208,7 +184,7 @@ class TestAsyncImprovement:
 }
 ```
 
-This prompt is better because...'''
+This prompt is better because..."""
 
         engineer = PromptEngineer(executor=markdown_executor)
         result = await engineer.improve("Basic prompt.", style=PromptStyle.AGENT)
@@ -228,7 +204,7 @@ class TestAgentPersonaGeneration:
             role="Data Analyst",
             task="Analyze customer data",
             expertise=["Python", "SQL", "Statistics"],
-            tone="professional"
+            tone="professional",
         )
 
         assert len(persona) > 0
@@ -246,15 +222,9 @@ class TestWorkflowImprovement:
         workflow_config = {
             "name": "test-workflow",
             "agents": [
-                {
-                    "role": "researcher",
-                    "persona": "Find papers."
-                },
-                {
-                    "role": "writer",
-                    "persona": "Write summaries."
-                }
-            ]
+                {"role": "researcher", "persona": "Find papers."},
+                {"role": "writer", "persona": "Write summaries."},
+            ],
         }
 
         improved = await engineer.improve_workflow_agents(workflow_config)
@@ -280,9 +250,7 @@ class TestPromptConfig:
     def test_custom_config(self):
         """Should accept custom values."""
         config = PromptConfig(
-            style=PromptStyle.CODING,
-            include_cot=False,
-            max_length=5000
+            style=PromptStyle.CODING, include_cot=False, max_length=5000
         )
 
         assert config.style == PromptStyle.CODING
@@ -300,7 +268,7 @@ class TestImprovedPrompt:
             improved="Better prompt with structure",
             improvements=["Added structure"],
             style=PromptStyle.AGENT,
-            confidence=0.8
+            confidence=0.8,
         )
 
         assert result.original == "Basic prompt"
@@ -315,9 +283,10 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_full_improvement_pipeline(self):
         """Test complete improvement pipeline."""
+
         # Mock a realistic LLM response
         async def realistic_executor(prompt: str) -> str:
-            return '''{
+            return """{
                 "improved_prompt": "You are a Senior Research Analyst specializing in market intelligence.\\n\\n## Role & Expertise\\nYou have deep expertise in analyzing market trends, competitive landscapes, and business opportunities.\\n\\n## Responsibilities\\n- Conduct thorough market research\\n- Identify key trends and patterns\\n- Provide actionable insights\\n\\n## Output Guidelines\\n- Structure findings clearly\\n- Support claims with data\\n- Highlight key takeaways",
                 "improvements": [
                     "Added specific role definition",
@@ -327,14 +296,14 @@ class TestIntegration:
                 ],
                 "confidence": 0.92,
                 "reasoning": "Transformed vague prompt into structured agent persona"
-            }'''
+            }"""
 
         engineer = PromptEngineer(executor=realistic_executor)
 
         result = await engineer.improve(
             "Research market trends.",
             style=PromptStyle.AGENT,
-            context="For a VC fund analyzing AI startups"
+            context="For a VC fund analyzing AI startups",
         )
 
         assert "Senior Research Analyst" in result.improved
@@ -353,7 +322,7 @@ class TestIntegration:
             basic_prompt,
             PromptStyle.ANALYSIS,
             "",
-            PromptConfig(include_cot=True, include_guardrails=True)
+            PromptConfig(include_cot=True, include_guardrails=True),
         )
 
         # Should have multiple improvements

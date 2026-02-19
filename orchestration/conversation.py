@@ -10,24 +10,23 @@ Supports both text AND voice input!
 No YAML knowledge required. No coding needed.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Callable, Any
-from enum import Enum
-import json
 import sys
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-
+from typing import Any
 
 # Voice input support
 VOICE_AVAILABLE = False
 try:
     import speech_recognition as sr
+
     VOICE_AVAILABLE = True
 except ImportError:
     pass  # Voice not available, will use text-only
 
 
-def get_voice_input(prompt: str = "Listening...", timeout: int = 5) -> Optional[str]:
+def get_voice_input(prompt: str = "Listening...", timeout: int = 5) -> str | None:
     """
     Get voice input from microphone.
 
@@ -47,7 +46,7 @@ def get_voice_input(prompt: str = "Listening...", timeout: int = 5) -> Optional[
 
         # Use Google's free speech recognition
         text = recognizer.recognize_google(audio)
-        print(f"   Heard: \"{text}\"")
+        print(f'   Heard: "{text}"')
         return text.lower().strip()
 
     except sr.WaitTimeoutError:
@@ -67,13 +66,22 @@ def get_voice_input(prompt: str = "Listening...", timeout: int = 5) -> Optional[
 def install_voice_support():
     """Install voice input dependencies"""
     import subprocess
+
     print("📦 Installing voice support...")
     try:
-        subprocess.run([
-            sys.executable, "-m", "pip", "install",
-            "SpeechRecognition", "pyaudio",
-            "--break-system-packages", "-q"
-        ], check=True)
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "SpeechRecognition",
+                "pyaudio",
+                "--break-system-packages",
+                "-q",
+            ],
+            check=True,
+        )
         print("✅ Voice support installed! Restart to use voice input.")
         return True
     except Exception as e:
@@ -92,6 +100,7 @@ class QuestionType(Enum):
 @dataclass
 class Choice:
     """A choice for multiple-choice questions"""
+
     key: str  # "a", "b", "c" etc.
     label: str
     description: str = ""
@@ -101,11 +110,12 @@ class Choice:
 @dataclass
 class Question:
     """A question to ask the user"""
+
     id: str
     text: str
     question_type: QuestionType
     choices: list[Choice] = field(default_factory=list)
-    default: Optional[str] = None
+    default: str | None = None
     help_text: str = ""
     required: bool = True
 
@@ -118,6 +128,7 @@ class Question:
 @dataclass
 class WorkflowConfig:
     """Configuration built from user responses"""
+
     name: str = ""
     description: str = ""
     goal: str = ""
@@ -164,49 +175,86 @@ class ConversationBuilder:
                 text="👋 Hi! What would you like your AI team to help you with?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("a", "Build a new feature ⭐ Most Popular",
-                           "Ex: 'Add user login', 'Create dashboard', 'Build API endpoint'", "feature"),
-                    Choice("b", "Fix a bug",
-                           "Ex: 'Fix crash on login', 'Debug slow query', 'Resolve timeout'", "bugfix"),
-                    Choice("c", "Write content",
-                           "Ex: 'Write blog post', 'Create documentation', 'Draft email'", "content"),
-                    Choice("d", "Review & improve code",
-                           "Ex: 'Review PR #123', 'Optimize performance', 'Security audit'", "review"),
-                    Choice("e", "Something else",
-                           "I'll describe my custom task in the next step", "custom"),
+                    Choice(
+                        "a",
+                        "Build a new feature ⭐ Most Popular",
+                        "Ex: 'Add user login', 'Create dashboard', 'Build API endpoint'",
+                        "feature",
+                    ),
+                    Choice(
+                        "b",
+                        "Fix a bug",
+                        "Ex: 'Fix crash on login', 'Debug slow query', 'Resolve timeout'",
+                        "bugfix",
+                    ),
+                    Choice(
+                        "c",
+                        "Write content",
+                        "Ex: 'Write blog post', 'Create documentation', 'Draft email'",
+                        "content",
+                    ),
+                    Choice(
+                        "d",
+                        "Review & improve code",
+                        "Ex: 'Review PR #123', 'Optimize performance', 'Security audit'",
+                        "review",
+                    ),
+                    Choice(
+                        "e",
+                        "Something else",
+                        "I'll describe my custom task in the next step",
+                        "custom",
+                    ),
                 ],
-                help_text="Just pick what sounds closest - you can customize later!"
+                help_text="Just pick what sounds closest - you can customize later!",
             ),
-
             # Step 2: Custom goal (if "something else")
             Question(
                 id="custom_goal",
                 text="📝 Great! Describe what you'd like the AI team to do:",
                 question_type=QuestionType.TEXT,
                 help_text="Examples: 'Migrate database to PostgreSQL', 'Refactor auth module', 'Generate test data'",
-                required=False  # Only shown if "custom" selected
+                required=False,  # Only shown if "custom" selected
             ),
-
             # Step 3: Name your workflow
             Question(
                 id="name",
                 text="🏷️ What should we call this workflow?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("a", "feature-builder",
-                           "Good for: new features, components, modules", "feature-builder"),
-                    Choice("b", "bug-fixer",
-                           "Good for: debugging, fixing issues, patches", "bug-fixer"),
-                    Choice("c", "content-creator",
-                           "Good for: docs, articles, reports, emails", "content-creator"),
-                    Choice("d", "code-reviewer",
-                           "Good for: PRs, audits, refactoring", "code-reviewer"),
-                    Choice("e", "custom-workflow",
-                           "I'll use my own name (type it next)", "custom"),
+                    Choice(
+                        "a",
+                        "feature-builder",
+                        "Good for: new features, components, modules",
+                        "feature-builder",
+                    ),
+                    Choice(
+                        "b",
+                        "bug-fixer",
+                        "Good for: debugging, fixing issues, patches",
+                        "bug-fixer",
+                    ),
+                    Choice(
+                        "c",
+                        "content-creator",
+                        "Good for: docs, articles, reports, emails",
+                        "content-creator",
+                    ),
+                    Choice(
+                        "d",
+                        "code-reviewer",
+                        "Good for: PRs, audits, refactoring",
+                        "code-reviewer",
+                    ),
+                    Choice(
+                        "e",
+                        "custom-workflow",
+                        "I'll use my own name (type it next)",
+                        "custom",
+                    ),
                 ],
-                help_text="Pick a name or choose 'custom' to type your own"
+                help_text="Pick a name or choose 'custom' to type your own",
             ),
-
             # Step 3b: Custom name (if "custom" selected)
             Question(
                 id="custom_name",
@@ -214,29 +262,47 @@ class ConversationBuilder:
                 question_type=QuestionType.TEXT,
                 default="my-workflow",
                 help_text="Use lowercase with dashes, like: my-cool-workflow",
-                required=False
+                required=False,
             ),
-
             # Step 4: Which agents do you need?
             Question(
                 id="agents",
                 text="🤖 Which AI agents should be on your team?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("a", "Full team ⭐ Recommended",
-                           "5 agents: Planner→Developer→Verifier→Tester→Reviewer (thorough)", "full"),
-                    Choice("b", "Quick team (3 agents)",
-                           "Planner→Developer→Verifier (fast, good for small tasks)", "quick"),
-                    Choice("c", "Research & Write team",
-                           "Researcher→Analyst→Writer (great for content/docs)", "research"),
-                    Choice("d", "Solo developer",
-                           "Just 1 Developer agent (fastest, simple tasks only)", "single"),
-                    Choice("e", "Let me pick specific agents",
-                           "Choose exactly which agents you want", "custom"),
+                    Choice(
+                        "a",
+                        "Full team ⭐ Recommended",
+                        "5 agents: Planner→Developer→Verifier→Tester→Reviewer (thorough)",
+                        "full",
+                    ),
+                    Choice(
+                        "b",
+                        "Quick team (3 agents)",
+                        "Planner→Developer→Verifier (fast, good for small tasks)",
+                        "quick",
+                    ),
+                    Choice(
+                        "c",
+                        "Research & Write team",
+                        "Researcher→Analyst→Writer (great for content/docs)",
+                        "research",
+                    ),
+                    Choice(
+                        "d",
+                        "Solo developer",
+                        "Just 1 Developer agent (fastest, simple tasks only)",
+                        "single",
+                    ),
+                    Choice(
+                        "e",
+                        "Let me pick specific agents",
+                        "Choose exactly which agents you want",
+                        "custom",
+                    ),
                 ],
-                help_text="Full team catches more mistakes; Quick team is faster"
+                help_text="Full team catches more mistakes; Quick team is faster",
             ),
-
             # Step 5: Custom agents (if "let me pick")
             Question(
                 id="custom_agents",
@@ -253,74 +319,107 @@ class ConversationBuilder:
                     Choice("8", "📊 Analyst", "Analyzes data & finds insights"),
                 ],
                 help_text="Popular combos: '1,2,3' (plan-code-verify) or '6,8,7' (research-analyze-write)",
-                required=False
+                required=False,
             ),
-
             # Step 6: Should agents verify each other?
             Question(
                 id="verification",
                 text="🔍 Should agents double-check each other's work?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("y", "Yes ⭐ Recommended",
-                           "Verifier reviews Developer's code (catches 90% of bugs early!)", True),
-                    Choice("n", "No, skip verification",
-                           "Faster but may miss mistakes (only for quick prototypes)", False),
+                    Choice(
+                        "y",
+                        "Yes ⭐ Recommended",
+                        "Verifier reviews Developer's code (catches 90% of bugs early!)",
+                        True,
+                    ),
+                    Choice(
+                        "n",
+                        "No, skip verification",
+                        "Faster but may miss mistakes (only for quick prototypes)",
+                        False,
+                    ),
                 ],
                 default="y",
-                help_text="Cross-verification adds ~30 sec but catches most bugs"
+                help_text="Cross-verification adds ~30 sec but catches most bugs",
             ),
-
             # Step 7: Human approval needed?
             Question(
                 id="approval",
                 text="👤 Do you want to approve actions before they run?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("y", "Yes, I'll review first",
-                           "Pause for your approval before: deploys, file changes, API calls", True),
-                    Choice("n", "No, run automatically ⭐ Recommended",
-                           "AI team works autonomously (you can still see all logs)", False),
+                    Choice(
+                        "y",
+                        "Yes, I'll review first",
+                        "Pause for your approval before: deploys, file changes, API calls",
+                        True,
+                    ),
+                    Choice(
+                        "n",
+                        "No, run automatically ⭐ Recommended",
+                        "AI team works autonomously (you can still see all logs)",
+                        False,
+                    ),
                 ],
                 default="n",
-                help_text="Use 'Yes' for production deploys; 'No' for dev/testing"
+                help_text="Use 'Yes' for production deploys; 'No' for dev/testing",
             ),
-
             # Step 8: Safety guardrails
             Question(
                 id="guardrails",
                 text="🛡️ What safety level do you want?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("a", "Standard ⭐ Recommended",
-                           "Blocks: passwords, API keys, credit cards, toxic content", "standard"),
-                    Choice("b", "Maximum security",
-                           "All above + rate limiting + extra content checks", "maximum"),
-                    Choice("c", "Minimal",
-                           "Just toxic content filter (faster, less protection)", "minimal"),
-                    Choice("d", "None (not recommended)",
-                           "No safety checks (only for isolated testing)", "none"),
+                    Choice(
+                        "a",
+                        "Standard ⭐ Recommended",
+                        "Blocks: passwords, API keys, credit cards, toxic content",
+                        "standard",
+                    ),
+                    Choice(
+                        "b",
+                        "Maximum security",
+                        "All above + rate limiting + extra content checks",
+                        "maximum",
+                    ),
+                    Choice(
+                        "c",
+                        "Minimal",
+                        "Just toxic content filter (faster, less protection)",
+                        "minimal",
+                    ),
+                    Choice(
+                        "d",
+                        "None (not recommended)",
+                        "No safety checks (only for isolated testing)",
+                        "none",
+                    ),
                 ],
                 default="a",
-                help_text="Standard is great for most use cases"
+                help_text="Standard is great for most use cases",
             ),
-
             # Step 9: Confirm
             Question(
                 id="confirm",
                 text="✅ Ready to create your workflow?",
                 question_type=QuestionType.MULTIPLE_CHOICE,
                 choices=[
-                    Choice("y", "Yes, generate it! 🚀",
-                           "Creates YAML + Python code you can run immediately", True),
-                    Choice("n", "No, start over",
-                           "Go back to the first question", False),
+                    Choice(
+                        "y",
+                        "Yes, generate it! 🚀",
+                        "Creates YAML + Python code you can run immediately",
+                        True,
+                    ),
+                    Choice(
+                        "n", "No, start over", "Go back to the first question", False
+                    ),
                 ],
-                help_text="You can always edit the generated files later"
+                help_text="You can always edit the generated files later",
             ),
         ]
 
-    def get_current_question(self) -> Optional[Question]:
+    def get_current_question(self) -> Question | None:
         """Get the current question to ask"""
         if self.current_step >= len(self.questions):
             return None
@@ -362,7 +461,9 @@ class ConversationBuilder:
             # Store the value, not the key
             for choice in question.choices:
                 if choice.key.lower() == response:
-                    self.answers[question.id] = choice.value if choice.value is not None else response
+                    self.answers[question.id] = (
+                        choice.value if choice.value is not None else response
+                    )
                     break
 
         elif question.question_type == QuestionType.YES_NO:
@@ -415,11 +516,20 @@ class ConversationBuilder:
         if agents_choice == "custom":
             custom = self.answers.get("custom_agents", "1,2,3")
             agent_map = {
-                "1": "planner", "2": "developer", "3": "verifier",
-                "4": "tester", "5": "reviewer", "6": "researcher",
-                "7": "writer", "8": "analyst"
+                "1": "planner",
+                "2": "developer",
+                "3": "verifier",
+                "4": "tester",
+                "5": "reviewer",
+                "6": "researcher",
+                "7": "writer",
+                "8": "analyst",
             }
-            return [agent_map[n.strip()] for n in custom.split(",") if n.strip() in agent_map]
+            return [
+                agent_map[n.strip()]
+                for n in custom.split(",")
+                if n.strip() in agent_map
+            ]
 
         return agent_presets.get(agents_choice, agent_presets["full"])
 
@@ -441,7 +551,9 @@ class ConversationBuilder:
         # Handle custom name vs preset name
         name_choice = self.answers.get("name", "custom-workflow")
         if name_choice == "custom":
-            name = self.answers.get("custom_name", "my-workflow").lower().replace(" ", "-")
+            name = (
+                self.answers.get("custom_name", "my-workflow").lower().replace(" ", "-")
+            )
         else:
             name = name_choice.lower().replace(" ", "-")
         goal = self.answers.get("goal", "feature")
@@ -464,21 +576,21 @@ class ConversationBuilder:
         # Build YAML
         lines = [
             f"# {name.replace('-', ' ').title()} Workflow",
-            f"# Generated by Agenticom Workflow Builder",
-            f"",
+            "# Generated by Agenticom Workflow Builder",
+            "",
             f"id: {name}",
             f"name: {name.replace('-', ' ').title()}",
-            f"description: |",
+            "description: |",
             f"  {description}",
-            f"",
-            f"agents:",
+            "",
+            "agents:",
         ]
 
         # Add agents
         for agent in agents:
             lines.append(f"  - role: {agent}")
             if guardrails and agent in ["planner", "developer"]:
-                lines.append(f"    guardrails:")
+                lines.append("    guardrails:")
                 for g in guardrails:
                     lines.append(f"      - {g}")
 
@@ -490,42 +602,42 @@ class ConversationBuilder:
             "planner": {
                 "id": "plan",
                 "input": "Create a detailed plan for: {task}",
-                "expects": "Clear step-by-step plan with acceptance criteria"
+                "expects": "Clear step-by-step plan with acceptance criteria",
             },
             "researcher": {
                 "id": "research",
                 "input": "Research the following topic: {task}",
-                "expects": "Comprehensive research notes with sources"
+                "expects": "Comprehensive research notes with sources",
             },
             "developer": {
                 "id": "implement",
                 "input": "Implement the following: {plan}",
-                "expects": "Working code that meets requirements"
+                "expects": "Working code that meets requirements",
             },
             "writer": {
                 "id": "write",
                 "input": "Write content based on: {research}",
-                "expects": "Well-structured, clear content"
+                "expects": "Well-structured, clear content",
             },
             "analyst": {
                 "id": "analyze",
                 "input": "Analyze: {research}",
-                "expects": "Key insights and actionable conclusions"
+                "expects": "Key insights and actionable conclusions",
             },
             "verifier": {
                 "id": "verify",
                 "input": "Verify the work: {implement}",
-                "expects": "All acceptance criteria met"
+                "expects": "All acceptance criteria met",
             },
             "tester": {
                 "id": "test",
                 "input": "Test: {implement}",
-                "expects": "All tests passing"
+                "expects": "All tests passing",
             },
             "reviewer": {
                 "id": "review",
                 "input": "Final review: {implement}",
-                "expects": "Approved for deployment"
+                "expects": "Approved for deployment",
             },
         }
 
@@ -544,17 +656,17 @@ class ConversationBuilder:
             input_text = template["input"]
             if prev_step != "task":
                 input_text = input_text.replace("{task}", f"{{{prev_step}}}")
-            lines.append(f"    input: \"{input_text}\"")
-            lines.append(f"    expects: \"{template['expects']}\"")
+            lines.append(f'    input: "{input_text}"')
+            lines.append(f'    expects: "{template["expects"]}"')
 
             # Add verification
             if verification and agent == "developer" and "verifier" in agents:
-                lines.append(f"    verified_by: verifier")
-                lines.append(f"    max_retries: 3")
+                lines.append("    verified_by: verifier")
+                lines.append("    max_retries: 3")
 
             # Add approval for final step
             if approval and i == len(agents) - 1:
-                lines.append(f"    requires_approval: true")
+                lines.append("    requires_approval: true")
 
             lines.append("")
             prev_step = step_id
@@ -566,7 +678,9 @@ class ConversationBuilder:
         # Handle custom name vs preset name
         name_choice = self.answers.get("name", "custom-workflow")
         if name_choice == "custom":
-            name = self.answers.get("custom_name", "my-workflow").lower().replace(" ", "-")
+            name = (
+                self.answers.get("custom_name", "my-workflow").lower().replace(" ", "-")
+            )
         else:
             name = name_choice.lower().replace(" ", "-")
         agents = self._get_agents_list()
@@ -590,12 +704,14 @@ class ConversationBuilder:
             if "rate-limiter" in guardrails:
                 lines.append("    RateLimiter,")
 
-        lines.extend([
-            ")",
-            "",
-            f"# Build the team",
-            f"team = (TeamBuilder(\"{name}\")",
-        ])
+        lines.extend(
+            [
+                ")",
+                "",
+                "# Build the team",
+                f'team = (TeamBuilder("{name}")',
+            ]
+        )
 
         # Add agents
         for agent in agents:
@@ -618,7 +734,7 @@ class ConversationBuilder:
             step_id = agent[:4]  # Short id
             role = role_map.get(agent, "AgentRole.DEVELOPER")
 
-            step_line = f"    .step(\"{step_id}\", {role}, \"Process: {{{prev_step}}}\""
+            step_line = f'    .step("{step_id}", {role}, "Process: {{{prev_step}}}"'
 
             if verification and agent == "developer" and "verifier" in agents:
                 step_line += ", verified_by=AgentRole.VERIFIER"
@@ -630,14 +746,16 @@ class ConversationBuilder:
             lines.append(step_line)
             prev_step = step_id
 
-        lines.extend([
-            "    .build())",
-            "",
-            "# Run the workflow",
-            "import asyncio",
-            "result = asyncio.run(team.run(\"Your task here\"))",
-            "print(f\"Success: {result.success}\")",
-        ])
+        lines.extend(
+            [
+                "    .build())",
+                "",
+                "# Run the workflow",
+                "import asyncio",
+                'result = asyncio.run(team.run("Your task here"))',
+                'print(f"Success: {result.success}")',
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -652,30 +770,39 @@ class ConversationBuilder:
             "─" * 40,
             f"  Name: {self.answers.get('name', 'my-workflow')}",
             f"  Goal: {self.answers.get('goal', 'feature')}",
-            f"",
+            "",
             f"  Agents ({len(agents)}):",
         ]
 
         agent_icons = {
-            "planner": "📋", "developer": "💻", "verifier": "🔍",
-            "tester": "🧪", "reviewer": "⭐", "researcher": "🔬",
-            "writer": "✍️", "analyst": "📊"
+            "planner": "📋",
+            "developer": "💻",
+            "verifier": "🔍",
+            "tester": "🧪",
+            "reviewer": "⭐",
+            "researcher": "🔬",
+            "writer": "✍️",
+            "analyst": "📊",
         }
 
         for agent in agents:
             icon = agent_icons.get(agent, "🤖")
             summary.append(f"    {icon} {agent.title()}")
 
-        summary.extend([
-            "",
-            f"  Cross-verification: {'✅ Yes' if self.answers.get('verification') else '❌ No'}",
-            f"  Human approval: {'✅ Yes' if self.answers.get('approval') else '❌ No'}",
-            "",
-            f"  Guardrails ({len(guardrails)}):",
-        ])
+        summary.extend(
+            [
+                "",
+                f"  Cross-verification: {'✅ Yes' if self.answers.get('verification') else '❌ No'}",
+                f"  Human approval: {'✅ Yes' if self.answers.get('approval') else '❌ No'}",
+                "",
+                f"  Guardrails ({len(guardrails)}):",
+            ]
+        )
 
         guardrail_icons = {
-            "content-filter": "🚫", "pii-detection": "🔐", "rate-limiter": "⏱️"
+            "content-filter": "🚫",
+            "pii-detection": "🔐",
+            "rate-limiter": "⏱️",
         }
 
         for g in guardrails:
@@ -690,7 +817,7 @@ class ConversationBuilder:
         return "\n".join(summary)
 
 
-def run_conversation(voice_mode: bool = False) -> Optional[str]:
+def run_conversation(voice_mode: bool = False) -> str | None:
     """
     Run the conversational workflow builder interactively.
 
@@ -701,9 +828,9 @@ def run_conversation(voice_mode: bool = False) -> Optional[str]:
     """
     builder = ConversationBuilder()
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("🏢 AGENTICOM WORKFLOW BUILDER")
-    print("="*50)
+    print("=" * 50)
 
     # Voice mode setup
     use_voice = False
@@ -747,23 +874,30 @@ def run_conversation(voice_mode: bool = False) -> Optional[str]:
 
         if use_voice:
             print()
-            voice_text = get_voice_input("Say your choice (A, B, C...) or describe what you want:")
+            voice_text = get_voice_input(
+                "Say your choice (A, B, C...) or describe what you want:"
+            )
             if voice_text:
                 # Parse voice input - look for letter choices
                 voice_lower = voice_text.lower()
                 for choice in question.choices:
                     # Match "a", "option a", "choice a", "letter a", etc.
-                    if (voice_lower == choice.key.lower() or
-                        f"option {choice.key.lower()}" in voice_lower or
-                        f"choice {choice.key.lower()}" in voice_lower or
-                        f"letter {choice.key.lower()}" in voice_lower or
-                        choice.label.lower() in voice_lower):
+                    if (
+                        voice_lower == choice.key.lower()
+                        or f"option {choice.key.lower()}" in voice_lower
+                        or f"choice {choice.key.lower()}" in voice_lower
+                        or f"letter {choice.key.lower()}" in voice_lower
+                        or choice.label.lower() in voice_lower
+                    ):
                         response = choice.key.lower()
                         break
 
                 # Also check for yes/no
                 if response is None and question.question_type == QuestionType.YES_NO:
-                    if any(w in voice_lower for w in ["yes", "yeah", "yep", "sure", "okay", "ok"]):
+                    if any(
+                        w in voice_lower
+                        for w in ["yes", "yeah", "yep", "sure", "okay", "ok"]
+                    ):
                         response = "y"
                     elif any(w in voice_lower for w in ["no", "nope", "nah"]):
                         response = "n"

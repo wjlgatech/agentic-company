@@ -5,40 +5,33 @@ Tests the Agent, AgentTeam, and YAML workflow functionality.
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock
 
 from orchestration.agents.base import (
-    Agent,
-    AgentRole,
     AgentConfig,
-    AgentContext,
     AgentResult,
+    AgentRole,
     MockAgent,
-    LLMAgent,
+)
+from orchestration.agents.specialized import (
+    DeveloperAgent,
+    PlannerAgent,
+    ReviewerAgent,
+    TesterAgent,
+    VerifierAgent,
+    create_agent,
 )
 from orchestration.agents.team import (
     AgentTeam,
-    TeamConfig,
-    TeamBuilder,
-    WorkflowStep,
     StepStatus,
-    create_feature_dev_team,
+    TeamBuilder,
+    TeamConfig,
+    WorkflowStep,
     create_bug_fix_team,
+    create_feature_dev_team,
     create_security_audit_team,
-)
-from orchestration.agents.specialized import (
-    PlannerAgent,
-    DeveloperAgent,
-    VerifierAgent,
-    TesterAgent,
-    ReviewerAgent,
-    create_agent,
 )
 from orchestration.workflows.parser import (
     WorkflowParser,
-    WorkflowDefinition,
-    load_workflow,
 )
 from orchestration.workflows.templates import (
     FEATURE_DEV_TEMPLATE,
@@ -109,7 +102,7 @@ class TestAgentBase:
         config = AgentConfig(
             role=AgentRole.REVIEWER,
             name="Code Reviewer",
-            persona="A strict but fair reviewer"
+            persona="A strict but fair reviewer",
         )
         agent = MockAgent(config)
 
@@ -158,10 +151,11 @@ class TestSpecializedAgents:
         assert agent.role == AgentRole.PLANNER
         assert agent.name == "Custom Planner"
 
-    def test_create_agent_unknown_role(self):
-        """Test factory with unknown role raises error"""
-        with pytest.raises(ValueError):
-            create_agent(AgentRole.CUSTOM)
+    def test_create_agent_custom_role(self):
+        """Test factory with CUSTOM role creates a generic LLMAgent"""
+        agent = create_agent(AgentRole.CUSTOM, name="My Custom Agent")
+        assert agent.role == AgentRole.CUSTOM
+        assert agent.name == "My Custom Agent"
 
 
 class TestAgentTeam:
@@ -200,7 +194,7 @@ class TestAgentTeam:
             name="Planning",
             agent_role=AgentRole.PLANNER,
             input_template="Create plan for: {task}",
-            expects="A detailed plan"
+            expects="A detailed plan",
         )
 
         team.add_step(step)
@@ -217,17 +211,19 @@ class TestAgentTeam:
         # Add mock agents
         planner = MockAgent(
             AgentConfig(role=AgentRole.PLANNER, name="Planner"),
-            mock_output="Plan: Step 1, Step 2"
+            mock_output="Plan: Step 1, Step 2",
         )
         team.add_agent(planner)
 
         # Add step
-        team.add_step(WorkflowStep(
-            id="plan",
-            name="Planning",
-            agent_role=AgentRole.PLANNER,
-            input_template="Create plan for: {task}"
-        ))
+        team.add_step(
+            WorkflowStep(
+                id="plan",
+                name="Planning",
+                agent_role=AgentRole.PLANNER,
+                input_template="Create plan for: {task}",
+            )
+        )
 
         result = await team.run("Build a website")
 
@@ -242,28 +238,36 @@ class TestAgentTeam:
         team = AgentTeam(config)
 
         # Add agents
-        team.add_agent(MockAgent(
-            AgentConfig(role=AgentRole.PLANNER, name="Planner"),
-            mock_output="Plan created"
-        ))
-        team.add_agent(MockAgent(
-            AgentConfig(role=AgentRole.DEVELOPER, name="Developer"),
-            mock_output="Code written"
-        ))
+        team.add_agent(
+            MockAgent(
+                AgentConfig(role=AgentRole.PLANNER, name="Planner"),
+                mock_output="Plan created",
+            )
+        )
+        team.add_agent(
+            MockAgent(
+                AgentConfig(role=AgentRole.DEVELOPER, name="Developer"),
+                mock_output="Code written",
+            )
+        )
 
         # Add steps
-        team.add_step(WorkflowStep(
-            id="plan",
-            name="Planning",
-            agent_role=AgentRole.PLANNER,
-            input_template="Plan: {task}"
-        ))
-        team.add_step(WorkflowStep(
-            id="implement",
-            name="Implementation",
-            agent_role=AgentRole.DEVELOPER,
-            input_template="Implement: {plan}"
-        ))
+        team.add_step(
+            WorkflowStep(
+                id="plan",
+                name="Planning",
+                agent_role=AgentRole.PLANNER,
+                input_template="Plan: {task}",
+            )
+        )
+        team.add_step(
+            WorkflowStep(
+                id="implement",
+                name="Implementation",
+                agent_role=AgentRole.DEVELOPER,
+                input_template="Implement: {plan}",
+            )
+        )
 
         result = await team.run("Build feature")
 
@@ -277,20 +281,24 @@ class TestAgentTeam:
         config = TeamConfig(name="Failing Team")
         team = AgentTeam(config)
 
-        team.add_agent(MockAgent(
-            AgentConfig(role=AgentRole.PLANNER, name="Planner"),
-            should_fail=True,
-            fail_message="Planning failed"
-        ))
+        team.add_agent(
+            MockAgent(
+                AgentConfig(role=AgentRole.PLANNER, name="Planner"),
+                should_fail=True,
+                fail_message="Planning failed",
+            )
+        )
 
-        team.add_step(WorkflowStep(
-            id="plan",
-            name="Planning",
-            agent_role=AgentRole.PLANNER,
-            input_template="Plan: {task}",
-            max_retries=0,
-            on_fail="abort"
-        ))
+        team.add_step(
+            WorkflowStep(
+                id="plan",
+                name="Planning",
+                agent_role=AgentRole.PLANNER,
+                input_template="Plan: {task}",
+                max_retries=0,
+                on_fail="abort",
+            )
+        )
 
         result = await team.run("Build feature")
 
@@ -303,12 +311,14 @@ class TestTeamBuilder:
 
     def test_basic_team_building(self):
         """Test building team with builder"""
-        team = (TeamBuilder("test-team", "Test description")
+        team = (
+            TeamBuilder("test-team", "Test description")
             .with_planner()
             .with_developer()
             .step("plan", AgentRole.PLANNER, "Plan: {task}")
             .step("develop", AgentRole.DEVELOPER, "Develop: {plan}")
-            .build())
+            .build()
+        )
 
         assert team.config.name == "test-team"
         assert AgentRole.PLANNER in team.agents
@@ -317,19 +327,22 @@ class TestTeamBuilder:
 
     def test_team_builder_with_all_agents(self):
         """Test builder with all standard agents"""
-        team = (TeamBuilder("full-team")
+        team = (
+            TeamBuilder("full-team")
             .with_planner()
             .with_developer()
             .with_verifier()
             .with_tester()
             .with_reviewer()
-            .build())
+            .build()
+        )
 
         assert len(team.agents) == 5
 
     def test_team_builder_with_verification(self):
         """Test builder with cross-verification"""
-        team = (TeamBuilder("verified-team")
+        team = (
+            TeamBuilder("verified-team")
             .with_developer()
             .with_verifier()
             .step(
@@ -337,24 +350,24 @@ class TestTeamBuilder:
                 AgentRole.DEVELOPER,
                 "Develop: {task}",
                 verified_by=AgentRole.VERIFIER,
-                expects="Working code"
+                expects="Working code",
             )
-            .build())
+            .build()
+        )
 
         assert team.steps[0].verified_by == AgentRole.VERIFIER
         assert team.steps[0].expects == "Working code"
 
     def test_team_builder_with_approval(self):
         """Test builder with approval step"""
-        team = (TeamBuilder("approval-team")
+        team = (
+            TeamBuilder("approval-team")
             .with_reviewer()
             .step(
-                "review",
-                AgentRole.REVIEWER,
-                "Review: {task}",
-                requires_approval=True
+                "review", AgentRole.REVIEWER, "Review: {task}", requires_approval=True
             )
-            .build())
+            .build()
+        )
 
         assert team.steps[0].requires_approval
 
@@ -538,7 +551,7 @@ class TestCrossVerification:
             agent_role=AgentRole.DEVELOPER,
             step_id="step-1",
             output="Code implementation",
-            success=True
+            success=True,
         )
 
         verification = await verifier.verify(result, "Code must compile")
@@ -557,7 +570,7 @@ class TestCrossVerification:
             agent_role=AgentRole.DEVELOPER,
             step_id="step-1",
             output="Code implementation",
-            success=True
+            success=True,
         )
 
         verification = await verifier.verify(result, "Code must have error handling")
@@ -572,15 +585,13 @@ class TestGuardrailIntegration:
     @pytest.mark.asyncio
     async def test_agent_with_guardrails(self):
         """Test agent with guardrail pipeline"""
-        from orchestration import GuardrailPipeline, ContentFilter
+        from orchestration import ContentFilter, GuardrailPipeline
 
         config = AgentConfig(role=AgentRole.DEVELOPER, name="Dev")
         agent = MockAgent(config, mock_output="Safe output")
 
         # Create guardrail that blocks "hack"
-        guardrails = GuardrailPipeline([
-            ContentFilter(blocked_topics=["hack"])
-        ])
+        guardrails = GuardrailPipeline([ContentFilter(blocked_topics=["hack"])])
         agent.set_guardrails(guardrails)
 
         # Safe input should pass
@@ -590,14 +601,14 @@ class TestGuardrailIntegration:
     @pytest.mark.asyncio
     async def test_agent_guardrail_blocks_input(self):
         """Test guardrail blocking harmful input"""
-        from orchestration import GuardrailPipeline, ContentFilter
+        from orchestration import ContentFilter, GuardrailPipeline
 
         config = AgentConfig(role=AgentRole.DEVELOPER, name="Dev")
         agent = MockAgent(config, mock_output="Safe output")
 
-        guardrails = GuardrailPipeline([
-            ContentFilter(blocked_topics=["hack", "malware"])
-        ])
+        guardrails = GuardrailPipeline(
+            [ContentFilter(blocked_topics=["hack", "malware"])]
+        )
         agent.set_guardrails(guardrails)
 
         # Harmful input should be blocked

@@ -8,79 +8,35 @@ Inspired by Antfarm's elegant simplicity + production-grade safety.
 """
 
 from orchestration._version import __version__
-from orchestration.config import OrchestratorConfig, get_config
-from orchestration.guardrails import (
-    GuardrailResult,
-    ContentFilter,
-    RelevanceGuardrail,
-    RateLimiter,
-    GuardrailPipeline,
-)
-from orchestration.evaluator import (
-    EvaluationResult,
-    RuleBasedEvaluator,
-    LLMEvaluator,
-    EvaluatorOptimizer,
-)
-from orchestration.memory import (
-    MemoryEntry,
-    MemoryStore,
-    LocalMemoryStore,
-)
-from orchestration.approval import (
-    ApprovalRequest,
-    ApprovalGate,
-    AutoApprovalGate,
-    HumanApprovalGate,
-)
-from orchestration.observability import (
-    MetricsCollector,
-    Tracer,
-    Logger,
-    ObservabilityStack,
-)
-from orchestration.pipeline import Pipeline, PipelineStep
 
 # Multi-Agent Teams (inspired by Antfarm)
 from orchestration.agents import (
     Agent,
-    AgentRole,
     AgentConfig,
+    AgentRole,
     AgentTeam,
+    DeveloperAgent,
+    PlannerAgent,
+    ReviewerAgent,
     TeamConfig,
     TeamResult,
-    PlannerAgent,
-    DeveloperAgent,
-    VerifierAgent,
     TesterAgent,
-    ReviewerAgent,
+    VerifierAgent,
 )
 from orchestration.agents.team import (
     TeamBuilder,
     WorkflowStep,
-    create_feature_dev_team,
     create_bug_fix_team,
+    create_feature_dev_team,
     create_security_audit_team,
 )
-
-# YAML Workflow Definitions
-from orchestration.workflows import (
-    WorkflowDefinition,
-    WorkflowParser,
-    load_workflow,
-    load_ready_workflow,  # NEW: Ready-to-run workflow loading
-    load_workflows_from_directory,
-    init_workflow,
+from orchestration.approval import (
+    ApprovalGate,
+    ApprovalRequest,
+    AutoApprovalGate,
+    HumanApprovalGate,
 )
-
-# LLM Integrations (OpenClaw + Nanobot)
-from orchestration.integrations import (
-    OpenClawExecutor,
-    NanobotExecutor,
-    UnifiedExecutor,
-    auto_setup_executor,
-    get_available_backends,
-)
+from orchestration.config import OrchestratorConfig, get_config
 
 # Conversational Workflow Builder (Easy Mode)
 from orchestration.conversation import (
@@ -88,6 +44,50 @@ from orchestration.conversation import (
     Question,
     QuestionType,
     run_conversation,
+)
+from orchestration.evaluator import (
+    EvaluationResult,
+    EvaluatorOptimizer,
+    LLMEvaluator,
+    RuleBasedEvaluator,
+)
+from orchestration.guardrails import (
+    ContentFilter,
+    GuardrailPipeline,
+    GuardrailResult,
+    RateLimiter,
+    RelevanceGuardrail,
+)
+
+# LLM Integrations (OpenClaw + Nanobot)
+from orchestration.integrations import (
+    NanobotExecutor,
+    OpenClawExecutor,
+    UnifiedExecutor,
+    auto_setup_executor,
+    get_available_backends,
+)
+from orchestration.memory import (
+    LocalMemoryStore,
+    MemoryEntry,
+    MemoryStore,
+)
+from orchestration.observability import (
+    Logger,
+    MetricsCollector,
+    ObservabilityStack,
+    Tracer,
+)
+from orchestration.pipeline import Pipeline, PipelineStep
+
+# YAML Workflow Definitions
+from orchestration.workflows import (
+    WorkflowDefinition,
+    WorkflowParser,
+    init_workflow,
+    load_ready_workflow,  # NEW: Ready-to-run workflow loading
+    load_workflow,
+    load_workflows_from_directory,
 )
 
 __all__ = [

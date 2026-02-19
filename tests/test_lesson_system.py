@@ -5,26 +5,27 @@ NO MOCKS - Uses real LLM calls, real file I/O, real data structures.
 Tests every claim with unit, integration, and real-world scenarios.
 """
 
-import pytest
 import json
-import tempfile
 import os
-from pathlib import Path
+import tempfile
 from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
 
 from orchestration.lessons import (
-    LessonType,
-    LessonStatus,
     Lesson,
-    LessonMetadata,
     LessonExtractor,
     LessonManager,
+    LessonMetadata,
+    LessonStatus,
+    LessonType,
 )
-
 
 # =============================================================================
 # FIXTURES - Real data, no mocks
 # =============================================================================
+
 
 @pytest.fixture
 def temp_storage():
@@ -41,6 +42,7 @@ def real_llm_call():
     For CI/testing without API keys, uses a simple pattern-based generator.
     For production testing with API keys, uses actual Claude API.
     """
+
     def llm_call(prompt: str) -> str:
         """Real or simulated LLM response based on environment."""
 
@@ -51,11 +53,12 @@ def real_llm_call():
             # REAL API CALL
             try:
                 import anthropic
+
                 client = anthropic.Anthropic(api_key=api_key)
                 message = client.messages.create(
                     model="claude-sonnet-4-20250514",
                     max_tokens=2000,
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
                 )
                 return message.content[0].text
             except Exception as e:
@@ -74,19 +77,21 @@ def real_llm_call():
                 title = "Incremental implementation approach works well"
                 content = "Breaking down the feature into small, testable increments allowed for early validation and reduced rework. Each increment was independently deployable."
 
-            return json.dumps({
-                "lessons": [
-                    {
-                        "type": lesson_type,
-                        "title": title,
-                        "content": content,
-                        "situation": "When working on features with unclear requirements or complex integrations.",
-                        "recommendation": "Start with minimal viable implementation, get feedback early, then iterate based on real usage patterns.",
-                        "confidence": 0.82,
-                        "domain_tags": ["implementation", "api", "testing"]
-                    }
-                ]
-            })
+            return json.dumps(
+                {
+                    "lessons": [
+                        {
+                            "type": lesson_type,
+                            "title": title,
+                            "content": content,
+                            "situation": "When working on features with unclear requirements or complex integrations.",
+                            "recommendation": "Start with minimal viable implementation, get feedback early, then iterate based on real usage patterns.",
+                            "confidence": 0.82,
+                            "domain_tags": ["implementation", "api", "testing"],
+                        }
+                    ]
+                }
+            )
 
         return "{}"
 
@@ -106,28 +111,28 @@ def sample_workflow_data():
             "plan": {
                 "started_at": "2026-02-14T10:00:00",
                 "completed_at": "2026-02-14T10:15:00",
-                "artifacts": []
+                "artifacts": [],
             },
             "implement": {
                 "started_at": "2026-02-14T10:15:00",
                 "completed_at": "2026-02-14T10:45:00",
-                "artifacts": ["/outputs/abc123/auth_service.py"]
+                "artifacts": ["/outputs/abc123/auth_service.py"],
             },
             "verify": {
                 "started_at": "2026-02-14T10:45:00",
                 "completed_at": "2026-02-14T10:50:00",
-                "artifacts": []
+                "artifacts": [],
             },
             "test": {
                 "started_at": "2026-02-14T10:50:00",
                 "completed_at": "2026-02-14T11:00:00",
-                "artifacts": ["/outputs/abc123/test_auth.py"]
+                "artifacts": ["/outputs/abc123/test_auth.py"],
             },
             "review": {
                 "started_at": "2026-02-14T11:00:00",
                 "completed_at": "2026-02-14T11:05:00",
-                "artifacts": []
-            }
+                "artifacts": [],
+            },
         },
         "steps": [
             {
@@ -135,43 +140,44 @@ def sample_workflow_data():
                 "agent": "Planner",
                 "status": "completed",
                 "output": "Created detailed implementation plan for OAuth authentication...",
-                "error": None
+                "error": None,
             },
             {
                 "step_id": "develop",
                 "agent": "Developer",
                 "status": "completed",
                 "output": "Implemented OAuth flow with PKCE...",
-                "error": None
+                "error": None,
             },
             {
                 "step_id": "verify",
                 "agent": "Verifier",
                 "status": "completed",
                 "output": "Code review passed, security best practices followed...",
-                "error": None
+                "error": None,
             },
             {
                 "step_id": "test",
                 "agent": "Tester",
                 "status": "completed",
                 "output": "All tests passing, edge cases covered...",
-                "error": None
+                "error": None,
             },
             {
                 "step_id": "review",
                 "agent": "Reviewer",
                 "status": "completed",
                 "output": "Approved for deployment...",
-                "error": None
-            }
-        ]
+                "error": None,
+            },
+        ],
     }
 
 
 # =============================================================================
 # UNIT TESTS - Individual components
 # =============================================================================
+
 
 class TestLessonDataStructures:
     """Test data structures with REAL data."""
@@ -184,7 +190,7 @@ class TestLessonDataStructures:
             domain_tags=["authentication", "oauth", "security"],
             complexity="medium",
             confidence_score=0.85,
-            evidence_run_ids=["abc123", "def456"]
+            evidence_run_ids=["abc123", "def456"],
         )
 
         assert metadata.workflow_id == "feature-dev"
@@ -199,7 +205,7 @@ class TestLessonDataStructures:
             workflow_id="feature-dev",
             workflow_cluster="code",
             domain_tags=["auth"],
-            confidence_score=0.80
+            confidence_score=0.80,
         )
 
         lesson = Lesson(
@@ -212,7 +218,7 @@ class TestLessonDataStructures:
             status=LessonStatus.PROPOSED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         # Test serialization
@@ -232,7 +238,10 @@ class TestLessonDataStructures:
 class TestLessonExtractor:
     """Test lesson extraction with REAL LLM calls."""
 
-    def test_extract_from_successful_workflow(self, real_llm_call, sample_workflow_data):
+    @pytest.mark.integration
+    def test_extract_from_successful_workflow(
+        self, real_llm_call, sample_workflow_data
+    ):
         """Test extracting lessons from real successful workflow."""
         extractor = LessonExtractor(llm_call=real_llm_call)
 
@@ -244,11 +253,13 @@ class TestLessonExtractor:
             status=data["status"],
             duration=data["duration"],
             stages=data["stages"],
-            steps=data["steps"]
+            steps=data["steps"],
         )
 
         # Should extract at least one lesson
-        assert len(lessons) >= 1, "Should extract at least one lesson from successful workflow"
+        assert (
+            len(lessons) >= 1
+        ), "Should extract at least one lesson from successful workflow"
 
         # Check lesson quality
         for lesson in lessons:
@@ -260,8 +271,11 @@ class TestLessonExtractor:
             assert lesson.status == LessonStatus.PROPOSED
             assert lesson.created_by == "llm"
             assert lesson.metadata.workflow_id == data["workflow_id"]
-            assert lesson.metadata.confidence_score >= 0.7, "Should only propose high-confidence lessons"
+            assert (
+                lesson.metadata.confidence_score >= 0.7
+            ), "Should only propose high-confidence lessons"
 
+    @pytest.mark.integration
     def test_extract_from_failed_workflow(self, real_llm_call):
         """Test extracting lessons from real failed workflow."""
         extractor = LessonExtractor(llm_call=real_llm_call)
@@ -273,13 +287,29 @@ class TestLessonExtractor:
             "status": "failed",
             "duration": 423.0,
             "stages": {
-                "plan": {"started_at": "2026-02-14T10:00:00", "completed_at": "2026-02-14T10:10:00"},
-                "implement": {"started_at": "2026-02-14T10:10:00", "completed_at": None}
+                "plan": {
+                    "started_at": "2026-02-14T10:00:00",
+                    "completed_at": "2026-02-14T10:10:00",
+                },
+                "implement": {
+                    "started_at": "2026-02-14T10:10:00",
+                    "completed_at": None,
+                },
             },
             "steps": [
-                {"step_id": "plan", "agent": "Planner", "status": "completed", "error": None},
-                {"step_id": "develop", "agent": "Developer", "status": "failed", "error": "API authentication timeout"}
-            ]
+                {
+                    "step_id": "plan",
+                    "agent": "Planner",
+                    "status": "completed",
+                    "error": None,
+                },
+                {
+                    "step_id": "develop",
+                    "agent": "Developer",
+                    "status": "failed",
+                    "error": "API authentication timeout",
+                },
+            ],
         }
 
         lessons = extractor.extract_from_run(**failed_data)
@@ -316,7 +346,7 @@ class TestLessonManager:
             workflow_id="feature-dev",
             workflow_cluster="code",
             domain_tags=["testing", "python"],
-            confidence_score=0.85
+            confidence_score=0.85,
         )
 
         lesson = Lesson(
@@ -329,7 +359,7 @@ class TestLessonManager:
             status=LessonStatus.PROPOSED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         # Add lesson
@@ -340,7 +370,7 @@ class TestLessonManager:
         assert temp_storage.exists()
 
         # Verify file contents
-        with open(temp_storage, 'r') as f:
+        with open(temp_storage) as f:
             data = json.load(f)
             assert len(data["lessons"]) == 1
             assert data["lessons"][0]["id"] == "test-001"
@@ -359,7 +389,7 @@ class TestLessonManager:
             workflow_id="feature-dev",
             workflow_cluster="code",
             domain_tags=["api"],
-            confidence_score=0.90
+            confidence_score=0.90,
         )
 
         lesson = Lesson(
@@ -372,7 +402,7 @@ class TestLessonManager:
             status=LessonStatus.PROPOSED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         manager.add_proposed(lesson)
@@ -381,7 +411,7 @@ class TestLessonManager:
         success = manager.approve(
             lesson_id="approve-test",
             reviewer_id="engineer-001",
-            notes="Good recommendation, approved for use"
+            notes="Good recommendation, approved for use",
         )
 
         assert success is True
@@ -401,7 +431,7 @@ class TestLessonManager:
             workflow_id="feature-dev",
             workflow_cluster="code",
             domain_tags=["performance"],
-            confidence_score=0.65
+            confidence_score=0.65,
         )
 
         lesson = Lesson(
@@ -414,7 +444,7 @@ class TestLessonManager:
             status=LessonStatus.PROPOSED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         manager.add_proposed(lesson)
@@ -423,7 +453,7 @@ class TestLessonManager:
         success = manager.reject(
             lesson_id="reject-test",
             reviewer_id="engineer-002",
-            reason="This is bad advice - caching is useful when done correctly"
+            reason="This is bad advice - caching is useful when done correctly",
         )
 
         assert success is True
@@ -444,7 +474,7 @@ class TestLessonManager:
             workflow_id="feature-dev",
             workflow_cluster="code",
             domain_tags=["git"],
-            confidence_score=0.88
+            confidence_score=0.88,
         )
 
         lesson = Lesson(
@@ -457,14 +487,14 @@ class TestLessonManager:
             status=LessonStatus.APPROVED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         manager.add_proposed(lesson)
         manager.approve("usage-test", "engineer-003")
 
         # Record usage multiple times
-        for i in range(5):
+        for _i in range(5):
             manager.record_usage("usage-test")
 
         # Verify usage count
@@ -480,7 +510,7 @@ class TestLessonManager:
             workflow_id="feature-dev",
             workflow_cluster="code",
             domain_tags=["testing"],
-            confidence_score=0.85
+            confidence_score=0.85,
         )
 
         lesson = Lesson(
@@ -493,7 +523,7 @@ class TestLessonManager:
             status=LessonStatus.APPROVED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         manager.add_proposed(lesson)
@@ -521,7 +551,7 @@ class TestLessonManager:
                 workflow_id=f"workflow-{cluster}",
                 workflow_cluster=cluster,
                 domain_tags=[cluster],
-                confidence_score=0.85
+                confidence_score=0.85,
             )
 
             lesson = Lesson(
@@ -534,7 +564,7 @@ class TestLessonManager:
                 status=LessonStatus.APPROVED,
                 metadata=metadata,
                 created_at=datetime.now().isoformat(),
-                created_by="llm"
+                created_by="llm",
             )
 
             manager.add_proposed(lesson)
@@ -565,7 +595,7 @@ class TestLessonManager:
                 workflow_id="feature-dev",
                 workflow_cluster="code",
                 domain_tags=tags,
-                confidence_score=0.85
+                confidence_score=0.85,
             )
 
             lesson = Lesson(
@@ -578,7 +608,7 @@ class TestLessonManager:
                 status=LessonStatus.APPROVED,
                 metadata=metadata,
                 created_at=datetime.now().isoformat(),
-                created_by="llm"
+                created_by="llm",
             )
 
             manager.add_proposed(lesson)
@@ -596,10 +626,14 @@ class TestLessonManager:
 # INTEGRATION TESTS - End-to-end flows
 # =============================================================================
 
+
 class TestLessonExtractionFlow:
     """Test complete lesson extraction and management flow."""
 
-    def test_full_workflow_to_lesson_pipeline(self, real_llm_call, sample_workflow_data, temp_storage):
+    @pytest.mark.integration
+    def test_full_workflow_to_lesson_pipeline(
+        self, real_llm_call, sample_workflow_data, temp_storage
+    ):
         """
         REAL END-TO-END TEST:
         Workflow completes → Extract lessons → Review → Approve → Store → Retrieve
@@ -627,7 +661,7 @@ class TestLessonExtractionFlow:
                 manager.approve(
                     lesson_id=lesson.id,
                     reviewer_id="human-reviewer",
-                    notes="Reviewed and approved"
+                    notes="Reviewed and approved",
                 )
 
         # Step 5: Verify approved lessons are retrievable
@@ -658,6 +692,7 @@ class TestLessonExtractionFlow:
 # REAL-WORLD USE CASE TESTS
 # =============================================================================
 
+
 class TestRealWorldScenarios:
     """Test real-world use cases with actual data patterns."""
 
@@ -673,18 +708,18 @@ class TestRealWorldScenarios:
             {
                 "title": "Always add type hints in Python",
                 "tags": ["python", "code-quality"],
-                "content": "Our codebase uses mypy for type checking..."
+                "content": "Our codebase uses mypy for type checking...",
             },
             {
                 "title": "Use conventional commits",
                 "tags": ["git", "process"],
-                "content": "We follow Angular commit convention..."
+                "content": "We follow Angular commit convention...",
             },
             {
                 "title": "Write tests before implementation",
                 "tags": ["testing", "tdd"],
-                "content": "TDD approach helps catch issues early..."
-            }
+                "content": "TDD approach helps catch issues early...",
+            },
         ]
 
         for i, data in enumerate(team_lessons):
@@ -692,7 +727,7 @@ class TestRealWorldScenarios:
                 workflow_id="feature-dev",
                 workflow_cluster="code",
                 domain_tags=data["tags"],
-                confidence_score=0.90
+                confidence_score=0.90,
             )
 
             lesson = Lesson(
@@ -705,7 +740,7 @@ class TestRealWorldScenarios:
                 status=LessonStatus.APPROVED,
                 metadata=metadata,
                 created_at=datetime.now().isoformat(),
-                created_by="team"
+                created_by="team",
             )
 
             manager.add_proposed(lesson)
@@ -713,13 +748,13 @@ class TestRealWorldScenarios:
 
         # New developer retrieves lessons for Python feature
         relevant_lessons = manager.get_approved(
-            workflow_cluster="code",
-            domain_tags=["python"]
+            workflow_cluster="code", domain_tags=["python"]
         )
 
         assert len(relevant_lessons) >= 1, "Should find Python best practices"
         assert any("type hints" in l.title.lower() for l in relevant_lessons)
 
+    @pytest.mark.integration
     def test_scenario_recurring_bug_pattern(self, real_llm_call, temp_storage):
         """
         SCENARIO: Same bug appears in multiple workflows.
@@ -735,10 +770,20 @@ class TestRealWorldScenarios:
             "task": "Add user registration",
             "status": "failed",
             "duration": 320.0,
-            "stages": {"plan": {"started_at": "2026-02-14T10:00:00", "completed_at": "2026-02-14T10:05:00"}},
+            "stages": {
+                "plan": {
+                    "started_at": "2026-02-14T10:00:00",
+                    "completed_at": "2026-02-14T10:05:00",
+                }
+            },
             "steps": [
-                {"step_id": "develop", "agent": "Developer", "status": "failed", "error": "Database connection pool exhausted"}
-            ]
+                {
+                    "step_id": "develop",
+                    "agent": "Developer",
+                    "status": "failed",
+                    "error": "Database connection pool exhausted",
+                }
+            ],
         }
 
         lessons1 = extractor.extract_from_run(**workflow1)
@@ -752,10 +797,20 @@ class TestRealWorldScenarios:
             "task": "Add password reset",
             "status": "failed",
             "duration": 285.0,
-            "stages": {"plan": {"started_at": "2026-02-14T11:00:00", "completed_at": "2026-02-14T11:05:00"}},
+            "stages": {
+                "plan": {
+                    "started_at": "2026-02-14T11:00:00",
+                    "completed_at": "2026-02-14T11:05:00",
+                }
+            },
             "steps": [
-                {"step_id": "develop", "agent": "Developer", "status": "failed", "error": "Database connection timeout"}
-            ]
+                {
+                    "step_id": "develop",
+                    "agent": "Developer",
+                    "status": "failed",
+                    "error": "Database connection timeout",
+                }
+            ],
         }
 
         lessons2 = extractor.extract_from_run(**workflow2)
@@ -765,12 +820,17 @@ class TestRealWorldScenarios:
         # Review and approve lessons about connection handling
         pending = manager.get_pending_review()
         for lesson in pending:
-            if "connection" in lesson.content.lower() or "database" in lesson.content.lower():
+            if (
+                "connection" in lesson.content.lower()
+                or "database" in lesson.content.lower()
+            ):
                 manager.approve(lesson.id, "reviewer", "Important pattern to avoid")
 
         # Third workflow should find this lesson
         connection_lessons = manager.get_approved(domain_tags=["database"])
-        assert len(connection_lessons) > 0, "Should have lesson about database connections"
+        assert (
+            len(connection_lessons) > 0
+        ), "Should have lesson about database connections"
 
     def test_scenario_cross_team_knowledge_sharing(self, temp_storage):
         """
@@ -785,7 +845,7 @@ class TestRealWorldScenarios:
             workflow_cluster="code",
             domain_tags=["api", "rate-limiting", "retry"],
             confidence_score=0.92,
-            evidence_run_ids=["team-a-run-1", "team-a-run-2"]
+            evidence_run_ids=["team-a-run-1", "team-a-run-2"],
         )
 
         lesson = Lesson(
@@ -800,7 +860,7 @@ class TestRealWorldScenarios:
             created_at=(datetime.now() - timedelta(days=30)).isoformat(),  # Old lesson
             created_by="team-a",
             usage_count=5,  # Team A used it successfully
-            effectiveness_score=0.95  # Very effective
+            effectiveness_score=0.95,  # Very effective
         )
 
         manager.add_proposed(lesson)
@@ -826,6 +886,7 @@ class TestRealWorldScenarios:
 # STRESS TESTS
 # =============================================================================
 
+
 class TestStressScenarios:
     """Stress test with realistic volumes and edge cases."""
 
@@ -840,7 +901,7 @@ class TestStressScenarios:
                 workflow_id=f"workflow-{i}",
                 workflow_cluster=cluster,
                 domain_tags=[f"tag-{i % 10}"],
-                confidence_score=0.70 + (i % 30) * 0.01
+                confidence_score=0.70 + (i % 30) * 0.01,
             )
 
             lesson = Lesson(
@@ -853,7 +914,7 @@ class TestStressScenarios:
                 status=LessonStatus.APPROVED,
                 metadata=metadata,
                 created_at=datetime.now().isoformat(),
-                created_by="llm"
+                created_by="llm",
             )
 
             manager.add_proposed(lesson)
@@ -861,6 +922,7 @@ class TestStressScenarios:
 
         # Test retrieval performance
         import time
+
         start = time.time()
 
         lessons = manager.get_approved(workflow_cluster="code")
@@ -879,7 +941,7 @@ class TestStressScenarios:
             workflow_id="test",
             workflow_cluster="code",
             domain_tags=["concurrent"],
-            confidence_score=0.85
+            confidence_score=0.85,
         )
 
         lesson = Lesson(
@@ -892,7 +954,7 @@ class TestStressScenarios:
             status=LessonStatus.APPROVED,
             metadata=metadata,
             created_at=datetime.now().isoformat(),
-            created_by="llm"
+            created_by="llm",
         )
 
         manager.add_proposed(lesson)

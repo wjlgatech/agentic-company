@@ -4,67 +4,75 @@ Lesson Learning System - Extract and manage lessons from workflow executions.
 Phase 2: Basic lesson extraction with LLM proposals and human curation.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from enum import Enum
 import json
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class LessonType(str, Enum):
     """Types of lessons that can be learned."""
-    SUCCESS_PATTERN = "success_pattern"      # What worked well
-    FAILURE_PATTERN = "failure_pattern"      # What went wrong
-    OPTIMIZATION = "optimization"            # How to do it better/faster
-    EDGE_CASE = "edge_case"                 # Unusual situation handling
-    ANTI_PATTERN = "anti_pattern"           # What to avoid
-    BEST_PRACTICE = "best_practice"         # Recommended approach
+
+    SUCCESS_PATTERN = "success_pattern"  # What worked well
+    FAILURE_PATTERN = "failure_pattern"  # What went wrong
+    OPTIMIZATION = "optimization"  # How to do it better/faster
+    EDGE_CASE = "edge_case"  # Unusual situation handling
+    ANTI_PATTERN = "anti_pattern"  # What to avoid
+    BEST_PRACTICE = "best_practice"  # Recommended approach
 
 
 class LessonStatus(str, Enum):
     """Lesson approval status."""
-    PROPOSED = "proposed"        # LLM proposed, awaiting review
-    APPROVED = "approved"        # Human approved, active in memory
-    REJECTED = "rejected"        # Human rejected
-    ARCHIVED = "archived"        # Superseded or outdated
+
+    PROPOSED = "proposed"  # LLM proposed, awaiting review
+    APPROVED = "approved"  # Human approved, active in memory
+    REJECTED = "rejected"  # Human rejected
+    ARCHIVED = "archived"  # Superseded or outdated
 
 
 @dataclass
 class LessonMetadata:
     """Metadata about a lesson's context and applicability."""
-    workflow_id: str                          # Which workflow this came from
-    workflow_cluster: str = "general"         # code, content, analysis, etc.
-    domain_tags: List[str] = field(default_factory=list)  # e.g., ["auth", "api", "python"]
-    complexity: str = "medium"                # simple, medium, complex
-    confidence_score: float = 0.0             # LLM's confidence (0-1)
-    evidence_run_ids: List[str] = field(default_factory=list)  # Runs that support this lesson
+
+    workflow_id: str  # Which workflow this came from
+    workflow_cluster: str = "general"  # code, content, analysis, etc.
+    domain_tags: list[str] = field(
+        default_factory=list
+    )  # e.g., ["auth", "api", "python"]
+    complexity: str = "medium"  # simple, medium, complex
+    confidence_score: float = 0.0  # LLM's confidence (0-1)
+    evidence_run_ids: list[str] = field(
+        default_factory=list
+    )  # Runs that support this lesson
 
 
 @dataclass
 class Lesson:
     """A learned insight from workflow execution."""
+
     id: str
     type: LessonType
-    title: str                                # Short summary (1 line)
-    content: str                              # Detailed lesson content
-    situation: str                            # When/where this applies
-    recommendation: str                       # What to do about it
+    title: str  # Short summary (1 line)
+    content: str  # Detailed lesson content
+    situation: str  # When/where this applies
+    recommendation: str  # What to do about it
 
     status: LessonStatus
     metadata: LessonMetadata
 
     created_at: str
-    created_by: str                           # "llm" or user ID
-    reviewed_at: Optional[str] = None
-    reviewed_by: Optional[str] = None
-    review_notes: Optional[str] = None
+    created_by: str  # "llm" or user ID
+    reviewed_at: str | None = None
+    reviewed_by: str | None = None
+    review_notes: str | None = None
 
-    usage_count: int = 0                      # How many times retrieved
-    last_used_at: Optional[str] = None
-    effectiveness_score: Optional[float] = None  # Human feedback (0-1)
+    usage_count: int = 0  # How many times retrieved
+    last_used_at: str | None = None
+    effectiveness_score: float | None = None  # Human feedback (0-1)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "id": self.id,
@@ -73,7 +81,11 @@ class Lesson:
             "content": self.content,
             "situation": self.situation,
             "recommendation": self.recommendation,
-            "status": self.status.value if isinstance(self.status, LessonStatus) else self.status,
+            "status": (
+                self.status.value
+                if isinstance(self.status, LessonStatus)
+                else self.status
+            ),
             "metadata": {
                 "workflow_id": self.metadata.workflow_id,
                 "workflow_cluster": self.metadata.workflow_cluster,
@@ -93,7 +105,7 @@ class Lesson:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Lesson":
+    def from_dict(cls, data: dict[str, Any]) -> "Lesson":
         """Deserialize from dictionary."""
         metadata = LessonMetadata(
             workflow_id=data["metadata"]["workflow_id"],
@@ -204,9 +216,9 @@ IMPORTANT: Only propose lessons with confidence >= 0.7. Quality over quantity.""
         task: str,
         status: str,
         duration: float,
-        stages: Dict[str, Any],
-        steps: List[Dict[str, Any]],
-    ) -> List[Lesson]:
+        stages: dict[str, Any],
+        steps: list[dict[str, Any]],
+    ) -> list[Lesson]:
         """
         Extract lessons from a completed workflow run.
 
@@ -279,11 +291,13 @@ IMPORTANT: Only propose lessons with confidence >= 0.7. Quality over quantity.""
             print(f"Lesson extraction failed: {e}")
             return []
 
-    def _summarize_execution(self, steps: List[Dict[str, Any]]) -> str:
+    def _summarize_execution(self, steps: list[dict[str, Any]]) -> str:
         """Summarize step execution for LLM context."""
         summary_lines = []
         for step in steps:
-            status_emoji = {"completed": "✓", "failed": "✗", "pending": "○"}.get(step.get("status"), "?")
+            status_emoji = {"completed": "✓", "failed": "✗", "pending": "○"}.get(
+                step.get("status"), "?"
+            )
             summary_lines.append(
                 f"{status_emoji} {step.get('step_id', 'unknown')}: {step.get('agent', 'unknown')} "
                 f"({step.get('status', 'unknown')})"
@@ -293,7 +307,7 @@ IMPORTANT: Only propose lessons with confidence >= 0.7. Quality over quantity.""
 
         return "\n".join(summary_lines)
 
-    def _summarize_stages(self, stages: Dict[str, Any]) -> str:
+    def _summarize_stages(self, stages: dict[str, Any]) -> str:
         """Summarize stage performance for LLM context."""
         if not stages:
             return "No stage data available"
@@ -322,11 +336,20 @@ IMPORTANT: Only propose lessons with confidence >= 0.7. Quality over quantity.""
         """Detect workflow cluster from ID."""
         workflow_id_lower = workflow_id.lower()
 
-        if any(kw in workflow_id_lower for kw in ["dev", "feature", "code", "implement", "build"]):
+        if any(
+            kw in workflow_id_lower
+            for kw in ["dev", "feature", "code", "implement", "build"]
+        ):
             return "code"
-        elif any(kw in workflow_id_lower for kw in ["market", "content", "campaign", "social"]):
+        elif any(
+            kw in workflow_id_lower
+            for kw in ["market", "content", "campaign", "social"]
+        ):
             return "content"
-        elif any(kw in workflow_id_lower for kw in ["analysis", "research", "due-diligence", "audit"]):
+        elif any(
+            kw in workflow_id_lower
+            for kw in ["analysis", "research", "due-diligence", "audit"]
+        ):
             return "analysis"
         else:
             return "general"
@@ -337,7 +360,7 @@ class LessonManager:
     Manage lesson storage and retrieval with human curation.
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         """
         Initialize lesson manager.
 
@@ -352,14 +375,14 @@ class LessonManager:
         self.storage_path = Path(storage_path)
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.lessons: Dict[str, Lesson] = {}
+        self.lessons: dict[str, Lesson] = {}
         self._load()
 
     def _load(self):
         """Load lessons from storage."""
         if self.storage_path.exists():
             try:
-                with open(self.storage_path, 'r') as f:
+                with open(self.storage_path) as f:
                     data = json.load(f)
                     for lesson_data in data.get("lessons", []):
                         lesson = Lesson.from_dict(lesson_data)
@@ -375,7 +398,7 @@ class LessonManager:
                 "version": "1.0",
                 "updated_at": datetime.now().isoformat(),
             }
-            with open(self.storage_path, 'w') as f:
+            with open(self.storage_path, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             print(f"Failed to save lessons: {e}")
@@ -387,10 +410,7 @@ class LessonManager:
         return lesson.id
 
     def approve(
-        self,
-        lesson_id: str,
-        reviewer_id: str,
-        notes: Optional[str] = None
+        self, lesson_id: str, reviewer_id: str, notes: str | None = None
     ) -> bool:
         """Approve a proposed lesson."""
         if lesson_id not in self.lessons:
@@ -405,12 +425,7 @@ class LessonManager:
         self._save()
         return True
 
-    def reject(
-        self,
-        lesson_id: str,
-        reviewer_id: str,
-        reason: str
-    ) -> bool:
+    def reject(self, lesson_id: str, reviewer_id: str, reason: str) -> bool:
         """Reject a proposed lesson."""
         if lesson_id not in self.lessons:
             return False
@@ -424,19 +439,20 @@ class LessonManager:
         self._save()
         return True
 
-    def get_pending_review(self) -> List[Lesson]:
+    def get_pending_review(self) -> list[Lesson]:
         """Get all lessons awaiting review."""
         return [
-            lesson for lesson in self.lessons.values()
+            lesson
+            for lesson in self.lessons.values()
             if lesson.status == LessonStatus.PROPOSED
         ]
 
     def get_approved(
         self,
-        workflow_cluster: Optional[str] = None,
-        domain_tags: Optional[List[str]] = None,
-        limit: int = 10
-    ) -> List[Lesson]:
+        workflow_cluster: str | None = None,
+        domain_tags: list[str] | None = None,
+        limit: int = 10,
+    ) -> list[Lesson]:
         """
         Get approved lessons, optionally filtered.
 
@@ -449,21 +465,22 @@ class LessonManager:
             List of approved lessons, sorted by usage_count (most used first)
         """
         lessons = [
-            lesson for lesson in self.lessons.values()
+            lesson
+            for lesson in self.lessons.values()
             if lesson.status == LessonStatus.APPROVED
         ]
 
         # Filter by cluster
         if workflow_cluster:
             lessons = [
-                l for l in lessons
-                if l.metadata.workflow_cluster == workflow_cluster
+                l for l in lessons if l.metadata.workflow_cluster == workflow_cluster
             ]
 
         # Filter by domain tags
         if domain_tags:
             lessons = [
-                l for l in lessons
+                l
+                for l in lessons
                 if any(tag in l.metadata.domain_tags for tag in domain_tags)
             ]
 
@@ -500,22 +517,24 @@ class LessonManager:
                 )
             self._save()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get lesson statistics."""
         total = len(self.lessons)
         by_status = {}
         for status in LessonStatus:
-            by_status[status.value] = len([
-                l for l in self.lessons.values()
-                if l.status == status
-            ])
+            by_status[status.value] = len(
+                [l for l in self.lessons.values() if l.status == status]
+            )
 
         by_type = {}
         for lesson_type in LessonType:
-            by_type[lesson_type.value] = len([
-                l for l in self.lessons.values()
-                if l.type == lesson_type and l.status == LessonStatus.APPROVED
-            ])
+            by_type[lesson_type.value] = len(
+                [
+                    l
+                    for l in self.lessons.values()
+                    if l.type == lesson_type and l.status == LessonStatus.APPROVED
+                ]
+            )
 
         return {
             "total_lessons": total,

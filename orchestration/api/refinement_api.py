@@ -13,9 +13,7 @@ Endpoints:
 All responses include the latest turn with inline cards/draft if applicable.
 """
 
-from typing import Optional
 from dataclasses import dataclass
-from enum import Enum
 
 # Simulated FastAPI-style definitions (actual implementation would use FastAPI)
 
@@ -23,22 +21,24 @@ from enum import Enum
 @dataclass
 class ChatMessage:
     """A message in the chat UI."""
+
     role: str  # "user" or "assistant"
     content: str
-    cards: Optional[list] = None  # Inline clarification cards
-    draft: Optional[dict] = None  # Draft preview
-    metadata: Optional[dict] = None
+    cards: list | None = None  # Inline clarification cards
+    draft: dict | None = None  # Draft preview
+    metadata: dict | None = None
 
 
 @dataclass
 class SessionResponse:
     """API response containing session state."""
+
     session_id: str
     state: str
     messages: list[ChatMessage]
     quality_score: float
     can_proceed: bool
-    final_prompt: Optional[str] = None
+    final_prompt: str | None = None
 
 
 class RefinementAPI:
@@ -51,6 +51,7 @@ class RefinementAPI:
 
     def __init__(self):
         from ..tools.conversational_refiner import ConversationalRefiner
+
         self.refiner = ConversationalRefiner()
 
     def start_session(self) -> SessionResponse:
@@ -88,41 +89,57 @@ class RefinementAPI:
             raise ValueError(f"Session {session_id} not found")
 
         # Process the input
-        turn = self.refiner.process_input(session, user_input)
+        self.refiner.process_input(session, user_input)
 
         # Convert to API response
         messages = []
         for t in session.turns:
             # User message
-            messages.append(ChatMessage(
-                role="user",
-                content=t.user_input,
-            ))
+            messages.append(
+                ChatMessage(
+                    role="user",
+                    content=t.user_input,
+                )
+            )
             # Assistant response
-            messages.append(ChatMessage(
-                role="assistant",
-                content=t.ai_response,
-                cards=[
-                    {
-                        "question": c.question,
-                        "options": [
-                            {"label": o.label, "value": o.value, "description": o.description}
-                            for o in c.options
-                        ],
-                        "allowFreeform": c.allow_freeform,
-                        "dimension": c.dimension,
-                    }
-                    for c in t.cards
-                ] if t.cards else None,
-                draft={
-                    "summary": t.draft.summary,
-                    "approach": t.draft.approach,
-                    "outputType": t.draft.output_type,
-                    "confidence": t.draft.confidence,
-                    "canProceed": t.draft.can_proceed,
-                } if t.draft else None,
-                metadata={"turnId": t.turn_id, "state": t.state.value}
-            ))
+            messages.append(
+                ChatMessage(
+                    role="assistant",
+                    content=t.ai_response,
+                    cards=(
+                        [
+                            {
+                                "question": c.question,
+                                "options": [
+                                    {
+                                        "label": o.label,
+                                        "value": o.value,
+                                        "description": o.description,
+                                    }
+                                    for o in c.options
+                                ],
+                                "allowFreeform": c.allow_freeform,
+                                "dimension": c.dimension,
+                            }
+                            for c in t.cards
+                        ]
+                        if t.cards
+                        else None
+                    ),
+                    draft=(
+                        {
+                            "summary": t.draft.summary,
+                            "approach": t.draft.approach,
+                            "outputType": t.draft.output_type,
+                            "confidence": t.draft.confidence,
+                            "canProceed": t.draft.can_proceed,
+                        }
+                        if t.draft
+                        else None
+                    ),
+                    metadata={"turnId": t.turn_id, "state": t.state.value},
+                )
+            )
 
         return SessionResponse(
             session_id=session.session_id,
@@ -154,23 +171,36 @@ class RefinementAPI:
         messages = []
         for t in session.turns:
             messages.append(ChatMessage(role="user", content=t.user_input))
-            messages.append(ChatMessage(
-                role="assistant",
-                content=t.ai_response,
-                cards=[
-                    {
-                        "question": c.question,
-                        "options": [{"label": o.label, "value": o.value} for o in c.options],
-                        "allowFreeform": c.allow_freeform,
-                    }
-                    for c in t.cards
-                ] if t.cards else None,
-                draft={
-                    "summary": t.draft.summary,
-                    "approach": t.draft.approach,
-                    "confidence": t.draft.confidence,
-                } if t.draft else None,
-            ))
+            messages.append(
+                ChatMessage(
+                    role="assistant",
+                    content=t.ai_response,
+                    cards=(
+                        [
+                            {
+                                "question": c.question,
+                                "options": [
+                                    {"label": o.label, "value": o.value}
+                                    for o in c.options
+                                ],
+                                "allowFreeform": c.allow_freeform,
+                            }
+                            for c in t.cards
+                        ]
+                        if t.cards
+                        else None
+                    ),
+                    draft=(
+                        {
+                            "summary": t.draft.summary,
+                            "approach": t.draft.approach,
+                            "confidence": t.draft.confidence,
+                        }
+                        if t.draft
+                        else None
+                    ),
+                )
+            )
 
         return SessionResponse(
             session_id=session.session_id,

@@ -1,14 +1,12 @@
 """Tests for guardrails system."""
 
-import pytest
-import time
 from orchestration.guardrails import (
     ContentFilter,
-    RelevanceGuardrail,
-    RateLimiter,
+    GuardrailPipeline,
     LengthGuardrail,
     PIIGuardrail,
-    GuardrailPipeline,
+    RateLimiter,
+    RelevanceGuardrail,
     create_default_pipeline,
 )
 
@@ -78,7 +76,7 @@ class TestRateLimiter:
     def test_allows_within_limit(self):
         """Requests within limit should pass."""
         limiter = RateLimiter(max_requests=5, window_seconds=60)
-        for i in range(5):
+        for _i in range(5):
             result = limiter.check("request", {"user_id": "user1"})
             assert result.passed
 
@@ -175,20 +173,24 @@ class TestGuardrailPipeline:
 
     def test_runs_all_guardrails(self):
         """Pipeline should run all guardrails."""
-        pipeline = GuardrailPipeline([
-            ContentFilter(),
-            LengthGuardrail(min_length=1),
-        ])
+        pipeline = GuardrailPipeline(
+            [
+                ContentFilter(),
+                LengthGuardrail(min_length=1),
+            ]
+        )
         results = pipeline.check("Valid content")
         assert len(results) == 2
         assert all(r.passed for r in results)
 
     def test_check_all_pass(self):
         """check_all_pass should return overall status."""
-        pipeline = GuardrailPipeline([
-            ContentFilter(blocked_topics=["bad"]),
-            LengthGuardrail(min_length=1),
-        ])
+        pipeline = GuardrailPipeline(
+            [
+                ContentFilter(blocked_topics=["bad"]),
+                LengthGuardrail(min_length=1),
+            ]
+        )
 
         passed, results = pipeline.check_all_pass("Good content")
         assert passed
@@ -196,10 +198,12 @@ class TestGuardrailPipeline:
 
     def test_check_stop_on_fail(self):
         """check_stop_on_fail should stop at first failure."""
-        pipeline = GuardrailPipeline([
-            ContentFilter(blocked_topics=["stop"]),
-            LengthGuardrail(min_length=1000),  # Would fail
-        ])
+        pipeline = GuardrailPipeline(
+            [
+                ContentFilter(blocked_topics=["stop"]),
+                LengthGuardrail(min_length=1000),  # Would fail
+            ]
+        )
 
         passed, results = pipeline.check_stop_on_fail("Please stop here")
         assert not passed

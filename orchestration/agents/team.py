@@ -5,31 +5,33 @@ Coordinates multiple specialized agents working together on complex tasks.
 Implements the "Ralph Loop" pattern: fresh context per step with cross-verification.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Any, Callable, Awaitable
-from datetime import datetime
-import uuid
-import asyncio
 import re
+import uuid
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
 import structlog
 
 from orchestration.agents.base import (
     Agent,
-    AgentRole,
     AgentContext,
     AgentResult,
+    AgentRole,
     VerificationResult,
 )
 from orchestration.artifact_manager import ArtifactManager
 from orchestration.artifacts import ArtifactCollection
-from orchestration.executor import SafeExecutor, ExecutionResult
+from orchestration.executor import SafeExecutor
 
 logger = structlog.get_logger(__name__)
 
 
 class StepStatus(Enum):
     """Status of a workflow step"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -42,17 +44,18 @@ class StepStatus(Enum):
 @dataclass
 class WorkflowStep:
     """Definition of a single step in a workflow"""
+
     id: str
     name: str
     agent_role: AgentRole
     input_template: str
     expects: str = ""  # Acceptance criteria
-    verified_by: Optional[AgentRole] = None
+    verified_by: AgentRole | None = None
     requires_approval: bool = False
     max_retries: int = 3
     timeout_seconds: int = 300
     on_fail: str = "retry"  # retry, skip, escalate, abort
-    execute: Optional[str] = None  # Command to execute after step completes
+    execute: str | None = None  # Command to execute after step completes
     artifacts_required: bool = False  # Require artifacts to be created
     metadata: dict = field(default_factory=dict)
 
@@ -60,41 +63,46 @@ class WorkflowStep:
 @dataclass
 class StepResult:
     """Result of executing a workflow step"""
+
     step: WorkflowStep
     agent_result: AgentResult
-    verification: Optional[VerificationResult] = None
+    verification: VerificationResult | None = None
     status: StepStatus = StepStatus.COMPLETED
     retries: int = 0
     started_at: datetime = field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     metadata: dict = field(default_factory=dict)  # Store diagnostics and other metadata
 
 
 @dataclass
 class TeamConfig:
     """Configuration for an agent team"""
+
     name: str
     description: str = ""
     max_concurrent_steps: int = 1  # Sequential by default
     timeout_seconds: int = 3600
-    escalation_handler: Optional[Callable[[StepResult], Awaitable[None]]] = None
-    approval_handler: Optional[Callable[[StepResult], Awaitable[bool]]] = None
-    diagnostics_config: Optional[Any] = None  # DiagnosticsConfig from orchestration.diagnostics
+    escalation_handler: Callable[[StepResult], Awaitable[None]] | None = None
+    approval_handler: Callable[[StepResult], Awaitable[bool]] | None = None
+    diagnostics_config: Any | None = (
+        None  # DiagnosticsConfig from orchestration.diagnostics
+    )
     metadata: dict = field(default_factory=dict)
 
 
 @dataclass
 class TeamResult:
     """Result of team workflow execution"""
+
     team_id: str
     workflow_id: str
     task: str
     steps: list[StepResult]
     success: bool
     final_output: Any
-    error: Optional[str] = None
+    error: str | None = None
     started_at: datetime = field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     metadata: dict = field(default_factory=dict)
 
 
@@ -118,45 +126,55 @@ class AgentTeam:
         self._observers: list[Callable[[StepResult], Awaitable[None]]] = []
         self.artifact_manager = ArtifactManager()
         self.safe_executor = SafeExecutor(
-            approval_callback=config.approval_handler if hasattr(config, 'approval_handler') else None
+            approval_callback=(
+                config.approval_handler if hasattr(config, "approval_handler") else None
+            )
         )
 
         # Initialize diagnostics if enabled
         self.diagnostics = None
-        if config.diagnostics_config and getattr(config.diagnostics_config, 'enabled', False):
+        if config.diagnostics_config and getattr(
+            config.diagnostics_config, "enabled", False
+        ):
             try:
-                from orchestration.diagnostics import DiagnosticsIntegrator, require_playwright
+                from orchestration.diagnostics import (
+                    DiagnosticsIntegrator,
+                    require_playwright,
+                )
+
                 require_playwright()
 
                 # Get executor for meta-analysis
                 from orchestration.integrations.unified import auto_setup_executor
+
                 executor = auto_setup_executor()
 
                 self.diagnostics = DiagnosticsIntegrator(
-                    config.diagnostics_config,
-                    executor
+                    config.diagnostics_config, executor
                 )
                 logger.info("Diagnostics system enabled", team_id=self.id)
             except ImportError as e:
                 logger.warning("Diagnostics disabled: %s", str(e))
                 self.diagnostics = None
 
-    def add_agent(self, agent: Agent) -> 'AgentTeam':
+    def add_agent(self, agent: Agent) -> "AgentTeam":
         """Add an agent to the team"""
         self.agents[agent.role] = agent
         return self
 
-    def add_step(self, step: WorkflowStep) -> 'AgentTeam':
+    def add_step(self, step: WorkflowStep) -> "AgentTeam":
         """Add a step to the workflow"""
         self.steps.append(step)
         return self
 
-    def on_step_complete(self, callback: Callable[[StepResult], Awaitable[None]]) -> 'AgentTeam':
+    def on_step_complete(
+        self, callback: Callable[[StepResult], Awaitable[None]]
+    ) -> "AgentTeam":
         """Register callback for step completion events"""
         self._observers.append(callback)
         return self
 
-    async def run(self, task: str, context: Optional[dict] = None) -> TeamResult:
+    async def run(self, task: str, context: dict | None = None) -> TeamResult:
         """
         Execute the workflow with the given task.
 
@@ -199,7 +217,7 @@ class AgentTeam:
                             success=False,
                             final_output=None,
                             error=f"Step {step.name} failed: {step_result.agent_result.error}",
-                            completed_at=datetime.utcnow()
+                            completed_at=datetime.utcnow(),
                         )
                     elif step.on_fail == "skip":
                         continue
@@ -230,7 +248,7 @@ class AgentTeam:
                 steps=step_results,
                 success=success,
                 final_output=final_output,
-                completed_at=datetime.utcnow()
+                completed_at=datetime.utcnow(),
             )
 
         except Exception as e:
@@ -242,7 +260,7 @@ class AgentTeam:
                 success=False,
                 final_output=None,
                 error=str(e),
-                completed_at=datetime.utcnow()
+                completed_at=datetime.utcnow(),
             )
 
         finally:
@@ -263,9 +281,9 @@ class AgentTeam:
             Output: "Based on: {plan}"
         """
         # Convert {{step_outputs.X}} to {X}
-        template = re.sub(r'\{\{step_outputs\.([^}]+)\}\}', r'{\1}', template)
+        template = re.sub(r"\{\{step_outputs\.([^}]+)\}\}", r"{\1}", template)
         # Convert remaining {{X}} to {X}
-        template = re.sub(r'\{\{([^}]+)\}\}', r'{\1}', template)
+        template = re.sub(r"\{\{([^}]+)\}\}", r"{\1}", template)
         return template
 
     async def _execute_step(
@@ -275,7 +293,7 @@ class AgentTeam:
         task: str,
         outputs: dict[str, Any],
         context: dict,
-        workflow_id: str
+        workflow_id: str,
     ) -> StepResult:
         """Execute a single step with retries and verification"""
         started_at = datetime.utcnow()
@@ -295,11 +313,13 @@ class AgentTeam:
                 step_id=step.id,
                 input_data=input_data,
                 parent_outputs=outputs,
-                metadata={"step_name": step.name, "retry": retries}
+                metadata={"step_name": step.name, "retry": retries},
             )
 
             # Execute agent
-            agent_result = await agent.execute(input_data, agent_context, fresh_context=True)
+            agent_result = await agent.execute(
+                input_data, agent_context, fresh_context=True
+            )
 
             if not agent_result.success:
                 retries += 1
@@ -310,7 +330,7 @@ class AgentTeam:
                         status=StepStatus.FAILED,
                         retries=retries,
                         started_at=started_at,
-                        completed_at=datetime.utcnow()
+                        completed_at=datetime.utcnow(),
                     )
                 continue
 
@@ -331,7 +351,7 @@ class AgentTeam:
                                 status=StepStatus.FAILED,
                                 retries=retries,
                                 started_at=started_at,
-                                completed_at=datetime.utcnow()
+                                completed_at=datetime.utcnow(),
                             )
                         continue
 
@@ -343,7 +363,7 @@ class AgentTeam:
                     verification=verification,
                     status=StepStatus.AWAITING_APPROVAL,
                     retries=retries,
-                    started_at=started_at
+                    started_at=started_at,
                 )
 
                 approved = await self.config.approval_handler(step_result)
@@ -355,13 +375,12 @@ class AgentTeam:
                         status=StepStatus.FAILED,
                         retries=retries,
                         started_at=started_at,
-                        completed_at=datetime.utcnow()
+                        completed_at=datetime.utcnow(),
                     )
 
             # Extract and save artifacts
             artifacts = self.artifact_manager.extract_artifacts_from_text(
-                agent_result.output,
-                run_id=workflow_id
+                agent_result.output, run_id=workflow_id
             )
 
             # Add artifacts to agent result
@@ -371,8 +390,8 @@ class AgentTeam:
             if artifacts:
                 collection = ArtifactCollection(run_id=workflow_id, artifacts=artifacts)
                 output_dir = self.artifact_manager.save_collection(collection)
-                agent_result.metadata['artifact_dir'] = str(output_dir)
-                agent_result.metadata['artifact_count'] = len(artifacts)
+                agent_result.metadata["artifact_dir"] = str(output_dir)
+                agent_result.metadata["artifact_count"] = len(artifacts)
 
             # Check if artifacts are required
             if step.artifacts_required and not artifacts:
@@ -383,7 +402,7 @@ class AgentTeam:
                     status=StepStatus.FAILED,
                     retries=retries,
                     started_at=started_at,
-                    completed_at=datetime.utcnow()
+                    completed_at=datetime.utcnow(),
                 )
 
             # Execute command if specified
@@ -393,14 +412,13 @@ class AgentTeam:
                     # Run in the output directory where artifacts are saved
                     output_dir = self.artifact_manager.get_run_dir(workflow_id)
                     execution_result = await self.safe_executor.execute(
-                        step.execute,
-                        cwd=output_dir
+                        step.execute, cwd=output_dir
                     )
-                    agent_result.metadata['execution'] = execution_result.to_dict()
+                    agent_result.metadata["execution"] = execution_result.to_dict()
                 except Exception as e:
                     # Execution failure doesn't necessarily fail the step
                     # (depends on use case - could make configurable)
-                    agent_result.metadata['execution_error'] = str(e)
+                    agent_result.metadata["execution_error"] = str(e)
 
             # Success! Create result
             result = StepResult(
@@ -410,13 +428,15 @@ class AgentTeam:
                 status=StepStatus.COMPLETED,
                 retries=retries,
                 started_at=started_at,
-                completed_at=datetime.utcnow()
+                completed_at=datetime.utcnow(),
             )
 
             # Diagnostics capture (if enabled)
             if self.diagnostics and step.metadata.get("diagnostics_enabled"):
                 try:
-                    diagnostics = await self.diagnostics.capture_step_diagnostics(step, result)
+                    diagnostics = await self.diagnostics.capture_step_diagnostics(
+                        step, result
+                    )
                     result.metadata["diagnostics"] = diagnostics
                 except Exception as e:
                     logger.warning("Diagnostics capture failed: %s", str(e))
@@ -430,7 +450,7 @@ class AgentTeam:
             status=StepStatus.FAILED,
             retries=retries,
             started_at=started_at,
-            completed_at=datetime.utcnow()
+            completed_at=datetime.utcnow(),
         )
 
     def stop(self):
@@ -464,45 +484,50 @@ class TeamBuilder:
         self._agents: list[Agent] = []
         self._steps: list[WorkflowStep] = []
 
-    def with_config(self, **kwargs) -> 'TeamBuilder':
+    def with_config(self, **kwargs) -> "TeamBuilder":
         """Update team configuration"""
         for key, value in kwargs.items():
             if hasattr(self._config, key):
                 setattr(self._config, key, value)
         return self
 
-    def with_agent(self, agent: Agent) -> 'TeamBuilder':
+    def with_agent(self, agent: Agent) -> "TeamBuilder":
         """Add a custom agent"""
         self._agents.append(agent)
         return self
 
-    def with_planner(self, **kwargs) -> 'TeamBuilder':
+    def with_planner(self, **kwargs) -> "TeamBuilder":
         """Add a planner agent"""
         from orchestration.agents.specialized import PlannerAgent
+
         self._agents.append(PlannerAgent(**kwargs))
         return self
 
-    def with_developer(self, **kwargs) -> 'TeamBuilder':
+    def with_developer(self, **kwargs) -> "TeamBuilder":
         """Add a developer agent"""
         from orchestration.agents.specialized import DeveloperAgent
+
         self._agents.append(DeveloperAgent(**kwargs))
         return self
 
-    def with_verifier(self, **kwargs) -> 'TeamBuilder':
+    def with_verifier(self, **kwargs) -> "TeamBuilder":
         """Add a verifier agent"""
         from orchestration.agents.specialized import VerifierAgent
+
         self._agents.append(VerifierAgent(**kwargs))
         return self
 
-    def with_tester(self, **kwargs) -> 'TeamBuilder':
+    def with_tester(self, **kwargs) -> "TeamBuilder":
         """Add a tester agent"""
         from orchestration.agents.specialized import TesterAgent
+
         self._agents.append(TesterAgent(**kwargs))
         return self
 
-    def with_reviewer(self, **kwargs) -> 'TeamBuilder':
+    def with_reviewer(self, **kwargs) -> "TeamBuilder":
         """Add a reviewer agent"""
         from orchestration.agents.specialized import ReviewerAgent
+
         self._agents.append(ReviewerAgent(**kwargs))
         return self
 
@@ -512,29 +537,35 @@ class TeamBuilder:
         agent_role: AgentRole,
         input_template: str,
         expects: str = "",
-        verified_by: Optional[AgentRole] = None,
+        verified_by: AgentRole | None = None,
         requires_approval: bool = False,
-        **kwargs
-    ) -> 'TeamBuilder':
+        **kwargs,
+    ) -> "TeamBuilder":
         """Add a workflow step"""
-        self._steps.append(WorkflowStep(
-            id=name,
-            name=name,
-            agent_role=agent_role,
-            input_template=input_template,
-            expects=expects,
-            verified_by=verified_by,
-            requires_approval=requires_approval,
-            **kwargs
-        ))
+        self._steps.append(
+            WorkflowStep(
+                id=name,
+                name=name,
+                agent_role=agent_role,
+                input_template=input_template,
+                expects=expects,
+                verified_by=verified_by,
+                requires_approval=requires_approval,
+                **kwargs,
+            )
+        )
         return self
 
-    def on_escalation(self, handler: Callable[[StepResult], Awaitable[None]]) -> 'TeamBuilder':
+    def on_escalation(
+        self, handler: Callable[[StepResult], Awaitable[None]]
+    ) -> "TeamBuilder":
         """Set escalation handler"""
         self._config.escalation_handler = handler
         return self
 
-    def on_approval(self, handler: Callable[[StepResult], Awaitable[bool]]) -> 'TeamBuilder':
+    def on_approval(
+        self, handler: Callable[[StepResult], Awaitable[bool]]
+    ) -> "TeamBuilder":
         """Set approval handler"""
         self._config.approval_handler = handler
         return self
@@ -559,7 +590,8 @@ def create_feature_dev_team(**kwargs) -> AgentTeam:
 
     Workflow: Plan → Develop → Verify → Test → Review
     """
-    return (TeamBuilder("feature-dev", "Feature development workflow")
+    return (
+        TeamBuilder("feature-dev", "Feature development workflow")
         .with_planner()
         .with_developer()
         .with_verifier()
@@ -569,29 +601,30 @@ def create_feature_dev_team(**kwargs) -> AgentTeam:
             "plan",
             AgentRole.PLANNER,
             "Create implementation plan for: {task}",
-            expects="Plan with atomic stories and acceptance criteria"
+            expects="Plan with atomic stories and acceptance criteria",
         )
         .step(
             "implement",
             AgentRole.DEVELOPER,
             "Implement the following plan:\n{plan}",
             expects="Working code that meets acceptance criteria",
-            verified_by=AgentRole.VERIFIER
+            verified_by=AgentRole.VERIFIER,
         )
         .step(
             "test",
             AgentRole.TESTER,
             "Create and run tests for:\n{implement}",
-            expects="All tests passing"
+            expects="All tests passing",
         )
         .step(
             "review",
             AgentRole.REVIEWER,
             "Review code and tests:\n{implement}\n\nTests:\n{test}",
             expects="Code approved for merge",
-            requires_approval=True
+            requires_approval=True,
         )
-        .build())
+        .build()
+    )
 
 
 def create_bug_fix_team(**kwargs) -> AgentTeam:
@@ -600,7 +633,8 @@ def create_bug_fix_team(**kwargs) -> AgentTeam:
 
     Workflow: Investigate → Fix → Verify → Test
     """
-    return (TeamBuilder("bug-fix", "Bug fix workflow")
+    return (
+        TeamBuilder("bug-fix", "Bug fix workflow")
         .with_agent(create_agent_by_role(AgentRole.ANALYST, name="Investigator"))
         .with_developer()
         .with_verifier()
@@ -609,22 +643,23 @@ def create_bug_fix_team(**kwargs) -> AgentTeam:
             "investigate",
             AgentRole.ANALYST,
             "Investigate bug: {task}",
-            expects="Root cause identified"
+            expects="Root cause identified",
         )
         .step(
             "fix",
             AgentRole.DEVELOPER,
             "Fix bug based on investigation:\n{investigate}",
             expects="Bug fixed without introducing regressions",
-            verified_by=AgentRole.VERIFIER
+            verified_by=AgentRole.VERIFIER,
         )
         .step(
             "test",
             AgentRole.TESTER,
             "Test fix:\n{fix}\n\nOriginal issue: {task}",
-            expects="Bug fixed and regression tests pass"
+            expects="Bug fixed and regression tests pass",
         )
-        .build())
+        .build()
+    )
 
 
 def create_security_audit_team(**kwargs) -> AgentTeam:
@@ -633,7 +668,8 @@ def create_security_audit_team(**kwargs) -> AgentTeam:
 
     Workflow: Scan → Prioritize → Fix → Verify
     """
-    return (TeamBuilder("security-audit", "Security audit workflow")
+    return (
+        TeamBuilder("security-audit", "Security audit workflow")
         .with_agent(create_agent_by_role(AgentRole.ANALYST, name="Security Scanner"))
         .with_planner()
         .with_developer()
@@ -642,31 +678,33 @@ def create_security_audit_team(**kwargs) -> AgentTeam:
             "scan",
             AgentRole.ANALYST,
             "Perform security scan on: {task}",
-            expects="Vulnerabilities identified and documented"
+            expects="Vulnerabilities identified and documented",
         )
         .step(
             "prioritize",
             AgentRole.PLANNER,
             "Prioritize vulnerabilities:\n{scan}",
-            expects="Vulnerabilities ranked by severity"
+            expects="Vulnerabilities ranked by severity",
         )
         .step(
             "fix",
             AgentRole.DEVELOPER,
             "Fix high-priority vulnerabilities:\n{prioritize}",
             expects="Vulnerabilities patched",
-            verified_by=AgentRole.VERIFIER
+            verified_by=AgentRole.VERIFIER,
         )
         .step(
             "verify",
             AgentRole.VERIFIER,
             "Verify security fixes:\n{fix}\n\nOriginal vulnerabilities:\n{scan}",
-            expects="All high-priority vulnerabilities resolved"
+            expects="All high-priority vulnerabilities resolved",
         )
-        .build())
+        .build()
+    )
 
 
 def create_agent_by_role(role: AgentRole, **kwargs) -> Agent:
     """Helper to create agent by role"""
     from orchestration.agents.specialized import create_agent
+
     return create_agent(role, **kwargs)

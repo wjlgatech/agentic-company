@@ -1,16 +1,17 @@
 """Tests for Phase 3: Auto-Test-After-Fix Loop."""
 
-import pytest
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from orchestration.diagnostics import (
     DiagnosticsConfig,
     check_playwright_installation,
 )
+from orchestration.diagnostics.capture import (
+    DiagnosticCapture,
+)
 from orchestration.diagnostics.integration import DiagnosticsIntegrator
-from orchestration.diagnostics.capture import DiagnosticCapture, BrowserAction, ActionType
-
 
 # ============== Fixtures ==============
 
@@ -19,10 +20,12 @@ from orchestration.diagnostics.capture import DiagnosticCapture, BrowserAction, 
 def mock_executor():
     """Create a mock executor."""
     executor = AsyncMock()
-    executor.execute = AsyncMock(return_value={
-        "content": "Mock analysis",
-        "usage": {"input_tokens": 10, "output_tokens": 20},
-    })
+    executor.execute = AsyncMock(
+        return_value={
+            "content": "Mock analysis",
+            "usage": {"input_tokens": 10, "output_tokens": 20},
+        }
+    )
     return executor
 
 
@@ -94,9 +97,7 @@ async def test_wrap_step_execution_without_diagnostics_enabled(
         return mock_step_result
 
     # Execute
-    result = await integrator.wrap_step_execution(
-        mock_step, original_execute
-    )
+    result = await integrator.wrap_step_execution(mock_step, original_execute)
 
     # Should just call original execute and return
     assert result == mock_step_result
@@ -118,9 +119,7 @@ async def test_wrap_step_execution_no_test_config(
         return mock_step_result
 
     # Execute
-    result = await integrator.wrap_step_execution(
-        mock_step, original_execute
-    )
+    result = await integrator.wrap_step_execution(mock_step, original_execute)
 
     # Should return result with error
     assert result == mock_step_result
@@ -145,10 +144,11 @@ async def test_capture_step_diagnostics_no_config(
     assert "No test_url or test_actions" in result["error"]
 
 
+@pytest.mark.skipif(
+    not check_playwright_installation(), reason="Playwright not installed"
+)
 @pytest.mark.asyncio
-async def test_run_diagnostics_invalid_action(
-    diagnostics_config, mock_executor
-):
+async def test_run_diagnostics_invalid_action(diagnostics_config, mock_executor):
     """Test _run_diagnostics with invalid action format."""
     integrator = DiagnosticsIntegrator(diagnostics_config, mock_executor)
 
@@ -157,10 +157,7 @@ async def test_run_diagnostics_invalid_action(
         {"type": "navigate"},  # Missing value
     ]
 
-    result = await integrator._run_diagnostics(
-        "https://example.com",
-        invalid_actions
-    )
+    result = await integrator._run_diagnostics("https://example.com", invalid_actions)
 
     assert result.success is False
     # Error message comes from action execution, not format validation
@@ -171,8 +168,7 @@ async def test_run_diagnostics_invalid_action(
 
 
 @pytest.mark.skipif(
-    not check_playwright_installation(),
-    reason="Playwright not installed"
+    not check_playwright_installation(), reason="Playwright not installed"
 )
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -198,8 +194,7 @@ async def test_run_diagnostics_real_browser(diagnostics_config, mock_executor):
 
 
 @pytest.mark.skipif(
-    not check_playwright_installation(),
-    reason="Playwright not installed"
+    not check_playwright_installation(), reason="Playwright not installed"
 )
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -213,8 +208,7 @@ async def test_run_diagnostics_navigation_failure(diagnostics_config, mock_execu
     ]
 
     result = await integrator._run_diagnostics(
-        "https://invalid-url-that-does-not-exist.local",
-        actions
+        "https://invalid-url-that-does-not-exist.local", actions
     )
 
     # Should fail
@@ -223,8 +217,7 @@ async def test_run_diagnostics_navigation_failure(diagnostics_config, mock_execu
 
 
 @pytest.mark.skipif(
-    not check_playwright_installation(),
-    reason="Playwright not installed"
+    not check_playwright_installation(), reason="Playwright not installed"
 )
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -253,8 +246,7 @@ async def test_run_diagnostics_timeout(diagnostics_config, mock_executor):
 
 
 @pytest.mark.skipif(
-    not check_playwright_installation(),
-    reason="Playwright not installed"
+    not check_playwright_installation(), reason="Playwright not installed"
 )
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -331,13 +323,9 @@ async def test_graceful_handling_of_playwright_errors(
         return mock_step_result
 
     with patch.object(
-        integrator,
-        '_run_diagnostics',
-        side_effect=Exception("Playwright crashed!")
+        integrator, "_run_diagnostics", side_effect=Exception("Playwright crashed!")
     ):
-        result = await integrator.wrap_step_execution(
-            mock_step, failing_execute
-        )
+        result = await integrator.wrap_step_execution(mock_step, failing_execute)
 
         # Should handle error gracefully
         assert result is not None
@@ -376,10 +364,8 @@ async def test_max_iterations_respected(
             error="Test always fails",
         )
 
-    with patch.object(integrator, '_run_diagnostics', side_effect=failing_diagnostics):
-        result = await integrator.wrap_step_execution(
-            mock_step, original_execute
-        )
+    with patch.object(integrator, "_run_diagnostics", side_effect=failing_diagnostics):
+        result = await integrator.wrap_step_execution(mock_step, original_execute)
 
         # Should have tried exactly max_iterations times
         assert call_count == 2

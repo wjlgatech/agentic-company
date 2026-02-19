@@ -1,14 +1,14 @@
 """Stress tests for real-world usage scenarios."""
 
-import asyncio
 import time
-import pytest
 from concurrent.futures import ThreadPoolExecutor
+
+import pytest
 from fastapi.testclient import TestClient
 
 from orchestration.api import app
-from orchestration.guardrails import ContentFilter, RateLimiter, GuardrailPipeline
-from orchestration.evaluator import RuleBasedEvaluator, EvaluatorOptimizer
+from orchestration.evaluator import RuleBasedEvaluator
+from orchestration.guardrails import ContentFilter, GuardrailPipeline, RateLimiter
 from orchestration.memory import LocalMemoryStore
 from orchestration.observability import MetricsCollector, ObservabilityStack
 
@@ -22,11 +22,15 @@ class TestConcurrentWorkflows:
 
     def test_concurrent_api_requests(self, client):
         """API should handle concurrent requests."""
+
         def make_request(i):
-            response = client.post("/workflows/run", json={
-                "workflow_name": "test",
-                "input_data": f"Test input {i}",
-            })
+            response = client.post(
+                "/workflows/run",
+                json={
+                    "workflow_name": "test",
+                    "input_data": f"Test input {i}",
+                },
+            )
             return response.status_code
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -42,7 +46,7 @@ class TestConcurrentWorkflows:
 
         def store_and_search(i):
             # Store
-            entry_id = memory.remember(f"Content number {i}", tags=[f"tag{i}"])
+            memory.remember(f"Content number {i}", tags=[f"tag{i}"])
             # Search
             results = memory.search(f"Content number {i}")
             return len(results) > 0
@@ -60,10 +64,12 @@ class TestPerformanceBenchmarks:
 
     def test_guardrail_throughput(self):
         """Guardrails should process quickly."""
-        pipeline = GuardrailPipeline([
-            ContentFilter(),
-            RateLimiter(max_requests=10000, window_seconds=60),
-        ])
+        pipeline = GuardrailPipeline(
+            [
+                ContentFilter(),
+                RateLimiter(max_requests=10000, window_seconds=60),
+            ]
+        )
 
         content = "This is a test content for benchmarking guardrail throughput."
         start = time.time()
@@ -83,7 +89,9 @@ class TestPerformanceBenchmarks:
 
         # Populate with data
         for i in range(500):
-            memory.remember(f"Document {i} about topic {i % 10}", tags=[f"topic{i % 10}"])
+            memory.remember(
+                f"Document {i} about topic {i % 10}", tags=[f"topic{i % 10}"]
+            )
 
         start = time.time()
         for _ in range(100):
@@ -172,24 +180,33 @@ class TestRealUserScenarios:
         client = TestClient(app)
 
         # User searches for existing knowledge
-        response = client.post("/memory/search", json={
-            "query": "machine learning",
-            "limit": 5,
-        })
+        response = client.post(
+            "/memory/search",
+            json={
+                "query": "machine learning",
+                "limit": 5,
+            },
+        )
         assert response.status_code == 200
 
         # User stores new findings
-        response = client.post("/memory/store", json={
-            "content": "New research on transformer architectures",
-            "tags": ["research", "ml", "transformers"],
-        })
+        response = client.post(
+            "/memory/store",
+            json={
+                "content": "New research on transformer architectures",
+                "tags": ["research", "ml", "transformers"],
+            },
+        )
         assert response.status_code == 200
 
         # User runs workflow
-        response = client.post("/workflows/run", json={
-            "workflow_name": "content-research",
-            "input_data": "Summarize transformer research",
-        })
+        response = client.post(
+            "/workflows/run",
+            json={
+                "workflow_name": "content-research",
+                "input_data": "Summarize transformer research",
+            },
+        )
         assert response.status_code == 200
 
     def test_approval_workflow(self):
@@ -197,11 +214,14 @@ class TestRealUserScenarios:
         client = TestClient(app)
 
         # Create approval request
-        response = client.post("/approvals", params={
-            "workflow_id": "pub-123",
-            "step_name": "publish",
-            "content": "Ready to publish: New product announcement",
-        })
+        response = client.post(
+            "/approvals",
+            params={
+                "workflow_id": "pub-123",
+                "step_name": "publish",
+                "content": "Ready to publish: New product announcement",
+            },
+        )
         assert response.status_code == 200
         request_id = response.json()["id"]
 
@@ -211,11 +231,14 @@ class TestRealUserScenarios:
         assert response.json()["count"] >= 1
 
         # Approve
-        response = client.post(f"/approvals/{request_id}/decide", json={
-            "approved": True,
-            "reason": "Content looks good",
-            "decided_by": "reviewer@example.com",
-        })
+        response = client.post(
+            f"/approvals/{request_id}/decide",
+            json={
+                "approved": True,
+                "reason": "Content looks good",
+                "decided_by": "reviewer@example.com",
+            },
+        )
         assert response.status_code == 200
         assert response.json()["status"] in ["approved", "auto_approved"]
 
@@ -228,10 +251,13 @@ class TestErrorRecovery:
         client = TestClient(app)
 
         # Empty input
-        response = client.post("/workflows/run", json={
-            "workflow_name": "test",
-            "input_data": "",
-        })
+        response = client.post(
+            "/workflows/run",
+            json={
+                "workflow_name": "test",
+                "input_data": "",
+            },
+        )
         # Should still process (empty string is valid JSON)
         assert response.status_code == 200
 
@@ -319,9 +345,11 @@ class TestScaleSimulation:
 
     def test_large_content(self):
         """Should handle large content."""
-        guardrails = GuardrailPipeline([
-            ContentFilter(),
-        ])
+        guardrails = GuardrailPipeline(
+            [
+                ContentFilter(),
+            ]
+        )
 
         # 100KB of content
         large_content = "Test content. " * 10000

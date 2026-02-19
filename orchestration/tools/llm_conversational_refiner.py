@@ -38,21 +38,23 @@ Architecture:
 └─────────────────────────────────────────────────────────────────────────┘
 """
 
-import json
-import hashlib
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Callable, Awaitable
-from enum import Enum
 import asyncio
-
+import hashlib
+import json
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 # =============================================================================
 # DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass
 class LLMAnalysisResult:
     """Structured result from LLM analysis."""
+
     # Classification
     task_type: str = "creation"
     domain: str = "general"
@@ -60,31 +62,32 @@ class LLMAnalysisResult:
     confidence: float = 0.5
 
     # Extracted specifics
-    entities: List[str] = field(default_factory=list)
-    technologies: List[str] = field(default_factory=list)
-    metrics: List[str] = field(default_factory=list)
-    timeframes: List[str] = field(default_factory=list)
-    stakeholders: List[str] = field(default_factory=list)
-    constraints: List[str] = field(default_factory=list)
-    goals: List[str] = field(default_factory=list)
-    pain_points: List[str] = field(default_factory=list)
+    entities: list[str] = field(default_factory=list)
+    technologies: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
+    timeframes: list[str] = field(default_factory=list)
+    stakeholders: list[str] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
+    goals: list[str] = field(default_factory=list)
+    pain_points: list[str] = field(default_factory=list)
 
     # Readiness assessment
     readiness_score: float = 0.0
-    missing_info: List[str] = field(default_factory=list)
-    suggested_questions: List[Dict] = field(default_factory=list)
+    missing_info: list[str] = field(default_factory=list)
+    suggested_questions: list[dict] = field(default_factory=list)
 
     # Understanding summary
     understanding_summary: str = ""
-    draft_approach: List[str] = field(default_factory=list)
+    draft_approach: list[str] = field(default_factory=list)
 
 
 @dataclass
 class ConversationContext:
     """Accumulated context from conversation."""
-    all_user_inputs: List[str] = field(default_factory=list)
-    all_analyses: List[LLMAnalysisResult] = field(default_factory=list)
-    answers: Dict[str, str] = field(default_factory=dict)
+
+    all_user_inputs: list[str] = field(default_factory=list)
+    all_analyses: list[LLMAnalysisResult] = field(default_factory=list)
+    answers: dict[str, str] = field(default_factory=dict)
 
     def get_full_context(self) -> str:
         """Get combined context as text."""
@@ -206,6 +209,7 @@ Generate a comprehensive system prompt that preserves ALL the specific details."
 # LLM CONVERSATIONAL REFINER
 # =============================================================================
 
+
 class LLMConversationalRefiner:
     """
     LLM-powered conversational intent refiner.
@@ -233,10 +237,10 @@ class LLMConversationalRefiner:
         self.llm_executor = llm_executor
         self.readiness_threshold = readiness_threshold
         self.cache_enabled = cache_enabled
-        self._cache: Dict[str, LLMAnalysisResult] = {}
+        self._cache: dict[str, LLMAnalysisResult] = {}
 
         # Sessions storage
-        self.sessions: Dict[str, Dict] = {}
+        self.sessions: dict[str, dict] = {}
 
     # =========================================================================
     # SESSION MANAGEMENT
@@ -245,6 +249,7 @@ class LLMConversationalRefiner:
     def start_session(self) -> str:
         """Start a new refinement session."""
         import uuid
+
         session_id = str(uuid.uuid4())[:8]
         self.sessions[session_id] = {
             "state": SessionState.INITIAL,
@@ -254,7 +259,7 @@ class LLMConversationalRefiner:
         }
         return session_id
 
-    def get_session(self, session_id: str) -> Optional[Dict]:
+    def get_session(self, session_id: str) -> dict | None:
         return self.sessions.get(session_id)
 
     # =========================================================================
@@ -265,7 +270,7 @@ class LLMConversationalRefiner:
         self,
         session_id: str,
         user_input: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Process user input and return response.
 
@@ -313,7 +318,9 @@ class LLMConversationalRefiner:
         if analysis.readiness_score >= self.readiness_threshold:
             return await self._generate_draft_response(session, analysis, user_input)
         else:
-            return await self._generate_clarification_response(session, analysis, user_input)
+            return await self._generate_clarification_response(
+                session, analysis, user_input
+            )
 
     # =========================================================================
     # LLM CALLS
@@ -330,8 +337,7 @@ class LLMConversationalRefiner:
 
         # Call LLM
         response = await self.llm_executor(
-            ANALYSIS_SYSTEM_PROMPT,
-            f"Analyze this request:\n\n{user_input}"
+            ANALYSIS_SYSTEM_PROMPT, f"Analyze this request:\n\n{user_input}"
         )
 
         # Parse JSON response
@@ -371,17 +377,19 @@ class LLMConversationalRefiner:
 
             return result
 
-        except (json.JSONDecodeError, KeyError) as e:
+        except (json.JSONDecodeError, KeyError):
             # Fallback if LLM doesn't return valid JSON
             return LLMAnalysisResult(
                 understanding_summary="I understood your request but need to analyze it further.",
                 readiness_score=0.5,
-                suggested_questions=[{
-                    "question": "Could you tell me more about what you're trying to achieve?",
-                    "dimension": "goal",
-                    "options": [],
-                    "priority": 1
-                }]
+                suggested_questions=[
+                    {
+                        "question": "Could you tell me more about what you're trying to achieve?",
+                        "dimension": "goal",
+                        "options": [],
+                        "priority": 1,
+                    }
+                ],
             )
 
     async def _generate_natural_response(
@@ -396,22 +404,19 @@ Analysis result:
 - Understanding: {analysis.understanding_summary}
 - Readiness: {analysis.readiness_score:.0%}
 - Task: {analysis.task_type} in {analysis.domain}
-- Goals: {', '.join(analysis.goals[:3]) if analysis.goals else 'not specified'}
-- Constraints: {', '.join(analysis.constraints[:2]) if analysis.constraints else 'none mentioned'}
+- Goals: {", ".join(analysis.goals[:3]) if analysis.goals else "not specified"}
+- Constraints: {", ".join(analysis.constraints[:2]) if analysis.constraints else "none mentioned"}
 - Suggested questions: {json.dumps(analysis.suggested_questions[:2])}
 - Draft approach: {json.dumps(analysis.draft_approach)}
 
 Is draft ready: {is_draft_ready}
 """
 
-        response = await self.llm_executor(
-            RESPONSE_GENERATION_PROMPT,
-            context
-        )
+        response = await self.llm_executor(RESPONSE_GENERATION_PROMPT, context)
 
         return response.strip()
 
-    async def _generate_final_prompt(self, session: Dict) -> str:
+    async def _generate_final_prompt(self, session: dict) -> str:
         """Generate the final optimized prompt."""
 
         # Get latest analysis
@@ -430,12 +435,16 @@ Is draft ready: {is_draft_ready}
             goals=", ".join(latest.goals) if latest.goals else "not specified",
             constraints=", ".join(latest.constraints) if latest.constraints else "none",
             pain_points=", ".join(latest.pain_points) if latest.pain_points else "none",
-            stakeholders=", ".join(latest.stakeholders) if latest.stakeholders else "not specified",
+            stakeholders=(
+                ", ".join(latest.stakeholders)
+                if latest.stakeholders
+                else "not specified"
+            ),
         )
 
         final_prompt = await self.llm_executor(
             "You are an expert prompt engineer. Generate a comprehensive, specific system prompt.",
-            prompt_request
+            prompt_request,
         )
 
         return final_prompt.strip()
@@ -446,26 +455,32 @@ Is draft ready: {is_draft_ready}
 
     async def _generate_clarification_response(
         self,
-        session: Dict,
+        session: dict,
         analysis: LLMAnalysisResult,
         user_input: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate response asking for clarification."""
 
         session["state"] = SessionState.CLARIFYING
 
         # Generate natural response
-        response_text = await self._generate_natural_response(analysis, is_draft_ready=False)
+        response_text = await self._generate_natural_response(
+            analysis, is_draft_ready=False
+        )
 
         # Build cards from suggested questions
         cards = []
         for q in analysis.suggested_questions[:2]:
-            cards.append({
-                "question": q.get("question", ""),
-                "options": [{"label": opt, "value": opt} for opt in q.get("options", [])],
-                "dimension": q.get("dimension", ""),
-                "allowFreeform": True,
-            })
+            cards.append(
+                {
+                    "question": q.get("question", ""),
+                    "options": [
+                        {"label": opt, "value": opt} for opt in q.get("options", [])
+                    ],
+                    "dimension": q.get("dimension", ""),
+                    "allowFreeform": True,
+                }
+            )
 
         turn = {
             "user_input": user_input,
@@ -476,7 +491,7 @@ Is draft ready: {is_draft_ready}
             "analysis": {
                 "readiness": analysis.readiness_score,
                 "understanding": analysis.understanding_summary,
-            }
+            },
         }
         session["turns"].append(turn)
 
@@ -484,21 +499,28 @@ Is draft ready: {is_draft_ready}
 
     async def _generate_draft_response(
         self,
-        session: Dict,
+        session: dict,
         analysis: LLMAnalysisResult,
         user_input: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate response with draft preview."""
 
         session["state"] = SessionState.DRAFT_READY
 
         # Generate natural response
-        response_text = await self._generate_natural_response(analysis, is_draft_ready=True)
+        response_text = await self._generate_natural_response(
+            analysis, is_draft_ready=True
+        )
 
         # Build draft preview
         draft = {
             "summary": analysis.understanding_summary,
-            "approach": analysis.draft_approach or ["Understand your needs", "Analyze the situation", "Provide recommendations"],
+            "approach": analysis.draft_approach
+            or [
+                "Understand your needs",
+                "Analyze the situation",
+                "Provide recommendations",
+            ],
             "outputType": f"{analysis.task_type.title()} in {analysis.domain}",
             "confidence": analysis.readiness_score,
             "canProceed": True,
@@ -515,7 +537,7 @@ Is draft ready: {is_draft_ready}
                 "understanding": analysis.understanding_summary,
                 "entities": analysis.entities,
                 "goals": analysis.goals,
-            }
+            },
         }
         session["turns"].append(turn)
 
@@ -523,9 +545,9 @@ Is draft ready: {is_draft_ready}
 
     async def _handle_acceptance(
         self,
-        session: Dict,
+        session: dict,
         user_input: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle user accepting the draft."""
 
         session["state"] = SessionState.COMPLETE
@@ -557,9 +579,9 @@ Ready to execute! Would you like to see the full prompt or proceed directly?"""
 
     async def _handle_refinement(
         self,
-        session: Dict,
+        session: dict,
         user_input: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle user requesting refinement."""
 
         session["state"] = SessionState.REFINING
@@ -591,20 +613,53 @@ Just tell me what to change."""
     def _is_acceptance(self, input_lower: str) -> bool:
         """Quick check for acceptance - no LLM needed."""
         acceptance_patterns = [
-            "yes", "yep", "yeah", "sure", "ok", "okay", "go ahead",
-            "proceed", "do it", "looks good", "perfect", "great",
-            "that works", "sounds good", "let's go", "approved",
-            "continue", "execute", "run it", "make it so", "go for it"
+            "yes",
+            "yep",
+            "yeah",
+            "sure",
+            "ok",
+            "okay",
+            "go ahead",
+            "proceed",
+            "do it",
+            "looks good",
+            "perfect",
+            "great",
+            "that works",
+            "sounds good",
+            "let's go",
+            "approved",
+            "continue",
+            "execute",
+            "run it",
+            "make it so",
+            "go for it",
         ]
         return any(p in input_lower for p in acceptance_patterns)
 
     def _is_refinement_request(self, input_lower: str) -> bool:
         """Quick check for refinement request - no LLM needed."""
         refinement_patterns = [
-            "change", "modify", "adjust", "refine", "tweak",
-            "actually", "wait", "hold on", "not quite", "almost",
-            "can you", "could you", "what if", "instead",
-            "more", "less", "different", "add", "remove", "focus"
+            "change",
+            "modify",
+            "adjust",
+            "refine",
+            "tweak",
+            "actually",
+            "wait",
+            "hold on",
+            "not quite",
+            "almost",
+            "can you",
+            "could you",
+            "what if",
+            "instead",
+            "more",
+            "less",
+            "different",
+            "add",
+            "remove",
+            "focus",
         ]
         return any(p in input_lower for p in refinement_patterns)
 
@@ -613,14 +668,11 @@ Just tell me what to change."""
 # SYNC WRAPPER (for non-async code)
 # =============================================================================
 
+
 class SyncLLMConversationalRefiner:
     """Synchronous wrapper for LLMConversationalRefiner."""
 
-    def __init__(
-        self,
-        llm_executor: Callable[[str, str], str],
-        **kwargs
-    ):
+    def __init__(self, llm_executor: Callable[[str, str], str], **kwargs):
         """
         Initialize with a synchronous LLM executor.
 
@@ -628,29 +680,27 @@ class SyncLLMConversationalRefiner:
             llm_executor: Sync function that takes (system_prompt, user_message)
                          and returns the LLM response string.
         """
+
         # Wrap sync executor in async
         async def async_executor(system: str, user: str) -> str:
             return llm_executor(system, user)
 
         self._async_refiner = LLMConversationalRefiner(
-            llm_executor=async_executor,
-            **kwargs
+            llm_executor=async_executor, **kwargs
         )
 
     def start_session(self) -> str:
         return self._async_refiner.start_session()
 
-    def process_input(self, session_id: str, user_input: str) -> Dict[str, Any]:
-        return asyncio.run(
-            self._async_refiner.process_input(session_id, user_input)
-        )
+    def process_input(self, session_id: str, user_input: str) -> dict[str, Any]:
+        return asyncio.run(self._async_refiner.process_input(session_id, user_input))
 
 
 # =============================================================================
 # EXAMPLE USAGE
 # =============================================================================
 
-EXAMPLE_USAGE = '''
+EXAMPLE_USAGE = """
 # Example with OpenAI
 import openai
 
@@ -684,4 +734,4 @@ print(result["draft"])  # Draft preview if ready
 # User accepts
 result = await refiner.process_input(session_id, "looks good, proceed")
 print(result["final_prompt"])  # The optimized prompt!
-'''
+"""

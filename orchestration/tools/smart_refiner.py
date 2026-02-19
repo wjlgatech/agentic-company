@@ -12,14 +12,15 @@ The output should read like a skilled prompt engineer wrote it.
 
 import json
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Callable, Awaitable
 from enum import Enum
-
+from typing import Any
 
 # =============================================================================
 # SYSTEM PROMPTS - THE BRAIN OF THE REFINER
 # =============================================================================
+
 
 def get_interviewer_prompt(conversation_history: str, user_message: str) -> str:
     return f"""You are an expert interviewer helping users articulate their needs clearly.
@@ -131,6 +132,7 @@ Return ONLY the response text."""
 # DATA STRUCTURES
 # =============================================================================
 
+
 class ConversationState(Enum):
     INTERVIEWING = "interviewing"
     READY = "ready"
@@ -142,14 +144,14 @@ class ConversationState(Enum):
 class ConversationTurn:
     role: str  # "user" or "assistant"
     content: str
-    metadata: Dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass
 class Understanding:
     summary: str = ""
     confidence: float = 0.0
-    key_points: List[str] = field(default_factory=list)
+    key_points: list[str] = field(default_factory=list)
     domain: str = "general"
     task_type: str = "general"
 
@@ -158,9 +160,9 @@ class Understanding:
 class Session:
     session_id: str
     state: ConversationState = ConversationState.INTERVIEWING
-    turns: List[ConversationTurn] = field(default_factory=list)
+    turns: list[ConversationTurn] = field(default_factory=list)
     understanding: Understanding = field(default_factory=Understanding)
-    gaps: Dict = field(default_factory=dict)
+    gaps: dict = field(default_factory=dict)
     final_prompt: str = ""
     questions_asked: int = 0
     max_questions: int = 4
@@ -169,6 +171,7 @@ class Session:
 # =============================================================================
 # SMART REFINER
 # =============================================================================
+
 
 class SmartRefiner:
     """
@@ -197,18 +200,17 @@ class SmartRefiner:
         self.llm_call = llm_call
         self.max_questions = max_questions
         self.ready_threshold = ready_threshold
-        self.sessions: Dict[str, Session] = {}
+        self.sessions: dict[str, Session] = {}
 
     def create_session(self) -> str:
         """Create a new session."""
         session_id = str(uuid.uuid4())[:8]
         self.sessions[session_id] = Session(
-            session_id=session_id,
-            max_questions=self.max_questions
+            session_id=session_id, max_questions=self.max_questions
         )
         return session_id
 
-    async def process(self, session_id: str, user_input: str) -> Dict[str, Any]:
+    async def process(self, session_id: str, user_input: str) -> dict[str, Any]:
         """
         Process user input and return response.
 
@@ -226,7 +228,11 @@ class SmartRefiner:
             if self._is_acceptance(user_input.lower()):
                 # User approved the draft - finalize
                 return await self._finalize(session)
-            elif self._is_refinement(user_input.lower()) or "change" in user_input.lower() or "add" in user_input.lower():
+            elif (
+                self._is_refinement(user_input.lower())
+                or "change" in user_input.lower()
+                or "add" in user_input.lower()
+            ):
                 # User wants modifications - go back to interviewing
                 session.state = ConversationState.INTERVIEWING
                 # Continue with normal interview flow to gather more info
@@ -297,26 +303,26 @@ class SmartRefiner:
                 "questions_asked": session.questions_asked,
             }
 
-    async def _analyze_conversation(self, session: Session, latest_input: str) -> Dict:
+    async def _analyze_conversation(self, session: Session, latest_input: str) -> dict:
         """Use LLM to analyze the conversation and decide next steps."""
 
         # Build conversation history
-        history = "\n".join([
-            f"{t.role.upper()}: {t.content}"
-            for t in session.turns[:-1]  # Exclude the just-added user turn
-        ])
+        history = "\n".join(
+            [
+                f"{t.role.upper()}: {t.content}"
+                for t in session.turns[:-1]  # Exclude the just-added user turn
+            ]
+        )
 
         if not history:
             history = "(This is the start of the conversation)"
 
         prompt = get_interviewer_prompt(
-            conversation_history=history,
-            user_message=latest_input
+            conversation_history=history, user_message=latest_input
         )
 
         response = await self.llm_call(
-            "You are an expert interviewer. Return valid JSON only.",
-            prompt
+            "You are an expert interviewer. Return valid JSON only.", prompt
         )
 
         # Parse JSON
@@ -338,11 +344,13 @@ class SmartRefiner:
                 "question": {
                     "text": "Could you tell me more about what you're hoping to achieve?",
                     "why": "Understanding the core goal",
-                    "options": None
-                }
+                    "options": None,
+                },
             }
 
-    async def _generate_question_response(self, session: Session, analysis: Dict) -> str:
+    async def _generate_question_response(
+        self, session: Session, analysis: dict
+    ) -> str:
         """Generate a natural response with a question."""
 
         question_data = analysis.get("question", {})
@@ -354,17 +362,16 @@ class SmartRefiner:
             question=question_data.get("text", "Could you tell me more?"),
             why=question_data.get("why", ""),
             options=question_data.get("options", []),
-            ready_message=""
+            ready_message="",
         )
 
         response = await self.llm_call(
-            "Generate a natural, conversational response.",
-            prompt
+            "Generate a natural, conversational response.", prompt
         )
 
         return response.strip()
 
-    async def _generate_ready_response(self, session: Session, analysis: Dict) -> str:
+    async def _generate_ready_response(self, session: Session, analysis: dict) -> str:
         """Generate a response indicating we're ready to proceed."""
 
         ready_message = analysis.get("ready_message", "")
@@ -378,26 +385,25 @@ class SmartRefiner:
             question="",
             why="",
             options=[],
-            ready_message=ready_message
+            ready_message=ready_message,
         )
 
         response = await self.llm_call(
             "Generate a natural response confirming understanding and asking to proceed.",
-            prompt
+            prompt,
         )
 
         return response.strip()
 
-    async def _generate_draft_for_review(self, session: Session) -> Dict[str, Any]:
+    async def _generate_draft_for_review(self, session: Session) -> dict[str, Any]:
         """
         Generate a DRAFT prompt and present it to user for approval.
         User must explicitly approve before finalization.
         """
         # Build conversation summary for the synthesizer
-        conversation_summary = "\n".join([
-            f"{t.role.upper()}: {t.content}"
-            for t in session.turns
-        ])
+        conversation_summary = "\n".join(
+            [f"{t.role.upper()}: {t.content}" for t in session.turns]
+        )
 
         # Extract key information
         understanding = session.understanding
@@ -408,14 +414,18 @@ class SmartRefiner:
             what_they_want=understanding.summary,
             domain=understanding.domain,
             task_type=understanding.task_type,
-            key_context=", ".join(understanding.key_points) if understanding.key_points else "See conversation",
+            key_context=(
+                ", ".join(understanding.key_points)
+                if understanding.key_points
+                else "See conversation"
+            ),
             constraints="As discussed in conversation",
-            success_criteria="Addresses the user's stated needs comprehensively"
+            success_criteria="Addresses the user's stated needs comprehensively",
         )
 
         draft_prompt = await self.llm_call(
             "You are a world-class prompt engineer. Write an excellent, coherent system prompt.",
-            synthesis_prompt
+            synthesis_prompt,
         )
 
         # Store draft in session
@@ -433,12 +443,9 @@ Does this capture what you need? You can:
 • Tell me what to change or add if you want modifications
 • Continue asking questions if you need more refinement"""
 
-        return {
-            "response": response,
-            "draft_prompt": draft_prompt.strip()
-        }
+        return {"response": response, "draft_prompt": draft_prompt.strip()}
 
-    async def _finalize(self, session: Session) -> Dict[str, Any]:
+    async def _finalize(self, session: Session) -> dict[str, Any]:
         """Finalize and return the approved prompt."""
 
         session.state = ConversationState.COMPLETE
@@ -452,13 +459,26 @@ Does this capture what you need? You can:
             "understanding": {
                 "summary": understanding.summary,
                 "confidence": understanding.confidence,
-            }
+            },
         }
 
     def _is_acceptance(self, text: str) -> bool:
         """Check if user is accepting."""
-        signals = ["yes", "yeah", "yep", "sure", "ok", "okay", "proceed",
-                   "go ahead", "do it", "looks good", "perfect", "great", "let's go"]
+        signals = [
+            "yes",
+            "yeah",
+            "yep",
+            "sure",
+            "ok",
+            "okay",
+            "proceed",
+            "go ahead",
+            "do it",
+            "looks good",
+            "perfect",
+            "great",
+            "let's go",
+        ]
         return any(s in text for s in signals)
 
     def _is_refinement(self, text: str) -> bool:
@@ -470,6 +490,7 @@ Does this capture what you need? You can:
 # =============================================================================
 # SYNC WRAPPER
 # =============================================================================
+
 
 class SyncSmartRefiner:
     """Synchronous wrapper for SmartRefiner."""
@@ -486,8 +507,9 @@ class SyncSmartRefiner:
     def create_session(self) -> str:
         return self._async_refiner.create_session()
 
-    def process(self, session_id: str, user_input: str) -> Dict[str, Any]:
+    def process(self, session_id: str, user_input: str) -> dict[str, Any]:
         import asyncio
+
         return asyncio.run(self._async_refiner.process(session_id, user_input))
 
 
@@ -495,7 +517,7 @@ class SyncSmartRefiner:
 # EXAMPLE WITH REAL LLM
 # =============================================================================
 
-EXAMPLE_USAGE = '''
+EXAMPLE_USAGE = """
 import anthropic
 
 client = anthropic.AsyncAnthropic()
@@ -521,4 +543,4 @@ print(result["response"])  # Another question or ready to proceed
 
 result = await refiner.process(session_id, "yes, proceed")
 print(result["final_prompt"])  # Coherent, synthesized prompt!
-'''
+"""

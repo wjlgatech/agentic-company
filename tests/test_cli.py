@@ -62,13 +62,17 @@ class TestCLIWorkflow:
 
     def test_workflow_run_missing(self, runner):
         """workflow run with unknown workflow should fail gracefully."""
-        result = runner.invoke(main, ["workflow", "run", "test-workflow", "-i", "test input"])
+        result = runner.invoke(
+            main, ["workflow", "run", "test-workflow", "-i", "test input"]
+        )
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
 
     def test_workflow_run_dry_run(self, runner):
         """workflow run --dry-run should show plan without executing."""
-        result = runner.invoke(main, ["workflow", "run", "feature-dev", "-i", "test input", "--dry-run"])
+        result = runner.invoke(
+            main, ["workflow", "run", "feature-dev", "-i", "test input", "--dry-run"]
+        )
         assert result.exit_code == 0
         assert "Workflow Plan" in result.output
 
@@ -103,13 +107,17 @@ class TestCLIApproval:
 
     def test_approval_approve(self, runner):
         """approval approve should approve request."""
-        result = runner.invoke(main, ["approval", "approve", "test-id", "-r", "Looks good"])
+        result = runner.invoke(
+            main, ["approval", "approve", "test-id", "-r", "Looks good"]
+        )
         assert result.exit_code == 0
         assert "Approved" in result.output
 
     def test_approval_reject(self, runner):
         """approval reject should reject request."""
-        result = runner.invoke(main, ["approval", "reject", "test-id", "-r", "Not acceptable"])
+        result = runner.invoke(
+            main, ["approval", "reject", "test-id", "-r", "Not acceptable"]
+        )
         assert result.exit_code == 0
         assert "Rejected" in result.output
 

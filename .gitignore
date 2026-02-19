@@ -75,6 +75,9 @@ Thumbs.db
 # Docker
 .docker/
 
+# Workflow run artifacts — generated at runtime, never committed
+outputs/
+
 # Secrets
 *.pem
 *.key

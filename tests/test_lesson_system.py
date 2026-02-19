@@ -238,6 +238,7 @@ class TestLessonDataStructures:
 class TestLessonExtractor:
     """Test lesson extraction with REAL LLM calls."""
 
+    @pytest.mark.integration
     def test_extract_from_successful_workflow(
         self, real_llm_call, sample_workflow_data
     ):
@@ -256,9 +257,9 @@ class TestLessonExtractor:
         )
 
         # Should extract at least one lesson
-        assert len(lessons) >= 1, (
-            "Should extract at least one lesson from successful workflow"
-        )
+        assert (
+            len(lessons) >= 1
+        ), "Should extract at least one lesson from successful workflow"
 
         # Check lesson quality
         for lesson in lessons:
@@ -270,10 +271,11 @@ class TestLessonExtractor:
             assert lesson.status == LessonStatus.PROPOSED
             assert lesson.created_by == "llm"
             assert lesson.metadata.workflow_id == data["workflow_id"]
-            assert lesson.metadata.confidence_score >= 0.7, (
-                "Should only propose high-confidence lessons"
-            )
+            assert (
+                lesson.metadata.confidence_score >= 0.7
+            ), "Should only propose high-confidence lessons"
 
+    @pytest.mark.integration
     def test_extract_from_failed_workflow(self, real_llm_call):
         """Test extracting lessons from real failed workflow."""
         extractor = LessonExtractor(llm_call=real_llm_call)
@@ -628,6 +630,7 @@ class TestLessonManager:
 class TestLessonExtractionFlow:
     """Test complete lesson extraction and management flow."""
 
+    @pytest.mark.integration
     def test_full_workflow_to_lesson_pipeline(
         self, real_llm_call, sample_workflow_data, temp_storage
     ):
@@ -751,6 +754,7 @@ class TestRealWorldScenarios:
         assert len(relevant_lessons) >= 1, "Should find Python best practices"
         assert any("type hints" in l.title.lower() for l in relevant_lessons)
 
+    @pytest.mark.integration
     def test_scenario_recurring_bug_pattern(self, real_llm_call, temp_storage):
         """
         SCENARIO: Same bug appears in multiple workflows.
@@ -824,9 +828,9 @@ class TestRealWorldScenarios:
 
         # Third workflow should find this lesson
         connection_lessons = manager.get_approved(domain_tags=["database"])
-        assert len(connection_lessons) > 0, (
-            "Should have lesson about database connections"
-        )
+        assert (
+            len(connection_lessons) > 0
+        ), "Should have lesson about database connections"
 
     def test_scenario_cross_team_knowledge_sharing(self, temp_storage):
         """

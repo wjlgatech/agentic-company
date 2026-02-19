@@ -151,10 +151,11 @@ class TestSpecializedAgents:
         assert agent.role == AgentRole.PLANNER
         assert agent.name == "Custom Planner"
 
-    def test_create_agent_unknown_role(self):
-        """Test factory with unknown role raises error"""
-        with pytest.raises(ValueError):
-            create_agent(AgentRole.CUSTOM)
+    def test_create_agent_custom_role(self):
+        """Test factory with CUSTOM role creates a generic LLMAgent"""
+        agent = create_agent(AgentRole.CUSTOM, name="My Custom Agent")
+        assert agent.role == AgentRole.CUSTOM
+        assert agent.name == "My Custom Agent"
 
 
 class TestAgentTeam:

@@ -69,8 +69,7 @@ class DeveloperAgent(LLMAgent):
         config = AgentConfig(
             role=AgentRole.DEVELOPER,
             name=name,
-            persona=persona
-            or """You are a senior software developer.
+            persona=persona or """You are a senior software developer.
 Your job is to:
 1. Implement features according to specifications
 2. Write clean, maintainable code
@@ -108,8 +107,7 @@ class VerifierAgent(LLMAgent):
         config = AgentConfig(
             role=AgentRole.VERIFIER,
             name=name,
-            persona=persona
-            or """You are a meticulous code reviewer and QA specialist.
+            persona=persona or """You are a meticulous code reviewer and QA specialist.
 Your job is to:
 1. Verify work meets acceptance criteria
 2. Check for logical errors and edge cases
@@ -156,8 +154,7 @@ class TesterAgent(LLMAgent):
         config = AgentConfig(
             role=AgentRole.TESTER,
             name=name,
-            persona=persona
-            or """You are a software testing expert.
+            persona=persona or """You are a software testing expert.
 Your job is to:
 1. Design comprehensive test cases
 2. Test happy paths and edge cases
@@ -204,8 +201,7 @@ class ReviewerAgent(LLMAgent):
         config = AgentConfig(
             role=AgentRole.REVIEWER,
             name=name,
-            persona=persona
-            or """You are a senior code reviewer with high standards.
+            persona=persona or """You are a senior code reviewer with high standards.
 Your job is to:
 1. Review code for quality and maintainability
 2. Check for security vulnerabilities
@@ -247,8 +243,7 @@ class ResearcherAgent(LLMAgent):
         config = AgentConfig(
             role=AgentRole.RESEARCHER,
             name=name,
-            persona=persona
-            or """You are an expert researcher and analyst.
+            persona=persona or """You are an expert researcher and analyst.
 Your job is to:
 1. Investigate topics thoroughly
 2. Gather relevant information from multiple sources
@@ -274,8 +269,7 @@ class WriterAgent(LLMAgent):
         config = AgentConfig(
             role=AgentRole.WRITER,
             name=name,
-            persona=persona
-            or """You are a skilled technical writer.
+            persona=persona or """You are a skilled technical writer.
 Your job is to:
 1. Create clear, engaging documentation
 2. Explain complex topics simply
@@ -343,7 +337,11 @@ def create_agent(role: AgentRole, name: str | None = None, **kwargs) -> Agent:
 
     agent_class = agent_classes.get(role)
     if agent_class is None:
-        raise ValueError(f"No specialized agent for role: {role}")
+        # For CUSTOM and unmapped roles, create a generic LLMAgent
+        agent_name = name or f"Agent-{role.value}"
+        persona = kwargs.pop("persona", "") or ""
+        config = AgentConfig(role=role, name=agent_name, persona=persona, **kwargs)
+        return LLMAgent(config)
 
     if name:
         kwargs["name"] = name

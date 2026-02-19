@@ -144,6 +144,9 @@ async def test_capture_step_diagnostics_no_config(
     assert "No test_url or test_actions" in result["error"]
 
 
+@pytest.mark.skipif(
+    not check_playwright_installation(), reason="Playwright not installed"
+)
 @pytest.mark.asyncio
 async def test_run_diagnostics_invalid_action(diagnostics_config, mock_executor):
     """Test _run_diagnostics with invalid action format."""

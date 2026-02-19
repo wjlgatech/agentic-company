@@ -150,6 +150,18 @@ The YAML parser uses the `id` field (not `role`) for agent-to-role mapping. Temp
 
 `MCPToolBridge` (`tools/mcp_bridge.py`) connects workflow tool references to real MCP servers (PubMed, Ahrefs, Similarweb, etc.) via `MCPToolRegistry` (`tools/registry.py`).
 
+## File Organisation Rules
+
+These are enforced automatically by the pre-commit hook (`scripts/check_root_clutter.py`) — violations are blocked at commit time.
+
+| File type | Correct location | Notes |
+|---|---|---|
+| Documentation (`*.md`) | `docs/` → `docs/guides/`, `docs/phases/`, `docs/reports/` | `README.md` and `CLAUDE.md` are the only `.md` files allowed at root |
+| Test files (`test_*.py`) | `tests/` | Mirrors the module under test; marked `@pytest.mark.integration` if they need a live API key |
+| Bundled workflow YAMLs | `agenticom/bundled_workflows/` | No ad-hoc YAMLs at root |
+| Workflow run artifacts | `outputs/` (gitignored) | Never committed; generated at runtime |
+| One-off scripts / utilities | `scripts/` | Not `orchestration/` and not root |
+
 ## Code Style
 
 - **Formatter**: Black, line length 88

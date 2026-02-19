@@ -1,4 +1,15 @@
 repos:
+  # Local repo rules — enforce project file organisation
+  - repo: local
+    hooks:
+      - id: no-root-clutter
+        name: Block .md / test_*.py files at repo root
+        entry: python scripts/check_root_clutter.py
+        language: python
+        pass_filenames: true
+        # Run on any staged file (the script filters by location and extension)
+        types_or: [markdown, python]
+
   # Standard file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0

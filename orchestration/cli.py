@@ -154,9 +154,11 @@ def workflow_list() -> None:
                     workflows.append(
                         {
                             "name": definition.id,
-                            "description": definition.description.split("\n")[0][:60]
-                            if definition.description
-                            else "No description",
+                            "description": (
+                                definition.description.split("\n")[0][:60]
+                                if definition.description
+                                else "No description"
+                            ),
                             "path": str(yaml_file),
                             "agents": len(definition.agents),
                             "steps": len(definition.steps),
@@ -325,9 +327,11 @@ def workflow_run(
             if team_result.success:
                 console.print(
                     Panel(
-                        str(team_result.final_output)[:2000]
-                        if team_result.final_output
-                        else "No output",
+                        (
+                            str(team_result.final_output)[:2000]
+                            if team_result.final_output
+                            else "No output"
+                        ),
                         title="[green]Result[/green]",
                         border_style="green",
                     )
@@ -563,9 +567,11 @@ def recall(query: str, limit: int) -> None:
         for entry in results:
             table.add_row(
                 entry.id[:8],
-                entry.content[:100] + "..."
-                if len(entry.content) > 100
-                else entry.content,
+                (
+                    entry.content[:100] + "..."
+                    if len(entry.content) > 100
+                    else entry.content
+                ),
                 ", ".join(entry.tags),
             )
 

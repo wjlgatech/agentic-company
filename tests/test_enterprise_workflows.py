@@ -141,9 +141,9 @@ class TestEnterpriseWorkflowStructure:
                 for prev_step in definition.steps[:i]:
                     # If referenced, should exist
                     if f"step_outputs.{prev_step.id}" in step.input:
-                        assert prev_step.id in step_ids, (
-                            f"Invalid reference in {yaml_file.name}: {prev_step.id}"
-                        )
+                        assert (
+                            prev_step.id in step_ids
+                        ), f"Invalid reference in {yaml_file.name}: {prev_step.id}"
 
     def test_agent_roles_valid(self, parser):
         """All agent roles should be valid."""
@@ -165,18 +165,18 @@ class TestEnterpriseWorkflowStructure:
             for step in definition.steps:
                 # First step must reference {{task}}
                 if step == definition.steps[0]:
-                    assert "{{task}}" in step.input, (
-                        f"First step in {yaml_file.name} should reference {{{{task}}}}"
-                    )
+                    assert (
+                        "{{task}}" in step.input
+                    ), f"First step in {yaml_file.name} should reference {{{{task}}}}"
 
                 # Later steps should reference previous outputs
                 if step != definition.steps[0]:
                     has_ref = (
                         "{{step_outputs." in step.input or "{{task}}" in step.input
                     )
-                    assert has_ref, (
-                        f"Step {step.id} in {yaml_file.name} should reference context"
-                    )
+                    assert (
+                        has_ref
+                    ), f"Step {step.id} in {yaml_file.name} should reference context"
 
 
 class TestEnterpriseWorkflowMetadata:
@@ -190,9 +190,9 @@ class TestEnterpriseWorkflowMetadata:
         """All workflows should have descriptions."""
         for yaml_file in WORKFLOWS_DIR.glob("*.yaml"):
             definition = parser.parse_file(yaml_file)
-            assert definition.description, (
-                f"Workflow {yaml_file.name} missing description"
-            )
+            assert (
+                definition.description
+            ), f"Workflow {yaml_file.name} missing description"
 
     def test_all_workflows_have_metadata(self, parser):
         """Enterprise workflows should have metadata."""
@@ -210,12 +210,12 @@ class TestEnterpriseWorkflowMetadata:
             path = WORKFLOWS_DIR / name
             if path.exists():
                 definition = parser.parse_file(path)
-                assert definition.metadata.get("category"), (
-                    f"Workflow {name} missing category"
-                )
-                assert definition.metadata.get("typical_time_saved"), (
-                    f"Workflow {name} missing time_saved estimate"
-                )
+                assert definition.metadata.get(
+                    "category"
+                ), f"Workflow {name} missing category"
+                assert definition.metadata.get(
+                    "typical_time_saved"
+                ), f"Workflow {name} missing time_saved estimate"
 
 
 class TestTemplateSubstitution:

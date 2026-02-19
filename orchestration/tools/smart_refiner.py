@@ -414,9 +414,11 @@ class SmartRefiner:
             what_they_want=understanding.summary,
             domain=understanding.domain,
             task_type=understanding.task_type,
-            key_context=", ".join(understanding.key_points)
-            if understanding.key_points
-            else "See conversation",
+            key_context=(
+                ", ".join(understanding.key_points)
+                if understanding.key_points
+                else "See conversation"
+            ),
             constraints="As discussed in conversation",
             success_criteria="Addresses the user's stated needs comprehensively",
         )

@@ -156,13 +156,15 @@ def test_iteration_monitor():
         diagnostics = DiagnosticCapture(
             success=(i == 2),  # Fail first 2, succeed on 3rd
             error=None if i == 2 else f"Search not returning results (attempt {i + 1})",
-            console_errors=[]
-            if i == 2
-            else [
-                ConsoleMessage(
-                    type="error", text="TypeError: Cannot read property 'results'"
-                )
-            ],
+            console_errors=(
+                []
+                if i == 2
+                else [
+                    ConsoleMessage(
+                        type="error", text="TypeError: Cannot read property 'results'"
+                    )
+                ]
+            ),
         )
 
         monitor.record_iteration(

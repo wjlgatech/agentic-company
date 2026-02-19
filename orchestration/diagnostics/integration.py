@@ -127,9 +127,11 @@ class DiagnosticsIntegrator:
             # Record iteration
             self.monitor.record_iteration(
                 error=diagnostics.error if not diagnostics.success else None,
-                fix_attempted=result.agent_result.output[:200]
-                if hasattr(result, "agent_result")
-                else "N/A",
+                fix_attempted=(
+                    result.agent_result.output[:200]
+                    if hasattr(result, "agent_result")
+                    else "N/A"
+                ),
                 test_result=diagnostics.success,
                 diagnostics=diagnostics,
             )

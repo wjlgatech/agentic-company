@@ -106,33 +106,37 @@ class RefinementAPI:
                 ChatMessage(
                     role="assistant",
                     content=t.ai_response,
-                    cards=[
+                    cards=(
+                        [
+                            {
+                                "question": c.question,
+                                "options": [
+                                    {
+                                        "label": o.label,
+                                        "value": o.value,
+                                        "description": o.description,
+                                    }
+                                    for o in c.options
+                                ],
+                                "allowFreeform": c.allow_freeform,
+                                "dimension": c.dimension,
+                            }
+                            for c in t.cards
+                        ]
+                        if t.cards
+                        else None
+                    ),
+                    draft=(
                         {
-                            "question": c.question,
-                            "options": [
-                                {
-                                    "label": o.label,
-                                    "value": o.value,
-                                    "description": o.description,
-                                }
-                                for o in c.options
-                            ],
-                            "allowFreeform": c.allow_freeform,
-                            "dimension": c.dimension,
+                            "summary": t.draft.summary,
+                            "approach": t.draft.approach,
+                            "outputType": t.draft.output_type,
+                            "confidence": t.draft.confidence,
+                            "canProceed": t.draft.can_proceed,
                         }
-                        for c in t.cards
-                    ]
-                    if t.cards
-                    else None,
-                    draft={
-                        "summary": t.draft.summary,
-                        "approach": t.draft.approach,
-                        "outputType": t.draft.output_type,
-                        "confidence": t.draft.confidence,
-                        "canProceed": t.draft.can_proceed,
-                    }
-                    if t.draft
-                    else None,
+                        if t.draft
+                        else None
+                    ),
                     metadata={"turnId": t.turn_id, "state": t.state.value},
                 )
             )
@@ -171,25 +175,30 @@ class RefinementAPI:
                 ChatMessage(
                     role="assistant",
                     content=t.ai_response,
-                    cards=[
+                    cards=(
+                        [
+                            {
+                                "question": c.question,
+                                "options": [
+                                    {"label": o.label, "value": o.value}
+                                    for o in c.options
+                                ],
+                                "allowFreeform": c.allow_freeform,
+                            }
+                            for c in t.cards
+                        ]
+                        if t.cards
+                        else None
+                    ),
+                    draft=(
                         {
-                            "question": c.question,
-                            "options": [
-                                {"label": o.label, "value": o.value} for o in c.options
-                            ],
-                            "allowFreeform": c.allow_freeform,
+                            "summary": t.draft.summary,
+                            "approach": t.draft.approach,
+                            "confidence": t.draft.confidence,
                         }
-                        for c in t.cards
-                    ]
-                    if t.cards
-                    else None,
-                    draft={
-                        "summary": t.draft.summary,
-                        "approach": t.draft.approach,
-                        "confidence": t.draft.confidence,
-                    }
-                    if t.draft
-                    else None,
+                        if t.draft
+                        else None
+                    ),
                 )
             )
 

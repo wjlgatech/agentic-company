@@ -276,9 +276,9 @@ class TestWorkflowIntegration:
             + report["summary"].get("fallback", 0)
             + report["summary"]["mocked"]
         )
-        assert total_available >= 2, (
-            f"Expected at least 2 available tools, got {total_available}"
-        )
+        assert (
+            total_available >= 2
+        ), f"Expected at least 2 available tools, got {total_available}"
 
         # Ensure graceful handling - all tools should be accounted for
         total_accounted = (
@@ -286,9 +286,9 @@ class TestWorkflowIntegration:
             + report["summary"].get("waiting", 0)
             + report["summary"]["unresolved"]
         )
-        assert total_accounted == len(marketing_tools), (
-            "All tools should be accounted for"
-        )
+        assert total_accounted == len(
+            marketing_tools
+        ), "All tools should be accounted for"
 
     @pytest.mark.asyncio
     async def test_execute_marketing_workflow_tools(self):

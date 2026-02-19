@@ -764,9 +764,7 @@ I think I have enough to work with. Let me put together a draft..."""
         confidence_emoji = (
             "🟢"
             if draft.confidence >= 0.8
-            else "🟡"
-            if draft.confidence >= 0.6
-            else "🔴"
+            else "🟡" if draft.confidence >= 0.6 else "🔴"
         )
 
         response = f"""Great, I think I understand what you need!
@@ -821,22 +819,26 @@ I think I have enough to work with. Let me put together a draft..."""
                         }
                         for card in turn.cards
                     ],
-                    "draft": {
-                        "summary": turn.draft.summary,
-                        "approach": turn.draft.approach,
-                        "output_type": turn.draft.output_type,
-                        "confidence": turn.draft.confidence,
-                        "can_proceed": turn.draft.can_proceed,
-                    }
-                    if turn.draft
-                    else None,
+                    "draft": (
+                        {
+                            "summary": turn.draft.summary,
+                            "approach": turn.draft.approach,
+                            "output_type": turn.draft.output_type,
+                            "confidence": turn.draft.confidence,
+                            "can_proceed": turn.draft.can_proceed,
+                        }
+                        if turn.draft
+                        else None
+                    ),
                     "state": turn.state.value,
                 }
                 for turn in session.turns
             ],
-            "final_prompt": session.final_prompt
-            if session.state == ConversationState.COMPLETE
-            else None,
+            "final_prompt": (
+                session.final_prompt
+                if session.state == ConversationState.COMPLETE
+                else None
+            ),
         }
 
 

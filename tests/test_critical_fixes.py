@@ -32,9 +32,9 @@ class TestYAMLParserFix:
             AgentRole.REVIEWER,
         }
         actual_roles = set(team.agents.keys())
-        assert actual_roles == expected_roles, (
-            f"Expected {expected_roles}, got {actual_roles}"
-        )
+        assert (
+            actual_roles == expected_roles
+        ), f"Expected {expected_roles}, got {actual_roles}"
 
         # Verify steps are loaded
         assert len(team.steps) == 5, f"Expected 5 steps, got {len(team.steps)}"
@@ -48,9 +48,9 @@ class TestYAMLParserFix:
         team = load_workflow("agenticom/bundled_workflows/marketing-campaign.yaml")
 
         # Verify agents are loaded (some map to same role so count is less than 5)
-        assert len(team.agents) >= 4, (
-            f"Expected at least 4 agents, got {len(team.agents)}"
-        )
+        assert (
+            len(team.agents) >= 4
+        ), f"Expected at least 4 agents, got {len(team.agents)}"
 
         # Verify steps are loaded
         assert len(team.steps) == 5, f"Expected 5 steps, got {len(team.steps)}"
@@ -89,9 +89,9 @@ class TestYAMLParserFix:
 
         for agent in definition.agents:
             assert agent.persona, f"Agent {agent.name} should have persona"
-            assert len(agent.persona) > 50, (
-                f"Agent {agent.name} persona should be substantive"
-            )
+            assert (
+                len(agent.persona) > 50
+            ), f"Agent {agent.name} persona should be substantive"
 
         print("✅ Parser preserves persona from prompt field")
 
@@ -108,14 +108,14 @@ class TestCLIWorkflowExecution:
         source = cli_path.read_text()
 
         # Check that it doesn't have the old mock pattern
-        assert "time.sleep(1)  # Simulate processing" not in source, (
-            "CLI still contains mock sleep pattern!"
-        )
+        assert (
+            "time.sleep(1)  # Simulate processing" not in source
+        ), "CLI still contains mock sleep pattern!"
 
         # Check that it doesn't have the fake result pattern
-        assert 'output": f"Processed result for:' not in source, (
-            "CLI still contains fake result pattern!"
-        )
+        assert (
+            'output": f"Processed result for:' not in source
+        ), "CLI still contains fake result pattern!"
 
         # Check that it imports real workflow execution
         assert "load_workflow" in source, "CLI should use real workflow loading"
@@ -206,9 +206,9 @@ class TestWorkflowListDiscovery:
 
         # Should find bundled workflows
         assert "feature-dev" in result.output, "Should find feature-dev workflow"
-        assert "marketing-campaign" in result.output, (
-            "Should find marketing-campaign workflow"
-        )
+        assert (
+            "marketing-campaign" in result.output
+        ), "Should find marketing-campaign workflow"
 
         # Should show agent and step counts (from real parsing)
         assert "5" in result.output, "Should show step count of 5"
@@ -250,9 +250,9 @@ class TestAgentTeamExecution:
 
         # Should return AgentResult with success=False
         assert not result.success, "Should fail without executor"
-        assert "executor not set" in result.error.lower(), (
-            f"Error should mention executor: {result.error}"
-        )
+        assert (
+            "executor not set" in result.error.lower()
+        ), f"Error should mention executor: {result.error}"
 
         print("✅ Agent correctly requires executor")
 
@@ -268,9 +268,9 @@ class TestWorkflowExecutorWiring:
 
         # Verify agents don't have executors
         for role, agent in team.agents.items():
-            assert agent._executor is None, (
-                f"Agent {role} should not have executor without auto_setup"
-            )
+            assert (
+                agent._executor is None
+            ), f"Agent {role} should not have executor without auto_setup"
 
         print("✅ load_workflow() correctly leaves executors unset")
 
@@ -294,9 +294,9 @@ class TestWorkflowExecutorWiring:
                 # If we get here, a backend was available
                 print("✅ load_workflow(auto_setup=True) configured executors")
             except RuntimeError as e:
-                assert "No LLM backend" in str(e), (
-                    f"Should mention missing backend: {e}"
-                )
+                assert "No LLM backend" in str(
+                    e
+                ), f"Should mention missing backend: {e}"
                 print(
                     "✅ load_workflow(auto_setup=True) correctly requires LLM backend"
                 )
@@ -318,16 +318,14 @@ class TestWorkflowExecutorWiring:
 
         try:
             try:
-                load_ready_workflow(
-                    "agenticom/bundled_workflows/feature-dev.yaml"
-                )
+                load_ready_workflow("agenticom/bundled_workflows/feature-dev.yaml")
                 print(
                     "✅ load_ready_workflow() configured executors (backend available)"
                 )
             except RuntimeError as e:
-                assert "No LLM backend" in str(e), (
-                    f"Should mention missing backend: {e}"
-                )
+                assert "No LLM backend" in str(
+                    e
+                ), f"Should mention missing backend: {e}"
                 print("✅ load_ready_workflow() correctly requires LLM backend")
         finally:
             for key, value in old_keys.items():
@@ -392,9 +390,9 @@ class TestExecutorActuallyWorks:
             return
 
         executor = auto_setup_executor(eager_init=True)
-        assert executor.active_backend is not None, (
-            "active_backend should be set with eager_init"
-        )
+        assert (
+            executor.active_backend is not None
+        ), "active_backend should be set with eager_init"
         print(f"✅ auto_setup_executor eager_init works: {executor.active_backend}")
 
     def test_load_ready_workflow_sets_executors(self):
@@ -413,9 +411,9 @@ class TestExecutorActuallyWorks:
         # Check every agent has executor set
         for role, agent in team.agents.items():
             assert agent.has_executor, f"Agent {role} should have executor"
-            assert agent.executor is not None, (
-                f"Agent {role} executor should not be None"
-            )
+            assert (
+                agent.executor is not None
+            ), f"Agent {role} executor should not be None"
 
         print(f"✅ load_ready_workflow sets executors on all {len(team.agents)} agents")
 

@@ -205,9 +205,9 @@ class AgenticomCore:
                     "step": r.step_id,
                     "agent": r.agent,
                     "status": r.status.value,
-                    "output_preview": r.output[:200] + "..."
-                    if len(r.output) > 200
-                    else r.output,
+                    "output_preview": (
+                        r.output[:200] + "..." if len(r.output) > 200 else r.output
+                    ),
                 }
                 for r in results
             ],

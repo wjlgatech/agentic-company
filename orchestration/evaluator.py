@@ -294,10 +294,14 @@ class CompositeEvaluator(BaseEvaluator):
             results.append(result)
 
         if self.strategy == "weighted_average":
-            weighted_score = sum(r.score * w for r, w in zip(results, self.weights, strict=False))
+            weighted_score = sum(
+                r.score * w for r, w in zip(results, self.weights, strict=False)
+            )
             passed = weighted_score >= 0.7
         elif self.strategy == "all_pass":
-            weighted_score = sum(r.score * w for r, w in zip(results, self.weights, strict=False))
+            weighted_score = sum(
+                r.score * w for r, w in zip(results, self.weights, strict=False)
+            )
             passed = all(r.passed for r in results)
         else:  # any_pass
             weighted_score = max(r.score for r in results)

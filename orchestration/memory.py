@@ -47,15 +47,21 @@ class MemoryEntry:
             content=data["content"],
             metadata=data.get("metadata", {}),
             embedding=data.get("embedding"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-            updated_at=datetime.fromisoformat(data["updated_at"])
-            if data.get("updated_at")
-            else datetime.now(),
-            expires_at=datetime.fromisoformat(data["expires_at"])
-            if data.get("expires_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else datetime.now()
+            ),
+            updated_at=(
+                datetime.fromisoformat(data["updated_at"])
+                if data.get("updated_at")
+                else datetime.now()
+            ),
+            expires_at=(
+                datetime.fromisoformat(data["expires_at"])
+                if data.get("expires_at")
+                else None
+            ),
             tags=data.get("tags", []),
         )
 
@@ -302,8 +308,7 @@ class PostgresMemoryStore(MemoryStore):
             self._engine = create_async_engine(self.database_url)
 
             async with self._engine.begin() as conn:
-                await conn.execute(
-                    text(f"""
+                await conn.execute(text(f"""
                     CREATE TABLE IF NOT EXISTS {self.table_name} (
                         id VARCHAR(64) PRIMARY KEY,
                         content TEXT NOT NULL,
@@ -314,14 +319,11 @@ class PostgresMemoryStore(MemoryStore):
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         expires_at TIMESTAMP
                     )
-                """)
-                )
-                await conn.execute(
-                    text(f"""
+                """))
+                await conn.execute(text(f"""
                     CREATE INDEX IF NOT EXISTS idx_{self.table_name}_tags
                     ON {self.table_name} USING GIN(tags)
-                """)
-                )
+                """))
 
             self._initialized = True
         except ImportError:

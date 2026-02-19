@@ -243,9 +243,11 @@ class Agent(ABC):
             verifier_id=self.id,
             verified_result=result,
             passed=passed,
-            reasoning=str(verify_result.output)
-            if verify_result.success
-            else verify_result.error,
+            reasoning=(
+                str(verify_result.output)
+                if verify_result.success
+                else verify_result.error
+            ),
             criteria=criteria,
         )
 

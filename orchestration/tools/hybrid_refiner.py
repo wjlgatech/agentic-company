@@ -429,28 +429,38 @@ class HybridRefiner:
             summary=analysis.summary,
             task_type=analysis.task_type,
             domain=analysis.domain,
-            entities=", ".join(analysis.entities)
-            if analysis.entities
-            else "not specified",
+            entities=(
+                ", ".join(analysis.entities) if analysis.entities else "not specified"
+            ),
             goals="; ".join(analysis.goals) if analysis.goals else "not specified",
-            constraints="; ".join(analysis.constraints)
-            if analysis.constraints
-            else "none mentioned",
-            pain_points="; ".join(analysis.pain_points)
-            if analysis.pain_points
-            else "none mentioned",
-            stakeholders=", ".join(analysis.stakeholders)
-            if analysis.stakeholders
-            else "not specified",
-            technologies=", ".join(analysis.technologies)
-            if analysis.technologies
-            else "none mentioned",
-            metrics=", ".join(analysis.metrics)
-            if analysis.metrics
-            else "none mentioned",
-            approach="\n".join(analysis.suggested_approach)
-            if analysis.suggested_approach
-            else "to be determined",
+            constraints=(
+                "; ".join(analysis.constraints)
+                if analysis.constraints
+                else "none mentioned"
+            ),
+            pain_points=(
+                "; ".join(analysis.pain_points)
+                if analysis.pain_points
+                else "none mentioned"
+            ),
+            stakeholders=(
+                ", ".join(analysis.stakeholders)
+                if analysis.stakeholders
+                else "not specified"
+            ),
+            technologies=(
+                ", ".join(analysis.technologies)
+                if analysis.technologies
+                else "none mentioned"
+            ),
+            metrics=(
+                ", ".join(analysis.metrics) if analysis.metrics else "none mentioned"
+            ),
+            approach=(
+                "\n".join(analysis.suggested_approach)
+                if analysis.suggested_approach
+                else "to be determined"
+            ),
         )
 
         final_prompt = await self.llm_call(
@@ -467,9 +477,11 @@ class HybridRefiner:
             RESPONSE_GENERATION_PROMPT.format(
                 summary=analysis.summary,
                 readiness=int(analysis.readiness_score * 100),
-                missing=", ".join(analysis.missing_info)
-                if analysis.missing_info
-                else "none",
+                missing=(
+                    ", ".join(analysis.missing_info)
+                    if analysis.missing_info
+                    else "none"
+                ),
                 questions=json.dumps(analysis.clarifying_questions),
             ),
             "Generate a clarifying response.",

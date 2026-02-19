@@ -126,9 +126,9 @@ class AgentTeam:
         self._observers: list[Callable[[StepResult], Awaitable[None]]] = []
         self.artifact_manager = ArtifactManager()
         self.safe_executor = SafeExecutor(
-            approval_callback=config.approval_handler
-            if hasattr(config, "approval_handler")
-            else None
+            approval_callback=(
+                config.approval_handler if hasattr(config, "approval_handler") else None
+            )
         )
 
         # Initialize diagnostics if enabled

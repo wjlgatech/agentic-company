@@ -81,9 +81,11 @@ class Lesson:
             "content": self.content,
             "situation": self.situation,
             "recommendation": self.recommendation,
-            "status": self.status.value
-            if isinstance(self.status, LessonStatus)
-            else self.status,
+            "status": (
+                self.status.value
+                if isinstance(self.status, LessonStatus)
+                else self.status
+            ),
             "metadata": {
                 "workflow_id": self.metadata.workflow_id,
                 "workflow_cluster": self.metadata.workflow_cluster,

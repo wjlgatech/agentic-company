@@ -164,9 +164,9 @@ class TestRegressionPrevention:
         result = processed.format(**outputs)
 
         # CRITICAL ASSERTIONS
-        assert "step_outputs" not in result.lower(), (
-            "BUG: Literal 'step_outputs' should never appear in formatted output"
-        )
+        assert (
+            "step_outputs" not in result.lower()
+        ), "BUG: Literal 'step_outputs' should never appear in formatted output"
         assert "{{" not in result, "BUG: Template markers {{ should be substituted"
         assert "}}" not in result, "BUG: Template markers }} should be substituted"
 
@@ -248,12 +248,10 @@ class TestEdgeCases:
         template = "Code:\n{{step_outputs.implement}}"
         processed = self.team._preprocess_template(template)
 
-        outputs = {
-            "implement": """def login():
+        outputs = {"implement": """def login():
     username = input("Username: ")
     password = input("Password: ")
-    return authenticate(username, password)"""
-        }
+    return authenticate(username, password)"""}
 
         result = processed.format(**outputs)
         assert "def login():" in result

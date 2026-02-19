@@ -223,9 +223,7 @@ def workflow_status(ctx, run_id, as_json):
             status_icon = (
                 "✅"
                 if step["status"] == "completed"
-                else "⏳"
-                if step["status"] == "running"
-                else "❌"
+                else "⏳" if step["status"] == "running" else "❌"
             )
             click.echo(
                 f"   {status_icon} {step['step_id']} ({step['agent']}): {step['status']}"
@@ -341,7 +339,8 @@ def workflow_delete(ctx, run_id, permanent):
 
     if permanent:
         confirm = click.confirm(
-            f"⚠️  Permanently delete run {run_id}? This cannot be undone!", default=False
+            f"⚠️  Permanently delete run {run_id}? This cannot be undone!",
+            default=False,
         )
         if not confirm:
             click.echo("❌ Delete cancelled")

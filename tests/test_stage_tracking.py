@@ -47,12 +47,12 @@ def test_stage_initialization():
     for stage in WorkflowStage:
         assert stage.value in run.stages, f"Stage {stage.value} should be initialized"
         stage_info = run.stages[stage.value]
-        assert stage_info.started_at is None, (
-            f"Stage {stage.value} should not be started yet"
-        )
-        assert stage_info.completed_at is None, (
-            f"Stage {stage.value} should not be completed yet"
-        )
+        assert (
+            stage_info.started_at is None
+        ), f"Stage {stage.value} should not be started yet"
+        assert (
+            stage_info.completed_at is None
+        ), f"Stage {stage.value} should not be completed yet"
 
     print("✅ Stages initialized correctly")
     print(f"   Initialized stages: {list(run.stages.keys())}")
@@ -80,9 +80,9 @@ def test_stage_transitions():
     # Start plan stage
     run.start_stage(WorkflowStage.PLAN, "plan")
     assert run.current_stage == WorkflowStage.PLAN, "Current stage should be PLAN"
-    assert run.stages["plan"].started_at is not None, (
-        "Plan stage should have started_at"
-    )
+    assert (
+        run.stages["plan"].started_at is not None
+    ), "Plan stage should have started_at"
     assert run.stages["plan"].step_id == "plan", "Plan stage should have step_id"
     print("✅ Stage started correctly")
     print(f"   Current stage: {run.current_stage}")
@@ -90,18 +90,18 @@ def test_stage_transitions():
 
     # Complete plan stage
     run.complete_stage(WorkflowStage.PLAN)
-    assert run.stages["plan"].completed_at is not None, (
-        "Plan stage should have completed_at"
-    )
+    assert (
+        run.stages["plan"].completed_at is not None
+    ), "Plan stage should have completed_at"
     print("✅ Stage completed correctly")
     print(f"   Plan stage completed at: {run.stages['plan'].completed_at}")
 
     # Add artifact
     run.add_artifact(WorkflowStage.PLAN, "/path/to/plan.md")
     assert len(run.stages["plan"].artifacts) == 1, "Should have 1 artifact"
-    assert run.stages["plan"].artifacts[0] == "/path/to/plan.md", (
-        "Artifact path should match"
-    )
+    assert (
+        run.stages["plan"].artifacts[0] == "/path/to/plan.md"
+    ), "Artifact path should match"
     print("✅ Artifact added correctly")
     print(f"   Plan stage artifacts: {run.stages['plan'].artifacts}")
     print()
@@ -142,9 +142,9 @@ def test_stage_persistence():
     loaded_run = state.get_run("test-789")
     assert loaded_run is not None, "Run should be retrieved"
     assert loaded_run.stages is not None, "Stages should be loaded"
-    assert loaded_run.current_stage == WorkflowStage.IMPLEMENT, (
-        "Current stage should be IMPLEMENT"
-    )
+    assert (
+        loaded_run.current_stage == WorkflowStage.IMPLEMENT
+    ), "Current stage should be IMPLEMENT"
 
     plan_stage = loaded_run.stages["plan"]
     assert plan_stage.started_at is not None, "Plan stage should have started_at"
@@ -152,12 +152,12 @@ def test_stage_persistence():
     assert len(plan_stage.artifacts) == 1, "Plan stage should have 1 artifact"
 
     implement_stage = loaded_run.stages["implement"]
-    assert implement_stage.started_at is not None, (
-        "Implement stage should have started_at"
-    )
-    assert implement_stage.completed_at is None, (
-        "Implement stage should not be completed"
-    )
+    assert (
+        implement_stage.started_at is not None
+    ), "Implement stage should have started_at"
+    assert (
+        implement_stage.completed_at is None
+    ), "Implement stage should not be completed"
     assert len(implement_stage.artifacts) == 1, "Implement stage should have 1 artifact"
 
     print("✅ Stages persisted and loaded correctly")
@@ -243,9 +243,9 @@ def test_workflow_integration():
     run = state.get_run(run.id)  # Reload to get updated stages
 
     assert result2.status == StepStatus.COMPLETED, "Develop step should complete"
-    assert run.stages["implement"].started_at is not None, (
-        "Implement stage should have started"
-    )
+    assert (
+        run.stages["implement"].started_at is not None
+    ), "Implement stage should have started"
     print("✅ Implement stage tracked correctly")
     print(f"   Stage started: {run.stages['implement'].started_at}")
     print(f"   Stage completed: {run.stages['implement'].completed_at}")
@@ -254,9 +254,9 @@ def test_workflow_integration():
     run_dict = run.to_dict()
     assert "stages" in run_dict, "to_dict should include stages"
     assert "current_stage" in run_dict, "to_dict should include current_stage"
-    assert run_dict["stages"]["plan"]["started_at"] is not None, (
-        "Serialized plan stage should have started_at"
-    )
+    assert (
+        run_dict["stages"]["plan"]["started_at"] is not None
+    ), "Serialized plan stage should have started_at"
     print("✅ Serialization includes stages")
     print(f"   Serialized stages: {list(run_dict['stages'].keys())}")
     print()
@@ -291,9 +291,9 @@ def test_stage_detection():
 
     for step_id, expected_stage in test_cases:
         detected = WorkflowRunner._detect_stage_from_step_id(step_id)
-        assert detected == expected_stage, (
-            f"Step '{step_id}' should map to {expected_stage}, got {detected}"
-        )
+        assert (
+            detected == expected_stage
+        ), f"Step '{step_id}' should map to {expected_stage}, got {detected}"
         print(f"✅ '{step_id}' → {expected_stage.value}")
 
     print()

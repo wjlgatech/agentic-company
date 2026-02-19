@@ -242,7 +242,9 @@ class IntentModel:
             lines.append(
                 f"│   {status} {inp.get('name', '?')}: {inp.get('description', '')}".ljust(
                     61
-                )[:61]
+                )[
+                    :61
+                ]
                 + "│"
             )
 
@@ -265,7 +267,9 @@ class IntentModel:
             lines.append(
                 f"│   ○ {assumption.get('key', '?')}: {assumption.get('value', '')}".ljust(
                     61
-                )[:61]
+                )[
+                    :61
+                ]
                 + "│"
             )
 
@@ -1391,9 +1395,9 @@ class IntentRefiner:
         inputs.append(
             {
                 "name": "Task description",
-                "description": user_input[:100] + "..."
-                if len(user_input) > 100
-                else user_input,
+                "description": (
+                    user_input[:100] + "..." if len(user_input) > 100 else user_input
+                ),
                 "confirmed": True,
             }
         )

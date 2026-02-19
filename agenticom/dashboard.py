@@ -1682,9 +1682,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                             "key_points": session.understanding.key_points,
                         },
                         "questions_asked": session.questions_asked,
-                        "final_prompt": session.final_prompt
-                        if session.state.value == "complete"
-                        else None,
+                        "final_prompt": (
+                            session.final_prompt
+                            if session.state.value == "complete"
+                            else None
+                        ),
                     }
                 )
             else:

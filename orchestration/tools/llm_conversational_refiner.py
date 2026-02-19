@@ -435,9 +435,11 @@ Is draft ready: {is_draft_ready}
             goals=", ".join(latest.goals) if latest.goals else "not specified",
             constraints=", ".join(latest.constraints) if latest.constraints else "none",
             pain_points=", ".join(latest.pain_points) if latest.pain_points else "none",
-            stakeholders=", ".join(latest.stakeholders)
-            if latest.stakeholders
-            else "not specified",
+            stakeholders=(
+                ", ".join(latest.stakeholders)
+                if latest.stakeholders
+                else "not specified"
+            ),
         )
 
         final_prompt = await self.llm_executor(

@@ -48,9 +48,11 @@ class StageInfo:
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
-            "stage": self.stage.value
-            if isinstance(self.stage, WorkflowStage)
-            else self.stage,
+            "stage": (
+                self.stage.value
+                if isinstance(self.stage, WorkflowStage)
+                else self.stage
+            ),
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "step_id": self.step_id,
@@ -105,9 +107,11 @@ class WorkflowRun:
             "id": self.id,
             "workflow_id": self.workflow_id,
             "task": self.task,
-            "status": self.status.value
-            if isinstance(self.status, StepStatus)
-            else self.status,
+            "status": (
+                self.status.value
+                if isinstance(self.status, StepStatus)
+                else self.status
+            ),
             "current_step": self.current_step,
             "total_steps": self.total_steps,
             "context": self.context,
@@ -169,9 +173,11 @@ class StepResult:
             "run_id": self.run_id,
             "step_id": self.step_id,
             "agent": self.agent,
-            "status": self.status.value
-            if isinstance(self.status, StepStatus)
-            else self.status,
+            "status": (
+                self.status.value
+                if isinstance(self.status, StepStatus)
+                else self.status
+            ),
             "input_context": self.input_context,
             "output": self.output,
             "started_at": self.started_at,

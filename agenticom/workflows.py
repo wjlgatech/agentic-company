@@ -114,18 +114,22 @@ class WorkflowDefinition:
                 timeout_seconds=s.get("timeout", 300),
                 requires_approval=s.get("approval", False),
                 verify_with=s.get("verify_with"),
-                on_failure=FailureAction(
-                    action=s.get("on_failure", {}).get("action", "stop"),
-                    to_step=s.get("on_failure", {}).get("to_step"),
-                    max_loops=s.get("on_failure", {}).get("max_loops", 2),
-                    feedback_template=s.get("on_failure", {}).get("feedback_template"),
-                    escalate_to=s.get("on_failure", {}).get("escalate_to"),
-                    use_llm_analysis=s.get("on_failure", {}).get(
-                        "use_llm_analysis", False
-                    ),
-                )
-                if s.get("on_failure")
-                else None,
+                on_failure=(
+                    FailureAction(
+                        action=s.get("on_failure", {}).get("action", "stop"),
+                        to_step=s.get("on_failure", {}).get("to_step"),
+                        max_loops=s.get("on_failure", {}).get("max_loops", 2),
+                        feedback_template=s.get("on_failure", {}).get(
+                            "feedback_template"
+                        ),
+                        escalate_to=s.get("on_failure", {}).get("escalate_to"),
+                        use_llm_analysis=s.get("on_failure", {}).get(
+                            "use_llm_analysis", False
+                        ),
+                    )
+                    if s.get("on_failure")
+                    else None
+                ),
             )
             for s in data.get("steps", [])
         ]
@@ -154,9 +158,9 @@ class WorkflowDefinition:
                     "name": a.name,
                     "role": a.role,
                     "prompt": a.prompt_template,
-                    "workspace": {"files": a.workspace_files}
-                    if a.workspace_files
-                    else {},
+                    "workspace": (
+                        {"files": a.workspace_files} if a.workspace_files else {}
+                    ),
                     "tools": a.tools,
                 }
                 for a in self.agents

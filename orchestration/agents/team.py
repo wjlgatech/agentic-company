@@ -5,6 +5,7 @@ Coordinates multiple specialized agents working together on complex tasks.
 Implements the "Ralph Loop" pattern: fresh context per step with cross-verification.
 """
 
+import asyncio
 import re
 import uuid
 from collections.abc import Awaitable, Callable
@@ -125,6 +126,10 @@ class AgentTeam:
         self._running = False
         self._observers: list[Callable[[StepResult], Awaitable[None]]] = []
         self.artifact_manager = ArtifactManager()
+        # Self-improvement loop (optional, attached via attach_improvement_loop)
+        self._improvement_loop: Any | None = None
+        self._improvement_workflow_id: str = ""
+        self._self_improve: bool = False
         self.safe_executor = SafeExecutor(
             approval_callback=(
                 config.approval_handler if hasattr(config, "approval_handler") else None
@@ -172,6 +177,19 @@ class AgentTeam:
     ) -> "AgentTeam":
         """Register callback for step completion events"""
         self._observers.append(callback)
+        return self
+
+    def attach_improvement_loop(
+        self,
+        loop: Any,
+        workflow_id: str,
+        self_improve: bool = False,
+    ) -> "AgentTeam":
+        """Attach a self-improvement loop that records every run and evolves prompts."""
+        self._improvement_loop = loop
+        self._improvement_workflow_id = workflow_id
+        self._self_improve = self_improve
+        loop.attach_to_team(self, workflow_id, self_improve)
         return self
 
     async def run(self, task: str, context: dict | None = None) -> TeamResult:
@@ -241,7 +259,7 @@ class AgentTeam:
                 for sr in step_results
             )
 
-            return TeamResult(
+            result = TeamResult(
                 team_id=self.id,
                 workflow_id=workflow_id,
                 task=task,
@@ -251,8 +269,20 @@ class AgentTeam:
                 completed_at=datetime.utcnow(),
             )
 
+            # Fire-and-forget: record run in improvement loop (zero hot-path impact)
+            if self._improvement_loop is not None:
+                asyncio.create_task(
+                    self._improvement_loop.record_completed_run(
+                        result,
+                        self._improvement_workflow_id,
+                        self._self_improve,
+                    )
+                )
+
+            return result
+
         except Exception as e:
-            return TeamResult(
+            result = TeamResult(
                 team_id=self.id,
                 workflow_id=workflow_id,
                 task=task,
@@ -262,6 +292,17 @@ class AgentTeam:
                 error=str(e),
                 completed_at=datetime.utcnow(),
             )
+
+            if self._improvement_loop is not None:
+                asyncio.create_task(
+                    self._improvement_loop.record_completed_run(
+                        result,
+                        self._improvement_workflow_id,
+                        self._self_improve,
+                    )
+                )
+
+            return result
 
         finally:
             self._running = False

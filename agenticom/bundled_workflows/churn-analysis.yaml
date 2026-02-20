@@ -270,6 +270,7 @@ guardrails:
 timeout_seconds: 1500
 
 metadata:
+  self_improve: true
   category: customer-success
   difficulty: advanced
   typical_time_saved: "1-2 weeks"

@@ -26,6 +26,7 @@ from orchestration.self_improvement.adapters import CapabilityMapper, StepResult
 
 if TYPE_CHECKING:
     from orchestration.agents.team import TeamResult
+    from orchestration.self_improvement.semantic_smarc import SemanticSMARCVerifier
     from orchestration.self_improvement.vendor.anti_idling_system import (
         AntiIdlingSystem,
     )
@@ -54,11 +55,17 @@ class RunRecord:
     total_duration_ms: float
     total_retries: int
     total_tokens: int
-    step_scores: dict[str, float]  # {step_id: smarc_score}
+    step_scores: dict[str, float]  # {step_id: mean_smarc_score}
     agent_scores: dict[str, float]  # {agent_role: composite_score}
     prompt_version_ids: dict[str, str]  # {agent_id: version_id}
     ab_test_variant: str | None
     created_at: str
+    # Per-step, per-criterion detail (populated when SemanticSMARCVerifier is active)
+    smarc_detail: dict[str, Any] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.smarc_detail is None:
+            self.smarc_detail = {}
 
 
 class RunRecorder:
@@ -76,9 +83,12 @@ class RunRecorder:
         version_store: Any | None = None,
         pattern_trigger_n: int = 5,
         on_pattern_trigger: Callable | None = None,
+        semantic_verifier: SemanticSMARCVerifier | None = None,
     ) -> None:
         self.db_path = db_path
         self.verifier = verifier
+        # SemanticSMARCVerifier takes priority when available; rule-based is fallback
+        self.semantic_verifier = semantic_verifier
         self.performance = performance
         self.improvement_protocol = improvement_protocol
         self.anti_idling = anti_idling
@@ -99,7 +109,7 @@ class RunRecorder:
     # ------------------------------------------------------------------ #
 
     def _init_db(self) -> None:
-        """Create si_run_records table if it doesn't exist."""
+        """Create/migrate si_run_records table."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS si_run_records (
@@ -116,9 +126,17 @@ class RunRecorder:
                     prompt_version_ids TEXT DEFAULT '{}',
                     ab_test_variant TEXT,
                     created_at TEXT,
-                    metadata TEXT DEFAULT '{}'
+                    metadata TEXT DEFAULT '{}',
+                    smarc_detail TEXT DEFAULT '{}'
                 )
             """)
+            # Migration: add smarc_detail if upgrading from an older schema
+            try:
+                conn.execute(
+                    "ALTER TABLE si_run_records ADD COLUMN smarc_detail TEXT DEFAULT '{}'"
+                )
+            except Exception:
+                pass  # column already exists
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_si_runs_workflow
                 ON si_run_records(workflow_id)
@@ -158,25 +176,54 @@ class RunRecorder:
         """
         step_scores: dict[str, float] = {}
         agent_scores_accumulated: dict[str, list[float]] = {}
+        smarc_detail: dict[str, Any] = {}  # {step_id: SMARCResult.to_dict()}
 
         # ── 1. Per-step SMARC + performance + capability update ─────────
         for step_result in team_result.steps:
             agent_role = step_result.step.agent_role.value
-
-            # SMARC verification
             smarc_input = StepResultAdapter.to_smarc_input(step_result)
-            try:
-                smarc_results = self.verifier.verify_results(smarc_input)
-            except Exception:
-                smarc_results = {
-                    "specific": False,
-                    "measurable": False,
-                    "actionable": False,
-                    "reusable": False,
-                    "compoundable": False,
-                }
 
-            smarc_score = CapabilityMapper.smarc_score(smarc_results)
+            # Semantic verifier (LLM-based) takes priority; rule-based is fallback
+            if self.semantic_verifier is not None:
+                try:
+                    sem_result = await self.semantic_verifier.verify(
+                        output=step_result.agent_result.output or "",
+                        agent_role=agent_role,
+                        step_id=step_result.step.id,
+                        expects=getattr(step_result.step, "expects", "") or "",
+                        smarc_input=smarc_input,
+                    )
+                    smarc_scores_float = sem_result.scores  # dict[str, float]
+                    smarc_results = sem_result.passed  # dict[str, bool] compat
+                    smarc_detail[step_result.step.id] = sem_result.to_dict()
+                except Exception as exc:
+                    logger.warning(
+                        "SemanticSMARCVerifier failed (%s); using rule-based.", exc
+                    )
+                    smarc_scores_float = None
+                    smarc_results = None
+
+            if self.semantic_verifier is None or smarc_results is None:
+                try:
+                    smarc_results = self.verifier.verify_results(smarc_input)
+                except Exception:
+                    smarc_results = dict.fromkeys(
+                        (
+                            "specific",
+                            "measurable",
+                            "actionable",
+                            "reusable",
+                            "compoundable",
+                        ),
+                        False,
+                    )
+                smarc_scores_float = None
+
+            # Use float scores for capability map when available (more granular)
+            cap_input = (
+                smarc_scores_float if smarc_scores_float is not None else smarc_results
+            )
+            smarc_score = CapabilityMapper.smarc_score(cap_input)
             step_scores[step_result.step.id] = smarc_score
 
             # Performance optimizer
@@ -193,10 +240,8 @@ class RunRecorder:
             )
             agent_scores_accumulated.setdefault(agent_role, []).append(composite)
 
-            # Capability map update
-            capabilities = CapabilityMapper.smarc_to_capabilities(
-                agent_role, smarc_results
-            )
+            # Capability map — float scores give gap detector fine-grained proficiency
+            capabilities = CapabilityMapper.smarc_to_capabilities(agent_role, cap_input)
             try:
                 self.improvement_protocol.update_capability_map(capabilities)
             except Exception as exc:
@@ -263,6 +308,7 @@ class RunRecorder:
             prompt_version_ids=prompt_version_ids,
             ab_test_variant=team_result.metadata.get("ab_test_variant"),
             created_at=datetime.utcnow().isoformat(),
+            smarc_detail=smarc_detail,
         )
         self._persist_record(record)
         self._run_count += 1
@@ -292,8 +338,8 @@ class RunRecorder:
                 (id, run_id, workflow_id, task_description, overall_success,
                  total_duration_ms, total_retries, total_tokens,
                  step_scores, agent_scores, prompt_version_ids,
-                 ab_test_variant, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ab_test_variant, created_at, smarc_detail)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.id,
@@ -309,6 +355,7 @@ class RunRecorder:
                     json.dumps(record.prompt_version_ids),
                     record.ab_test_variant,
                     record.created_at,
+                    json.dumps(record.smarc_detail),
                 ),
             )
             conn.commit()

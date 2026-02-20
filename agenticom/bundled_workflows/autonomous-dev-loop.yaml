@@ -339,3 +339,6 @@ guardrails:
     - financial_decisions: "Always escalate purchases > $100"
     - data_deletion: "Always escalate data deletion requests"
     - external_communication: "Escalate emails/messages to external parties"
+
+metadata:
+  self_improve: true

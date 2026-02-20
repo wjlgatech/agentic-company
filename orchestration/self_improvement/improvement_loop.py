@@ -590,6 +590,11 @@ class ImprovementLoop:
             self._sync_agent_below_threshold_callback
         )
 
+        # ── Semantic SMARC verifier (LLM-based, with rule fallback) ──────
+        from orchestration.self_improvement.semantic_smarc import SemanticSMARCVerifier
+
+        self.semantic_verifier = SemanticSMARCVerifier(llm_executor=llm_executor)
+
         # ── In-house systems ─────────────────────────────────────────────
         self.version_store = PromptVersionStore(db_path)
 
@@ -609,6 +614,7 @@ class ImprovementLoop:
             version_store=self.version_store,
             pattern_trigger_n=pattern_trigger_n,
             on_pattern_trigger=self._on_pattern_trigger,
+            semantic_verifier=self.semantic_verifier,
         )
 
         # Track pending async work triggered by sync vendor callbacks

@@ -24,6 +24,11 @@ from orchestration.self_improvement.improvement_loop import (
     PromptVersionStore,
 )
 from orchestration.self_improvement.run_recorder import RunRecord, RunRecorder
+from orchestration.self_improvement.semantic_smarc import (
+    PASS_THRESHOLD,
+    SemanticSMARCVerifier,
+    SMARCResult,
+)
 
 __all__ = [
     "ImprovementLoop",
@@ -32,6 +37,9 @@ __all__ = [
     "PromptVersionStore",
     "RunRecord",
     "RunRecorder",
+    "SemanticSMARCVerifier",
+    "SMARCResult",
+    "PASS_THRESHOLD",
     "get_improvement_loop",
 ]
 

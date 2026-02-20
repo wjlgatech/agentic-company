@@ -438,3 +438,6 @@ steps:
 # 8. When tests pass: Continues to verification
 #
 # Result: 60x faster feedback loop (30 min → 30 sec per iteration)
+
+metadata:
+  self_improve: true

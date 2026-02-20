@@ -15,11 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -28,7 +27,9 @@ import pytest
 # =========================================================================== #
 
 
-def _make_step_result(success=True, retries=0, step_id="plan", agent_role_value="planner"):
+def _make_step_result(
+    success=True, retries=0, step_id="plan", agent_role_value="planner"
+):
     """Build a minimal StepResult-like object (avoids heavy orchestration imports)."""
     step = MagicMock()
     step.id = step_id
@@ -130,8 +131,12 @@ class TestCapabilityMapper:
         from orchestration.self_improvement.adapters import CapabilityMapper
 
         assert CapabilityMapper.smarc_score({}) == 0.0
-        assert CapabilityMapper.smarc_score({"a": True, "b": False}) == pytest.approx(0.5)
-        assert CapabilityMapper.smarc_score({"a": True, "b": True}) == pytest.approx(1.0)
+        assert CapabilityMapper.smarc_score({"a": True, "b": False}) == pytest.approx(
+            0.5
+        )
+        assert CapabilityMapper.smarc_score({"a": True, "b": True}) == pytest.approx(
+            1.0
+        )
 
 
 # =========================================================================== #
@@ -157,7 +162,11 @@ class TestVendorSmoke:
         )
         assert isinstance(result, dict)
         assert set(result.keys()) == {
-            "specific", "measurable", "actionable", "reusable", "compoundable"
+            "specific",
+            "measurable",
+            "actionable",
+            "reusable",
+            "compoundable",
         }
         # All values are bool
         assert all(isinstance(v, bool) for v in result.values())
@@ -169,7 +178,9 @@ class TestVendorSmoke:
 
         opt = MultiAgentPerformanceOptimizer(quality_threshold=0.85)
         agent_id = opt.register_agent({"role": "planner"})
-        opt.update_agent_performance(agent_id, {"accuracy": 0.9, "efficiency": 0.8, "adaptability": 0.7})
+        opt.update_agent_performance(
+            agent_id, {"accuracy": 0.9, "efficiency": 0.8, "adaptability": 0.7}
+        )
         assert opt.agents[agent_id]["performance_score"] > 0
 
     def test_recursive_self_improvement_protocol(self):
@@ -178,7 +189,9 @@ class TestVendorSmoke:
         )
 
         proto = RecursiveSelfImprovementProtocol()
-        proto.update_capability_map({"test_cap": {"proficiency": 0.4, "source": "test"}})
+        proto.update_capability_map(
+            {"test_cap": {"proficiency": 0.4, "source": "test"}}
+        )
         gaps = proto._identify_capability_gaps()
         assert "low_performance_areas" in gaps
         assert "test_cap" in gaps["low_performance_areas"]
@@ -204,7 +217,9 @@ class TestPromptVersionStore:
         from orchestration.self_improvement.improvement_loop import PromptVersionStore
 
         store = PromptVersionStore(tmp_db)
-        v = store.create_initial_version("feature-dev", "planner", "planner", "Be precise.")
+        v = store.create_initial_version(
+            "feature-dev", "planner", "planner", "Be precise."
+        )
 
         assert v.version_number == 1
         assert v.is_active is True
@@ -222,7 +237,9 @@ class TestPromptVersionStore:
         )
 
         store = PromptVersionStore(tmp_db)
-        v1 = store.create_initial_version("feature-dev", "planner", "planner", "Original.")
+        v1 = store.create_initial_version(
+            "feature-dev", "planner", "planner", "Original."
+        )
 
         patch = PromptPatch(
             id=str(uuid.uuid4()),
@@ -383,7 +400,9 @@ class TestPromptVersionStore:
 class TestRunRecorder:
     def _make_recorder(self, tmp_db, **kwargs):
         from orchestration.self_improvement.run_recorder import RunRecorder
-        from orchestration.self_improvement.vendor.anti_idling_system import AntiIdlingSystem
+        from orchestration.self_improvement.vendor.anti_idling_system import (
+            AntiIdlingSystem,
+        )
         from orchestration.self_improvement.vendor.multi_agent_performance import (
             MultiAgentPerformanceOptimizer,
         )
@@ -462,7 +481,9 @@ class TestRunRecorder:
         score than a successful step (adaptability=1.0)."""
         # Successful run
         recorder_ok = self._make_recorder(tmp_db)
-        ok_tr = _make_team_result(steps=[_make_step_result(success=True, retries=0)], success=True)
+        ok_tr = _make_team_result(
+            steps=[_make_step_result(success=True, retries=0)], success=True
+        )
         ok_record = await recorder_ok.record_run(ok_tr, "wf")
 
         # Failed run — separate recorder so agent IDs are independent
@@ -516,7 +537,9 @@ class TestPromptEvolver:
     async def test_heuristic_propose_specificity(self):
         evolver = self._make_evolver()
         version = self._make_version()
-        gaps = [{"capability": "planner_output_specificity", "source": "low_performance"}]
+        gaps = [
+            {"capability": "planner_output_specificity", "source": "low_performance"}
+        ]
 
         patch = await evolver.propose_patch(
             workflow_id="feature-dev",
@@ -549,11 +572,13 @@ class TestPromptEvolver:
 
     async def test_llm_path_success(self):
         """LLM path: executor returns valid JSON persona."""
-        llm_response = json.dumps({
-            "proposed_persona": "You are an improved planner.",
-            "justification": "Fixed specificity gap.",
-            "confidence": 0.85,
-        })
+        llm_response = json.dumps(
+            {
+                "proposed_persona": "You are an improved planner.",
+                "justification": "Fixed specificity gap.",
+                "confidence": 0.85,
+            }
+        )
 
         async def mock_llm(prompt, _ctx):
             return llm_response
@@ -576,6 +601,7 @@ class TestPromptEvolver:
 
     async def test_llm_path_falls_back_to_heuristic(self):
         """LLM executor raises; should fall back to heuristic."""
+
         async def broken_llm(prompt, _ctx):
             raise RuntimeError("API down")
 
@@ -647,6 +673,7 @@ class TestImprovementLoop:
         loop.attach_to_team(team, "feature-dev")
 
         from orchestration.self_improvement.improvement_loop import PromptVersionStore
+
         store = PromptVersionStore(tmp_db)
         # Only one active version
         assert store.get_active_version("feature-dev", "planner") is not None
@@ -773,6 +800,7 @@ class TestAgentTeamIntegration:
 class TestFeedbackCLI:
     def _invoke(self, args, loop=None):
         from click.testing import CliRunner
+
         from agenticom.cli import cli
 
         runner = CliRunner()
@@ -790,10 +818,18 @@ class TestFeedbackCLI:
         m = MagicMock()
         m.rate_run.return_value = True
         m.list_patches.return_value = []
-        m.approve_patch.return_value = {"status": "applied", "version_number": 2, "new_version_id": "v2"}
+        m.approve_patch.return_value = {
+            "status": "applied",
+            "version_number": 2,
+            "new_version_id": "v2",
+        }
         m.reject_patch.return_value = {"status": "rejected", "patch_id": "p1"}
         m.rollback.return_value = {"status": "rolled_back", "version_number": 1}
-        m.feedback_status.return_value = {"pending_patches": 0, "applied_patches": 0, "patches": []}
+        m.feedback_status.return_value = {
+            "pending_patches": 0,
+            "applied_patches": 0,
+            "patches": [],
+        }
         return m
 
     def test_feedback_status(self):
@@ -816,13 +852,17 @@ class TestFeedbackCLI:
 
     def test_feedback_reject_patch(self):
         loop = self._make_loop_mock()
-        result = self._invoke(["feedback", "reject-patch", "abc12345", "Too broad"], loop=loop)
+        result = self._invoke(
+            ["feedback", "reject-patch", "abc12345", "Too broad"], loop=loop
+        )
         assert result.exit_code == 0
         assert "rejected" in result.output.lower()
 
     def test_feedback_rollback(self):
         loop = self._make_loop_mock()
-        result = self._invoke(["feedback", "rollback", "feature-dev", "planner"], loop=loop)
+        result = self._invoke(
+            ["feedback", "rollback", "feature-dev", "planner"], loop=loop
+        )
         assert result.exit_code == 0
         assert "Rolled back" in result.output
 
@@ -861,7 +901,6 @@ class TestFeedbackCLI:
 class TestFeatureDevYaml:
     def test_yaml_has_self_improve_flag(self):
         import yaml
-        from pathlib import Path
 
         yaml_path = (
             Path(__file__).parent.parent
@@ -873,3 +912,530 @@ class TestFeatureDevYaml:
             data = yaml.safe_load(f)
 
         assert data.get("metadata", {}).get("self_improve") is True
+
+
+# =========================================================================== #
+# SemanticSMARCVerifier                                                        #
+# =========================================================================== #
+
+
+class TestSemanticSMARCVerifier:
+    """Tests for the LLM-based SMARC scorer (semantic_smarc.py)."""
+
+    # ── imports / constants ──────────────────────────────────────────────────
+
+    def _import(self):
+        from orchestration.self_improvement.semantic_smarc import (
+            PASS_THRESHOLD,
+            SemanticSMARCVerifier,
+            SMARCResult,
+        )
+
+        return SemanticSMARCVerifier, SMARCResult, PASS_THRESHOLD
+
+    # ── SMARCResult unit tests ───────────────────────────────────────────────
+
+    def test_smarc_result_passed_threshold(self):
+        _, SMARCResult, PASS_THRESHOLD = self._import()
+        result = SMARCResult(
+            agent_role="planner",
+            step_id="plan",
+            scores={
+                "specific": 0.8,
+                "measurable": 0.3,
+                "actionable": 0.9,
+                "reusable": 0.6,
+                "compoundable": 0.5,
+            },
+            reasoning=dict.fromkeys(
+                ("specific", "measurable", "actionable", "reusable", "compoundable"),
+                "ok",
+            ),
+            source="llm",
+        )
+        passed = result.passed
+        assert passed["specific"] is True  # 0.8 >= 0.6
+        assert passed["measurable"] is False  # 0.3 < 0.6
+        assert passed["actionable"] is True  # 0.9 >= 0.6
+        assert passed["reusable"] is True  # 0.6 >= 0.6
+        assert passed["compoundable"] is False  # 0.5 < 0.6
+
+    def test_smarc_result_composite(self):
+        _, SMARCResult, _ = self._import()
+        result = SMARCResult(
+            agent_role="dev",
+            step_id="develop",
+            scores={
+                "specific": 1.0,
+                "measurable": 0.5,
+                "actionable": 0.75,
+                "reusable": 0.25,
+                "compoundable": 0.5,
+            },
+            reasoning={},
+            source="rule",
+        )
+        assert result.composite == pytest.approx(0.6, abs=1e-9)
+
+    def test_smarc_result_composite_empty(self):
+        _, SMARCResult, _ = self._import()
+        result = SMARCResult(
+            agent_role="dev", step_id="x", scores={}, reasoning={}, source="rule"
+        )
+        assert result.composite == 0.0
+
+    def test_smarc_result_to_dict_keys(self):
+        _, SMARCResult, _ = self._import()
+        result = SMARCResult(
+            agent_role="tester",
+            step_id="test",
+            scores={
+                "specific": 0.7,
+                "measurable": 0.8,
+                "actionable": 0.9,
+                "reusable": 0.6,
+                "compoundable": 0.5,
+            },
+            reasoning={"specific": "x" * 300},  # should be truncated to 200
+            source="llm",
+        )
+        d = result.to_dict()
+        assert set(d.keys()) >= {
+            "agent_role",
+            "step_id",
+            "scores",
+            "reasoning",
+            "composite",
+            "passed",
+            "source",
+            "evaluated_at",
+        }
+        assert len(d["reasoning"]["specific"]) <= 200
+        assert d["source"] == "llm"
+
+    def test_pass_threshold_value(self):
+        _, _, PASS_THRESHOLD = self._import()
+        assert PASS_THRESHOLD == pytest.approx(0.6)
+
+    # ── Rule-based fallback ──────────────────────────────────────────────────
+
+    async def test_rule_fallback_when_no_llm(self):
+        SemanticSMARCVerifier, SMARCResult, _ = self._import()
+        verifier = SemanticSMARCVerifier(llm_executor=None)
+        result = await verifier.verify(
+            output="The plan includes 5 concrete steps with numbered sub-tasks " * 10,
+            agent_role="planner",
+            step_id="plan",
+            expects="STATUS: done",
+            smarc_input={
+                "output": "x" * 250,
+                "step_id": "plan",
+                "success": True,
+                "duration_ms": 300,
+                "tokens_used": 80,
+                "retries": 0,
+                "artifacts": [],
+                "next_step": "develop",
+                "recommendation": "proceed",
+            },
+        )
+        assert isinstance(result, SMARCResult)
+        assert result.source == "rule"
+        assert set(result.scores.keys()) == {
+            "specific",
+            "measurable",
+            "actionable",
+            "reusable",
+            "compoundable",
+        }
+        for score in result.scores.values():
+            assert 0.0 <= score <= 1.0
+
+    async def test_rule_fallback_compoundable_requires_long_output(self):
+        SemanticSMARCVerifier, _, _ = self._import()
+        verifier = SemanticSMARCVerifier(llm_executor=None)
+
+        # Short output → compoundable should be low
+        short_result = await verifier.verify(
+            output="short",
+            agent_role="planner",
+            step_id="plan",
+            smarc_input={"output": "short", "artifacts": []},
+        )
+        # Long output with artifacts → compoundable should be higher
+        long_result = await verifier.verify(
+            output="x" * 250,
+            agent_role="planner",
+            step_id="plan",
+            smarc_input={"output": "x" * 250, "artifacts": ["file.py"]},
+        )
+        assert long_result.scores["compoundable"] > short_result.scores["compoundable"]
+
+    # ── LLM path ─────────────────────────────────────────────────────────────
+
+    async def test_llm_path_success(self):
+        SemanticSMARCVerifier, SMARCResult, _ = self._import()
+        llm_response = json.dumps(
+            {
+                "specific": 0.85,
+                "measurable": 0.70,
+                "actionable": 0.90,
+                "reusable": 0.65,
+                "compoundable": 0.95,
+                "reasoning": {
+                    "specific": "Concrete steps provided.",
+                    "measurable": "Some metrics present.",
+                    "actionable": "Clear next step specified.",
+                    "reusable": "Template-like structure.",
+                    "compoundable": "Creates flywheel across all downstream steps.",
+                },
+            }
+        )
+
+        async def fake_llm(prompt, _ctx=None):
+            return llm_response
+
+        verifier = SemanticSMARCVerifier(llm_executor=fake_llm)
+        result = await verifier.verify(
+            output="Add OAuth2 endpoint: 1) install PyJWT 2) add /token route",
+            agent_role="planner",
+            step_id="plan",
+            expects="STATUS: done",
+        )
+        assert result.source == "llm"
+        assert result.scores["specific"] == pytest.approx(0.85)
+        assert result.scores["compoundable"] == pytest.approx(0.95)
+        assert result.passed["compoundable"] is True  # 0.95 >= 0.6
+        assert "flywheel" in result.reasoning["compoundable"].lower()
+
+    async def test_llm_path_clamps_scores_to_0_1(self):
+        SemanticSMARCVerifier, _, _ = self._import()
+        # LLM returns out-of-range values — must be clamped
+        llm_response = json.dumps(
+            {
+                "specific": 1.5,
+                "measurable": -0.2,
+                "actionable": 0.7,
+                "reusable": 2.0,
+                "compoundable": 0.8,
+                "reasoning": dict.fromkeys(
+                    (
+                        "specific",
+                        "measurable",
+                        "actionable",
+                        "reusable",
+                        "compoundable",
+                    ),
+                    "x",
+                ),
+            }
+        )
+
+        async def fake_llm(prompt, _ctx=None):
+            return llm_response
+
+        verifier = SemanticSMARCVerifier(llm_executor=fake_llm)
+        result = await verifier.verify(output="test", agent_role="dev", step_id="s")
+        assert result.scores["specific"] == pytest.approx(1.0)
+        assert result.scores["measurable"] == pytest.approx(0.0)
+        assert result.scores["reusable"] == pytest.approx(1.0)
+
+    async def test_llm_path_falls_back_on_bad_json(self):
+        SemanticSMARCVerifier, SMARCResult, _ = self._import()
+
+        async def bad_llm(prompt, _ctx=None):
+            return "This is not JSON at all!"
+
+        verifier = SemanticSMARCVerifier(llm_executor=bad_llm)
+        result = await verifier.verify(
+            output="test output",
+            agent_role="planner",
+            step_id="plan",
+            smarc_input={"output": "test", "next_step": "x", "recommendation": "y"},
+        )
+        # Should fall back to rule-based
+        assert result.source == "rule"
+        assert set(result.scores.keys()) == {
+            "specific",
+            "measurable",
+            "actionable",
+            "reusable",
+            "compoundable",
+        }
+
+    async def test_llm_path_handles_markdown_fences(self):
+        """LLM sometimes wraps JSON in ```json ... ``` fences."""
+        SemanticSMARCVerifier, _, _ = self._import()
+        inner = json.dumps(
+            {
+                "specific": 0.7,
+                "measurable": 0.6,
+                "actionable": 0.8,
+                "reusable": 0.5,
+                "compoundable": 0.9,
+                "reasoning": dict.fromkeys(
+                    (
+                        "specific",
+                        "measurable",
+                        "actionable",
+                        "reusable",
+                        "compoundable",
+                    ),
+                    "ok",
+                ),
+            }
+        )
+        fenced = f"```json\n{inner}\n```"
+
+        async def fence_llm(prompt, _ctx=None):
+            return fenced
+
+        verifier = SemanticSMARCVerifier(llm_executor=fence_llm)
+        result = await verifier.verify(output="hello", agent_role="dev", step_id="s")
+        assert result.source == "llm"
+        assert result.scores["compoundable"] == pytest.approx(0.9)
+
+    async def test_llm_path_handles_sync_executor(self):
+        """Sync (non-async) LLM executor must also work."""
+        SemanticSMARCVerifier, _, _ = self._import()
+        llm_response = json.dumps(
+            {
+                "specific": 0.6,
+                "measurable": 0.6,
+                "actionable": 0.6,
+                "reusable": 0.6,
+                "compoundable": 0.6,
+                "reasoning": dict.fromkeys(
+                    (
+                        "specific",
+                        "measurable",
+                        "actionable",
+                        "reusable",
+                        "compoundable",
+                    ),
+                    "ok",
+                ),
+            }
+        )
+
+        def sync_llm(prompt, _ctx=None):  # NOT async
+            return llm_response
+
+        verifier = SemanticSMARCVerifier(llm_executor=sync_llm)
+        result = await verifier.verify(output="hello", agent_role="dev", step_id="s")
+        assert result.source == "llm"
+        assert result.composite == pytest.approx(0.6)
+
+    # ── History / aggregation ────────────────────────────────────────────────
+
+    async def test_history_stored_and_queried(self):
+        SemanticSMARCVerifier, _, _ = self._import()
+
+        async def fake_llm(prompt, _ctx=None):
+            return json.dumps(
+                {
+                    "specific": 0.8,
+                    "measurable": 0.7,
+                    "actionable": 0.9,
+                    "reusable": 0.6,
+                    "compoundable": 0.5,
+                    "reasoning": dict.fromkeys(
+                        (
+                            "specific",
+                            "measurable",
+                            "actionable",
+                            "reusable",
+                            "compoundable",
+                        ),
+                        "ok",
+                    ),
+                }
+            )
+
+        verifier = SemanticSMARCVerifier(llm_executor=fake_llm)
+        await verifier.verify(output="a", agent_role="planner", step_id="plan")
+        await verifier.verify(output="b", agent_role="planner", step_id="plan2")
+        await verifier.verify(output="c", agent_role="developer", step_id="dev")
+
+        planner_history = verifier.history_for_agent("planner")
+        assert len(planner_history) == 2
+        dev_history = verifier.history_for_agent("developer")
+        assert len(dev_history) == 1
+
+    async def test_avg_scores_across_history(self):
+        SemanticSMARCVerifier, _, _ = self._import()
+
+        call_count = 0
+
+        async def varying_llm(prompt, _ctx=None):
+            nonlocal call_count
+            call_count += 1
+            score = 0.6 if call_count == 1 else 0.8
+            return json.dumps(
+                {
+                    "specific": score,
+                    "measurable": score,
+                    "actionable": score,
+                    "reusable": score,
+                    "compoundable": score,
+                    "reasoning": dict.fromkeys(
+                        (
+                            "specific",
+                            "measurable",
+                            "actionable",
+                            "reusable",
+                            "compoundable",
+                        ),
+                        "ok",
+                    ),
+                }
+            )
+
+        verifier = SemanticSMARCVerifier(llm_executor=varying_llm)
+        await verifier.verify(output="a", agent_role="planner", step_id="s1")
+        await verifier.verify(output="b", agent_role="planner", step_id="s2")
+
+        avgs = verifier.avg_scores(agent_role="planner")
+        assert avgs["specific"] == pytest.approx(0.7)  # (0.6 + 0.8) / 2
+
+    def test_avg_scores_empty_history(self):
+        SemanticSMARCVerifier, _, _ = self._import()
+        verifier = SemanticSMARCVerifier(llm_executor=None)
+        assert verifier.avg_scores() == {}
+        assert verifier.avg_scores(agent_role="planner") == {}
+
+    async def test_history_capped_at_100(self):
+        """History ring-buffer must not grow beyond 100 entries."""
+        SemanticSMARCVerifier, _, _ = self._import()
+
+        async def fast_llm(prompt, _ctx=None):
+            return json.dumps(
+                {
+                    "specific": 0.5,
+                    "measurable": 0.5,
+                    "actionable": 0.5,
+                    "reusable": 0.5,
+                    "compoundable": 0.5,
+                    "reasoning": dict.fromkeys(
+                        (
+                            "specific",
+                            "measurable",
+                            "actionable",
+                            "reusable",
+                            "compoundable",
+                        ),
+                        "",
+                    ),
+                }
+            )
+
+        verifier = SemanticSMARCVerifier(llm_executor=fast_llm)
+        for _i in range(110):
+            await verifier.verify(
+                output=f"out{_i}", agent_role="planner", step_id=f"s{_i}"
+            )
+
+        assert len(verifier._history) == 100
+
+    # ── RunRecorder integration ───────────────────────────────────────────────
+
+    async def test_run_recorder_uses_semantic_verifier(self, tmp_db):
+        """RunRecorder should call semantic verifier and store smarc_detail."""
+        import sqlite3
+
+        from orchestration.self_improvement.run_recorder import RunRecorder
+        from orchestration.self_improvement.semantic_smarc import SemanticSMARCVerifier
+        from orchestration.self_improvement.vendor.anti_idling_system import (
+            AntiIdlingSystem,
+        )
+        from orchestration.self_improvement.vendor.multi_agent_performance import (
+            MultiAgentPerformanceOptimizer,
+        )
+        from orchestration.self_improvement.vendor.recursive_self_improvement import (
+            RecursiveSelfImprovementProtocol,
+        )
+        from orchestration.self_improvement.vendor.results_verification import (
+            ResultsVerificationFramework,
+        )
+
+        async def fake_llm(prompt, _ctx=None):
+            return json.dumps(
+                {
+                    "specific": 0.75,
+                    "measurable": 0.80,
+                    "actionable": 0.85,
+                    "reusable": 0.70,
+                    "compoundable": 0.90,
+                    "reasoning": dict.fromkeys(
+                        (
+                            "specific",
+                            "measurable",
+                            "actionable",
+                            "reusable",
+                            "compoundable",
+                        ),
+                        "semantic",
+                    ),
+                }
+            )
+
+        semantic_verifier = SemanticSMARCVerifier(llm_executor=fake_llm)
+        recorder = RunRecorder(
+            db_path=tmp_db,
+            verifier=ResultsVerificationFramework(),
+            performance=MultiAgentPerformanceOptimizer(),
+            improvement_protocol=RecursiveSelfImprovementProtocol(
+                ethical_constraints={
+                    "do_no_harm": True,
+                    "human_alignment": True,
+                    "transparency": True,
+                    "reversibility": True,
+                }
+            ),
+            anti_idling=AntiIdlingSystem(),
+            semantic_verifier=semantic_verifier,
+        )
+
+        team_result = _make_team_result()
+        record = await recorder.record_run(team_result, "feature-dev")
+
+        # smarc_detail should be populated (not empty)
+        assert record.smarc_detail  # non-empty dict
+        step_id = list(record.smarc_detail.keys())[0]
+        detail = record.smarc_detail[step_id]
+        assert detail["source"] == "llm"
+        assert detail["scores"]["compoundable"] == pytest.approx(0.90)
+
+        # Also verify it was persisted to DB
+        with sqlite3.connect(tmp_db) as conn:
+            row = conn.execute(
+                "SELECT smarc_detail FROM si_run_records WHERE id = ?", (record.id,)
+            ).fetchone()
+        assert row is not None
+        stored = json.loads(row[0])
+        assert stored  # non-empty
+
+    # ── CapabilityMapper float score support ──────────────────────────────────
+
+    def test_capability_mapper_float_scores(self):
+        from orchestration.self_improvement.adapters import CapabilityMapper
+
+        # Float scores should be stored as direct proficiency
+        float_smarc = {"specific": 0.82, "measurable": 0.71}
+        caps = CapabilityMapper.smarc_to_capabilities("planner", float_smarc)
+        assert caps["planner_output_specificity"]["proficiency"] == pytest.approx(
+            0.82, abs=0.001
+        )
+        assert caps["planner_output_measurability"]["proficiency"] == pytest.approx(
+            0.71, abs=0.001
+        )
+        assert "semantic score" in caps["planner_output_specificity"]["evidence"]
+
+    def test_capability_mapper_smarc_score_with_floats(self):
+        from orchestration.self_improvement.adapters import CapabilityMapper
+
+        assert CapabilityMapper.smarc_score({"a": 0.6, "b": 0.8}) == pytest.approx(0.7)
+        assert CapabilityMapper.smarc_score({"a": True, "b": False}) == pytest.approx(
+            0.5
+        )
+        assert CapabilityMapper.smarc_score({}) == 0.0

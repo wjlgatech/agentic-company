@@ -208,3 +208,6 @@ steps:
       STATUS: done
     expects: "STATUS: done"
     retry: 2
+
+metadata:
+  self_improve: true

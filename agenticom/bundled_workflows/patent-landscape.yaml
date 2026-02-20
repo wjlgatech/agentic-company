@@ -183,6 +183,7 @@ guardrails:
 timeout_seconds: 1500
 
 metadata:
+  self_improve: true
   category: legal
   difficulty: expert
   typical_time_saved: "3-6 weeks"

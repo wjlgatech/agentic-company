@@ -65,3 +65,6 @@ steps:
       use_llm_analysis: true
       max_loops: 2
       feedback_template: "Test failures: {{error}}"
+
+metadata:
+  self_improve: true

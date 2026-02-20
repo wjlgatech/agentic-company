@@ -157,3 +157,6 @@ steps:
         {{error}}
 
         Please address these final concerns.
+
+metadata:
+  self_improve: true

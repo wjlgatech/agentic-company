@@ -309,6 +309,7 @@ guardrails:
 timeout_seconds: 1200
 
 metadata:
+  self_improve: true
   category: sre
   difficulty: advanced
   typical_time_saved: "4-8 hours"

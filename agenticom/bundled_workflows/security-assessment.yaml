@@ -240,6 +240,7 @@ guardrails:
 timeout_seconds: 1500
 
 metadata:
+  self_improve: true
   category: security
   difficulty: expert
   typical_time_saved: "2-4 weeks"

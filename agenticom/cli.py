@@ -830,6 +830,219 @@ def feedback_status(ctx, workflow, as_json):
         click.echo(f"❌ Error: {e}")
 
 
+@feedback.command("report")
+@click.argument("workflow_id")
+@click.option(
+    "--baseline-runs",
+    "-b",
+    default=5,
+    show_default=True,
+    help="Number of earliest runs to use as baseline",
+)
+@click.option(
+    "--recent-runs",
+    "-r",
+    default=5,
+    show_default=True,
+    help="Number of latest runs to compare against",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.pass_context
+def feedback_report(ctx, workflow_id, baseline_runs, recent_runs, as_json):
+    """Before/after improvement report for a workflow.
+
+    Compares agent SMARC scores between the earliest runs (baseline) and the
+    most recent runs, lists every patch that has been applied, and shows the
+    measured score delta so you can see the self-improvement loop working.
+
+    Example:
+        agenticom feedback report feature-dev
+        agenticom feedback report due-diligence --baseline-runs 3 --recent-runs 3
+    """
+    import json
+    import sqlite3
+    from pathlib import Path
+
+    db_path = Path.home() / ".agenticom" / "self_improve.db"
+    if not db_path.exists():
+        click.echo(
+            "❌ No self-improvement data yet. "
+            'Run a workflow first: agenticom workflow run feature-dev "<task>"'
+        )
+        return
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # ── Run records ──────────────────────────────────────────────
+            rows = conn.execute(
+                "SELECT id, overall_success, total_duration_ms, total_retries, "
+                "       total_tokens, agent_scores, step_scores, created_at "
+                "FROM si_run_records WHERE workflow_id = ? ORDER BY created_at ASC",
+                (workflow_id,),
+            ).fetchall()
+
+            if not rows:
+                click.echo(
+                    f"❌ No runs recorded for workflow '{workflow_id}'.\n"
+                    f"   Make sure self_improve is enabled and you have run the workflow."
+                )
+                return
+
+            total_runs = len(rows)
+            base_rows = rows[:baseline_runs]
+            recent_rows = rows[-recent_runs:] if total_runs > baseline_runs else rows
+
+            def avg_agent_scores(run_rows):
+                sums: dict[str, float] = {}
+                counts: dict[str, int] = {}
+                for r in run_rows:
+                    scores = json.loads(r["agent_scores"] or "{}")
+                    for agent, score in scores.items():
+                        sums[agent] = sums.get(agent, 0.0) + float(score)
+                        counts[agent] = counts.get(agent, 0) + 1
+                return {a: sums[a] / counts[a] for a in sums}
+
+            baseline_scores = avg_agent_scores(base_rows)
+            recent_scores = avg_agent_scores(recent_rows)
+            all_agents = sorted(set(baseline_scores) | set(recent_scores))
+
+            # ── Applied patches ───────────────────────────────────────────
+            patches = conn.execute(
+                "SELECT id, agent_id, agent_role, generated_by, confidence, "
+                "       capability_gaps, justification, approved_at "
+                "FROM si_prompt_patches "
+                "WHERE workflow_id = ? AND status = 'applied' "
+                "ORDER BY approved_at ASC",
+                (workflow_id,),
+            ).fetchall()
+
+            # ── Summary stats ─────────────────────────────────────────────
+            success_rate = (
+                sum(1 for r in rows if r["overall_success"]) / total_runs * 100
+            )
+            avg_tokens = sum(r["total_tokens"] or 0 for r in rows) / total_runs
+            avg_duration_s = (
+                sum(r["total_duration_ms"] or 0 for r in rows) / total_runs / 1000
+            )
+
+        # ── JSON output ───────────────────────────────────────────────────
+        if as_json:
+            deltas = {
+                a: {
+                    "baseline": round(baseline_scores.get(a, 0.0), 3),
+                    "recent": round(recent_scores.get(a, 0.0), 3),
+                    "delta": round(
+                        recent_scores.get(a, 0.0) - baseline_scores.get(a, 0.0), 3
+                    ),
+                }
+                for a in all_agents
+            }
+            click.echo(
+                format_json(
+                    {
+                        "workflow_id": workflow_id,
+                        "total_runs": total_runs,
+                        "baseline_runs": len(base_rows),
+                        "recent_runs": len(recent_rows),
+                        "success_rate_pct": round(success_rate, 1),
+                        "avg_tokens_per_run": round(avg_tokens),
+                        "avg_duration_s": round(avg_duration_s, 1),
+                        "agent_scores": deltas,
+                        "patches_applied": len(patches),
+                    }
+                )
+            )
+            return
+
+        # ── Human-readable output ─────────────────────────────────────────
+        click.echo()
+        click.echo(f"  Self-Improvement Report — {workflow_id}")
+        click.echo(f"  {'─' * 56}")
+        click.echo(
+            f"  Runs analysed : {total_runs}   "
+            f"Success rate: {success_rate:.0f}%   "
+            f"Patches applied: {len(patches)}"
+        )
+        click.echo(
+            f"  Avg tokens    : {avg_tokens:,.0f} / run   "
+            f"Avg duration: {avg_duration_s:.1f}s"
+        )
+        click.echo(
+            f"  Baseline      : first {len(base_rows)} run(s)   "
+            f"Current: last {len(recent_rows)} run(s)"
+        )
+        click.echo()
+
+        # Agent score table
+        col_w = max((len(a) for a in all_agents), default=8) + 2
+        header = (
+            f"  {'Agent':<{col_w}} {'Baseline':>10} {'Current':>10} {'Δ':>8}  Trend"
+        )
+        click.echo(header)
+        click.echo(f"  {'─' * (col_w + 36)}")
+
+        overall_deltas = []
+        for agent in all_agents:
+            b = baseline_scores.get(agent, 0.0)
+            c = recent_scores.get(agent, 0.0)
+            delta = c - b
+            overall_deltas.append(delta)
+
+            bar_len = int(c * 10)
+            bar = "█" * bar_len + "░" * (10 - bar_len)
+            trend = "▲" if delta > 0.02 else ("▼" if delta < -0.02 else "─")
+            delta_str = f"{delta:+.3f}" if delta != 0 else "  n/a "
+            click.echo(
+                f"  {agent:<{col_w}} {b:>10.3f} {c:>10.3f} {delta_str:>8}  "
+                f"{trend} {bar}"
+            )
+
+        click.echo()
+        if overall_deltas:
+            avg_delta = sum(overall_deltas) / len(overall_deltas)
+            direction = "improved" if avg_delta > 0 else "declined"
+            click.echo(
+                f"  Overall score {direction} by {avg_delta:+.3f} "
+                f"across {len(all_agents)} agent(s)"
+            )
+
+        # Applied patches
+        if patches:
+            click.echo()
+            click.echo(f"  Applied patches ({len(patches)}):")
+            click.echo(f"  {'─' * 56}")
+            for p in patches:
+                gaps = json.loads(p["capability_gaps"] or "[]")
+                gap_str = ", ".join(g.replace("_", " ") for g in gaps[:3])
+                ts = (p["approved_at"] or "")[:10]
+                click.echo(
+                    f"  [{p['id'][:8]}]  {p['agent_id']:<20} "
+                    f"{'by ' + p['generated_by']:<12} {ts}"
+                )
+                click.echo(f"    gaps : {gap_str or 'none listed'}")
+                click.echo(f"    why  : {p['justification'][:80]}")
+                click.echo()
+        else:
+            click.echo()
+            click.echo(
+                "  No patches applied yet. "
+                f"Run the workflow {5 - total_runs} more time(s) to trigger gap detection."
+                if total_runs < 5
+                else "  No patches applied yet. Use `agenticom feedback list-patches` "
+                "to see pending proposals."
+            )
+
+        click.echo()
+
+    except Exception as e:
+        click.echo(f"❌ Error generating report: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
 # ============== Dashboard ==============
 
 

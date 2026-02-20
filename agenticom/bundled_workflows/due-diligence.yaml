@@ -165,6 +165,7 @@ guardrails:
 timeout_seconds: 1800
 
 metadata:
+  self_improve: true
   category: finance
   difficulty: expert
   typical_time_saved: "4-6 weeks"

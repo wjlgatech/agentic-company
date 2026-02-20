@@ -272,6 +272,125 @@ result = await bridge.execute("web_search", query="AI regulation 2025")
 
 ---
 
+## 📢 News
+
+> **Format:** What it means for you → How it works → What was built
+
+---
+
+### 2026-02-19 — Your AI team gets smarter every time it runs
+
+Every run is now a lesson. The first time a planner produces vague output, the system notices. By run five it proposes a sharper prompt. By run twenty the whole team is measurably better — without you touching a config file.
+
+> **Tech:** Self-improvement loop — SMARC quality scoring on every step output → per-agent performance tracking → capability gap detection → targeted prompt patch proposals → human-in-the-loop approval or auto-apply.
+
+<details>
+<summary>Implementation details</summary>
+
+- **`orchestration/self_improvement/`** — new module vendoring four classes from `wjlgatech/self-optimization`: `ResultsVerificationFramework` (SMARC), `MultiAgentPerformanceOptimizer`, `RecursiveSelfImprovementProtocol`, `AntiIdlingSystem`
+- **Zero hot-path impact** — recording happens via `asyncio.create_task()` after `team.run()` returns
+- **`PromptVersionStore`** — SQLite-backed versioned personas with full rollback chain
+- **`PromptEvolver`** — heuristic suffix rules (always works) + optional LLM full-persona rewrite
+- **`agenticom feedback`** CLI — `list-patches`, `approve-patch`, `reject-patch`, `rollback`, `rate-run`, `status`
+- **`feature-dev.yaml`** — opt-in via `metadata.self_improve: true`
+- 51 new tests · 900 total passing
+
+</details>
+
+---
+
+### 2026-02-14 — Ship with confidence: 900 tests guard every change
+
+Refactor boldly. The test suite catches regressions before you do — covering guardrails, memory backends, the YAML parser, all 13 bundled workflows, the REST API, and the CLI end-to-end.
+
+> **Tech:** Comprehensive pytest suite with async support, integration-test isolation, and Playwright-conditional browser tests — enforced in CI across Python 3.10 / 3.11 / 3.12.
+
+<details>
+<summary>Implementation details</summary>
+
+- **849 → 900 tests** across three rounds of coverage expansion
+- `asyncio_mode = "auto"` — async test functions work without decorators
+- `@pytest.mark.integration` guards tests requiring live API keys; CI runs with `-m "not integration"`
+- `tests/conftest.py` — `collect_ignore` for 6 script-style files that aren't pytest suites
+- CodeQL + coverage jobs added to the CI matrix
+
+</details>
+
+---
+
+### 2026-02-13 — Production-grade CI: every PR is gated before it merges
+
+No more "it worked on my machine." Lint, types, tests on three Python versions, coverage, and security scanning all run automatically. Main branch is fully protected — no direct pushes, no bypassing checks.
+
+> **Tech:** GitHub Actions matrix CI (lint-and-type-check, test ×3 Pythons, coverage, CodeQL) + branch protection (1 reviewer, 5 required checks, `enforce_admins: true`).
+
+<details>
+<summary>Implementation details</summary>
+
+- `.github/workflows/ci.yml` — ruff + mypy + pytest in parallel across py3.10/3.11/3.12
+- `black>=24.0` pinned; must run after `ruff --fix` to avoid conflicts
+- `mypy` config: `disallow_untyped_defs=false`, `warn_return_any=false` (40 pre-existing modules carry `ignore_errors=true`)
+- Pre-commit hook (`scripts/check_root_clutter.py`) enforces file-organisation rules at commit time
+
+</details>
+
+---
+
+### 2026-02-11 — Catch bugs before users do: automated browser diagnostics
+
+The verifier agent used to report "it looks wrong." Now it shows you a screenshot, the console error, and an AI-generated root-cause hypothesis — all captured automatically during the workflow run.
+
+> **Tech:** Playwright browser automation captures screenshots + console logs + network requests after each step; a meta-analysis LLM layer identifies root causes and proposes targeted fixes; a criteria builder interviews you to sharpen acceptance criteria.
+
+<details>
+<summary>Implementation details</summary>
+
+- **`orchestration/diagnostics/`** — `PlaywrightCapture`, `MetaAnalyzer`, `CriteriaBuilder`, `IterationMonitor`, `DiagnosticsIntegrator`
+- `agenticom test-diagnostics <url>` — run browser automation from the CLI
+- `agenticom build-criteria "<task>"` — interactive Q&A → structured success criteria JSON
+- `@pytest.mark.skipif(not check_playwright_installation(), ...)` guards browser tests
+
+</details>
+
+---
+
+### 2026-02-11 — Connect to live data: MCP tool integrations
+
+Your agents can now query PubMed, Ahrefs, Similarweb, and any MCP server — not just reason about what the data might say, but actually retrieve it mid-workflow.
+
+> **Tech:** `MCPToolBridge` routes workflow tool references to registered MCP servers via `MCPToolRegistry`; `PromptEngineer` + `SmartRefiner` refine task descriptions into coherent multi-turn prompts before execution begins.
+
+<details>
+<summary>Implementation details</summary>
+
+- **`orchestration/tools/`** — `mcp_bridge.py`, `registry.py`, `prompt_engineer.py`, `intent_refiner.py`, `smart_refiner.py`, `hybrid_refiner.py`
+- `SmartRefiner` — multi-turn interview loop that synthesises a coherent final prompt from user answers
+- `ConversationalRefiner` — single-pass intent clarification for simpler cases
+- Graceful-mode flag: tools degrade silently when MCP server is unavailable
+
+</details>
+
+---
+
+### 2026-02-11 — From idea to deliverable in hours, not weeks
+
+Five specialist agents — planner, developer, verifier, tester, reviewer — collaborate on a shared task with cross-verification at every handoff. Each agent sees only what it needs; hallucinations from previous steps can't contaminate the next.
+
+> **Tech:** "Ralph Loop" pattern — fresh `AgentContext` per step with template substitution (`{{step_outputs.X}}`); loopback on failure; guardrails, memory, and approval gates composable per workflow; 13 bundled YAML workflows ready to run.
+
+<details>
+<summary>Implementation details</summary>
+
+- **`orchestration/agents/`** — `AgentTeam`, `TeamBuilder`, `AgentRole` enum, specialized agents (Planner/Developer/Verifier/Tester/Reviewer/Researcher/Writer/Analyst)
+- **`orchestration/workflows/`** — `WorkflowParser` (YAML → `AgentTeam`), template engine
+- **`agenticom/state.py`** — SQLite persistence (`~/.agenticom/state.db`) for all run state
+- **`orchestration/integrations/unified.py`** — `UnifiedExecutor` routes to OpenClaw (Anthropic), Nanobot (OpenAI), or Ollama; `auto_setup_executor()` picks the best available backend
+- 13 bundled workflows: `feature-dev`, `feature-dev-with-diagnostics`, `feature-dev-with-loopback`, `feature-dev-llm-recovery`, `autonomous-dev-loop`, `marketing-campaign`, `due-diligence`, `compliance-audit`, `patent-landscape`, `security-assessment`, `churn-analysis`, `grant-proposal`, `incident-postmortem`
+
+</details>
+
+---
+
 ## License
 
 MIT — use it, fork it, build on it.

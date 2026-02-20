@@ -878,7 +878,8 @@ def feedback_report(ctx, workflow_id, baseline_runs, recent_runs, as_json):
             # ── Run records ──────────────────────────────────────────────
             rows = conn.execute(
                 "SELECT id, overall_success, total_duration_ms, total_retries, "
-                "       total_tokens, agent_scores, step_scores, created_at "
+                "       total_tokens, agent_scores, step_scores, created_at, "
+                "       smarc_detail "
                 "FROM si_run_records WHERE workflow_id = ? ORDER BY created_at ASC",
                 (workflow_id,),
             ).fetchall()
@@ -904,9 +905,34 @@ def feedback_report(ctx, workflow_id, baseline_runs, recent_runs, as_json):
                         counts[agent] = counts.get(agent, 0) + 1
                 return {a: sums[a] / counts[a] for a in sums}
 
+            def avg_smarc_criteria(run_rows):
+                """Average per-criterion scores across all steps in given runs."""
+                sums: dict[str, float] = {}
+                counts: dict[str, int] = {}
+                sources: dict[str, set] = {}
+                for r in run_rows:
+                    detail = json.loads(r["smarc_detail"] or "{}")
+                    for step_data in detail.values():
+                        if not isinstance(step_data, dict):
+                            continue
+                        step_scores = step_data.get("scores", {})
+                        source = step_data.get("source", "rule")
+                        for criterion, score in step_scores.items():
+                            sums[criterion] = sums.get(criterion, 0.0) + float(score)
+                            counts[criterion] = counts.get(criterion, 0) + 1
+                            sources.setdefault(criterion, set()).add(source)
+                if not sums:
+                    return {}, {}
+                avgs = {c: sums[c] / counts[c] for c in sums}
+                src = {
+                    c: "llm" if "llm" in sources.get(c, set()) else "rule" for c in sums
+                }
+                return avgs, src
+
             baseline_scores = avg_agent_scores(base_rows)
             recent_scores = avg_agent_scores(recent_rows)
             all_agents = sorted(set(baseline_scores) | set(recent_scores))
+            criteria_scores, criteria_sources = avg_smarc_criteria(recent_rows)
 
             # ── Applied patches ───────────────────────────────────────────
             patches = conn.execute(
@@ -950,6 +976,13 @@ def feedback_report(ctx, workflow_id, baseline_runs, recent_runs, as_json):
                         "avg_tokens_per_run": round(avg_tokens),
                         "avg_duration_s": round(avg_duration_s, 1),
                         "agent_scores": deltas,
+                        "smarc_criteria": {
+                            c: {
+                                "score": round(s, 3),
+                                "source": criteria_sources.get(c, "rule"),
+                            }
+                            for c, s in criteria_scores.items()
+                        },
                         "patches_applied": len(patches),
                     }
                 )
@@ -1007,6 +1040,33 @@ def feedback_report(ctx, workflow_id, baseline_runs, recent_runs, as_json):
                 f"  Overall score {direction} by {avg_delta:+.3f} "
                 f"across {len(all_agents)} agent(s)"
             )
+
+        # SMARC dimension breakdown
+        if criteria_scores:
+            click.echo()
+            click.echo(
+                f"  SMARC dimension breakdown (latest {len(recent_rows)} run(s)):"
+            )
+            click.echo(f"  {'─' * 56}")
+            click.echo(f"  {'Criterion':<16} {'Score':>6}  {'Bar':<12}  Source")
+            _criteria_order = (
+                "specific",
+                "measurable",
+                "actionable",
+                "reusable",
+                "compoundable",
+            )
+            for criterion in _criteria_order:
+                if criterion not in criteria_scores:
+                    continue
+                score = criteria_scores[criterion]
+                source = criteria_sources.get(criterion, "rule")
+                bar_len = int(score * 10)
+                bar = "█" * bar_len + "░" * (10 - bar_len)
+                flywheel = "  ← flywheel" if criterion == "compoundable" else ""
+                click.echo(
+                    f"  {criterion:<16} {score:>6.2f}  {bar:<12}  {source}{flywheel}"
+                )
 
         # Applied patches
         if patches:

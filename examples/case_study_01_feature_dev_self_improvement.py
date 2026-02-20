@@ -669,6 +669,75 @@ def part_b_self_optimization(agents_raw: dict) -> None:
   specific agent — not a blanket change applied to everyone.
     """)
 
+    # ── Step 9b: Semantic vs Rule-based SMARC comparison ─────────────────
+    section("Step 9b — Rule-based vs Semantic LLM-based SMARC scoring")
+
+    print("""
+  The original rule-based SMARC checks read the *shape* of the result dict.
+  They almost always return 1.0 because the adapter guarantees the required
+  keys are present.  The new SemanticSMARCVerifier sends the actual agent
+  output text to an LLM judge that scores *content quality* on a 0.0–1.0
+  float scale.
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                     COMPARISON — same output                        │
+  │  Planner wrote: "Add login.  It should work well.  Good luck."     │
+  ├─────────────────────────┬───────────────┬───────────────────────────┤
+  │ Criterion               │  Rule-based   │  Semantic LLM             │
+  ├─────────────────────────┼───────────────┼───────────────────────────┤
+  │ specific                │  1.0  (dict   │  0.10  "vague: no concrete│
+  │                         │   non-None)   │   steps, just 'add login'"|
+  │ measurable              │  0.3  (no     │  0.05  "zero metrics or   │
+  │                         │   digits)     │   timelines specified"    │
+  │ actionable              │  1.0  (has    │  0.20  "no clear next step│
+  │                         │   next_step)  │   for the developer"      │
+  │ reusable                │  1.0  (dict   │  0.15  "context-specific, │
+  │                         │   > 1 key)    │   cannot be templated"    │
+  │ compoundable            │  1.0  (output │  0.08  "zero flywheel:    │
+  │                         │   > 200 chars │   consumed once, no       │
+  │                         │   ... wait,   │   downstream amplification│
+  │                         │   only 45!)   │   at all"                 │
+  │                         │  → 0.1 here   │                           │
+  ├─────────────────────────┼───────────────┼───────────────────────────┤
+  │ Composite               │  0.66         │  0.116                    │
+  │ Gap detected?           │  NO (above    │  YES — all 5 criteria     │
+  │                         │   0.6 thresh) │   below 0.6 threshold     │
+  └─────────────────────────┴───────────────┴───────────────────────────┘
+
+  The semantic verifier detects what the rule-based checker misses:
+  the *content* of the output is low quality even when the *structure*
+  happens to satisfy the dict-shape rules.
+
+  Compoundable — the flywheel criterion:
+  ──────────────────────────────────────
+  0.0  "Add login. Good luck."        → consumed once, zero amplification
+  0.3  "Add /token endpoint"          → feeds developer only (linear)
+  0.6  Structured plan with sub-tasks → feeds developer + verifier
+  1.0  Full plan with acceptance criteria, module boundaries, and
+       measurable targets → planner's criteria become the verifier's
+       auto-checks AND the improvement loop's patch-targeting signals
+       → every downstream agent is measurably stronger, across all
+       future runs (genuine flywheel)
+
+  SemanticSMARCVerifier usage:
+    verifier = SemanticSMARCVerifier(llm_executor=my_async_llm_fn)
+    result = await verifier.verify(
+        output="<agent text>",
+        agent_role="planner",
+        step_id="plan",
+        expects="STATUS: done",
+    )
+    print(result.scores)      # {"specific": 0.10, "compoundable": 0.08, …}
+    print(result.passed)      # {"specific": False, "compoundable": False, …}
+    print(result.composite)   # 0.116
+    print(result.reasoning["compoundable"])
+    # → "zero flywheel: consumed once, no downstream amplification at all"
+
+  The RunRecorder stores the full LLM reasoning in the smarc_detail column
+  so you can read it with:
+    agenticom feedback report feature-dev
+    """)
+
     # ── Step 10: Full lifecycle summary ──────────────────────────────────
     section("Step 10 — Full self-optimization lifecycle (summary)")
 
@@ -745,6 +814,9 @@ def part_b_self_optimization(agents_raw: dict) -> None:
        retry policy, loopback rules)
     ✓  How StepResultAdapter converts raw agent output into SMARC input
     ✓  How the 5 SMARC criteria are evaluated individually per step
+    ✓  Why rule-based SMARC misses content quality (shape vs substance)
+    ✓  How SemanticSMARCVerifier uses LLM judgement for float 0.0–1.0 scores
+    ✓  How "compoundable" measures flywheel effect across all downstream steps
     ✓  How composite performance scores are built from SMARC + retries
     ✓  How _identify_capability_gaps() detects failing dimensions
     ✓  How PromptEvolver appends targeted instruction suffixes (heuristic)

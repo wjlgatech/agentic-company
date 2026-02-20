@@ -60,22 +60,37 @@ class CapabilityMapper:
 
     @staticmethod
     def smarc_to_capabilities(
-        agent_role: str, smarc_results: dict[str, bool]
+        agent_role: str, smarc_results: dict[str, bool | float]
     ) -> dict[str, Any]:
-        """Return a capability map update suitable for update_capability_map()."""
+        """Return a capability map update suitable for update_capability_map().
+
+        Accepts both the legacy dict[str, bool] from ResultsVerificationFramework
+        and the richer dict[str, float] produced by SemanticSMARCVerifier.
+        Float scores are stored directly as proficiency (0.0–1.0), giving the
+        gap detector far more granularity than the old binary 0.8/0.1 mapping.
+        """
         cap_name = CapabilityMapper.SMARC_TO_CAPABILITY
-        return {
-            f"{agent_role}_{cap_name.get(criterion, criterion)}": {
-                "proficiency": 0.8 if passed else 0.1,
+        result = {}
+        for criterion, score in smarc_results.items():
+            if isinstance(score, float):
+                proficiency = round(float(score), 3)
+                evidence = f"semantic score={score:.2f} for {criterion}"
+            else:
+                proficiency = 0.8 if score else 0.1
+                evidence = f"{'passed' if score else 'failed'} {criterion} check"
+            result[f"{agent_role}_{cap_name.get(criterion, criterion)}"] = {
+                "proficiency": proficiency,
                 "source": "smarc_verification",
-                "evidence": f"{'passed' if passed else 'failed'} {criterion} check",
+                "evidence": evidence,
             }
-            for criterion, passed in smarc_results.items()
-        }
+        return result
 
     @staticmethod
-    def smarc_score(smarc_results: dict[str, bool]) -> float:
-        """Return fraction of SMARC criteria that passed (0.0 – 1.0)."""
+    def smarc_score(smarc_results: dict[str, bool | float]) -> float:
+        """Return mean SMARC score (0.0 – 1.0).
+
+        Handles both bool (legacy rule-based) and float (semantic) inputs.
+        """
         if not smarc_results:
             return 0.0
-        return sum(smarc_results.values()) / len(smarc_results)
+        return sum(float(v) for v in smarc_results.values()) / len(smarc_results)

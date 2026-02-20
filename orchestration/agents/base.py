@@ -117,6 +117,21 @@ class Agent(ABC):
         """Set guardrail pipeline for input/output filtering"""
         self._guardrail_pipeline = guardrail_pipeline
 
+    def update_persona(self, new_persona: str, version_id: str = "") -> None:
+        """Update the agent's persona at runtime (used by ImprovementLoop).
+
+        The system_prompt property reads self.persona dynamically, so this
+        takes effect on the very next execution call.
+        """
+        self.persona = new_persona
+        if version_id:
+            self.metadata = {
+                **(
+                    self.metadata if hasattr(self, "metadata") and self.metadata else {}
+                ),
+                "active_prompt_version_id": version_id,
+            }
+
     async def execute(
         self, task: str, context: AgentContext | None = None, fresh_context: bool = True
     ) -> AgentResult:

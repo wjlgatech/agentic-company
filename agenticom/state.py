@@ -251,6 +251,77 @@ class StateManager:
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+            # Self-improvement tables (si_*) — schema reference only.
+            # The live data lives in ~/.agenticom/self_improve.db managed by
+            # orchestration.self_improvement.ImprovementLoop.
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS si_run_records (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT,
+                    workflow_id TEXT,
+                    task_description TEXT,
+                    overall_success INTEGER,
+                    total_duration_ms REAL,
+                    total_retries INTEGER,
+                    total_tokens INTEGER,
+                    step_scores TEXT DEFAULT '{}',
+                    agent_scores TEXT DEFAULT '{}',
+                    prompt_version_ids TEXT DEFAULT '{}',
+                    ab_test_variant TEXT,
+                    created_at TEXT,
+                    metadata TEXT DEFAULT '{}'
+                );
+                CREATE TABLE IF NOT EXISTS si_prompt_versions (
+                    id TEXT PRIMARY KEY,
+                    workflow_id TEXT,
+                    agent_id TEXT,
+                    agent_role TEXT,
+                    version_number INTEGER,
+                    persona_text TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    applied_patch_id TEXT,
+                    previous_version_id TEXT,
+                    ab_test_id TEXT,
+                    ab_variant TEXT,
+                    created_at TEXT,
+                    deactivated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS si_prompt_patches (
+                    id TEXT PRIMARY KEY,
+                    workflow_id TEXT,
+                    agent_id TEXT,
+                    agent_role TEXT,
+                    capability_gaps TEXT,
+                    base_prompt_version_id TEXT,
+                    proposed_persona_text TEXT,
+                    justification TEXT,
+                    generated_by TEXT DEFAULT 'heuristic',
+                    status TEXT DEFAULT 'pending',
+                    confidence REAL,
+                    approved_by TEXT,
+                    approved_at TEXT,
+                    rejection_reason TEXT,
+                    created_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS si_ab_tests (
+                    id TEXT PRIMARY KEY,
+                    workflow_id TEXT,
+                    agent_id TEXT,
+                    control_version_id TEXT,
+                    candidate_version_id TEXT,
+                    status TEXT DEFAULT 'active',
+                    winner TEXT,
+                    started_at TEXT,
+                    concluded_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS si_capability_states (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    workflow_id TEXT,
+                    snapshot_json TEXT,
+                    created_at TEXT
+                );
+            """)
+
             conn.commit()
 
     def create_run(self, run: WorkflowRun) -> str:

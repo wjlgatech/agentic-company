@@ -10,6 +10,9 @@ description: |
 version: "1.0"
 tags: [development, coding, testing, review]
 
+metadata:
+  self_improve: true   # Enable self-improvement loop for this workflow
+
 agents:
   - id: planner
     name: Planner

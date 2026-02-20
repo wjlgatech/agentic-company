@@ -640,6 +640,196 @@ def test_diagnostics(ctx, url, actions, headless, output_dir):
         traceback.print_exc()
 
 
+# ============== Feedback / Self-Improvement ==============
+
+
+@cli.group()
+def feedback():
+    """Self-improvement feedback commands — review and manage prompt patches."""
+    pass
+
+
+@feedback.command("rate-run")
+@click.argument("run_id")
+@click.argument("score", type=float)
+@click.option("--notes", "-n", default="", help="Optional notes")
+@click.pass_context
+def feedback_rate_run(ctx, run_id, score, notes):
+    """Rate a completed workflow run (0.0–1.0).
+
+    Example:
+        agenticom feedback rate-run abc123 0.9 --notes "Great output"
+    """
+    if not 0.0 <= score <= 1.0:
+        click.echo("❌ Score must be between 0.0 and 1.0")
+        return
+
+    try:
+        from orchestration.self_improvement import get_improvement_loop
+
+        loop = get_improvement_loop()
+        ok = loop.rate_run(run_id, score, notes)
+        if ok:
+            click.echo(f"✅ Run {run_id} rated {score:.2f}")
+        else:
+            click.echo(f"❌ Run {run_id} not found in self-improvement records")
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
+
+
+@feedback.command("list-patches")
+@click.option("--workflow", "-w", default=None, help="Filter by workflow ID")
+@click.option(
+    "--status", "-s", default=None, help="Filter by status (pending/applied/rejected)"
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.pass_context
+def feedback_list_patches(ctx, workflow, status, as_json):
+    """List prompt patches proposed by the self-improvement loop.
+
+    Example:
+        agenticom feedback list-patches --workflow feature-dev
+    """
+    try:
+        from orchestration.self_improvement import get_improvement_loop
+
+        loop = get_improvement_loop()
+        patches = loop.list_patches(workflow_id=workflow, status=status)
+
+        if as_json:
+            click.echo(format_json({"patches": patches}))
+            return
+
+        if not patches:
+            click.echo("No patches found.")
+            return
+
+        click.echo(f"📋 {len(patches)} patch(es):\n")
+        for p in patches:
+            icon = {"pending": "⏳", "applied": "✅", "rejected": "❌"}.get(
+                p["status"], "🔹"
+            )
+            click.echo(
+                f"{icon} [{p['id'][:8]}] {p['agent_id']} | "
+                f"{p['status']} | conf={p['confidence']:.2f} | by={p['generated_by']}"
+            )
+            click.echo(f"   Gaps: {', '.join(p['gaps'][:3])}")
+            click.echo(f"   {p['justification']}")
+            click.echo()
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
+
+
+@feedback.command("approve-patch")
+@click.argument("patch_id")
+@click.option("--notes", "-n", default="", help="Optional approval notes")
+@click.pass_context
+def feedback_approve_patch(ctx, patch_id, notes):
+    """Approve and immediately apply a pending prompt patch.
+
+    Example:
+        agenticom feedback approve-patch abc12345
+    """
+    try:
+        from orchestration.self_improvement import get_improvement_loop
+
+        loop = get_improvement_loop()
+        result = loop.approve_patch(patch_id, notes=notes)
+        if "error" in result:
+            click.echo(f"❌ {result['error']}")
+        else:
+            click.echo(f"✅ Patch applied → version {result['version_number']}")
+            click.echo(f"   New version ID: {result['new_version_id']}")
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
+
+
+@feedback.command("reject-patch")
+@click.argument("patch_id")
+@click.argument("reason")
+@click.pass_context
+def feedback_reject_patch(ctx, patch_id, reason):
+    """Reject a pending prompt patch.
+
+    Example:
+        agenticom feedback reject-patch abc12345 "Adds too many constraints"
+    """
+    try:
+        from orchestration.self_improvement import get_improvement_loop
+
+        loop = get_improvement_loop()
+        result = loop.reject_patch(patch_id, reason)
+        if "error" in result:
+            click.echo(f"❌ {result['error']}")
+        else:
+            click.echo(f"✅ Patch {patch_id} rejected")
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
+
+
+@feedback.command("rollback")
+@click.argument("workflow_id")
+@click.argument("agent_id")
+@click.pass_context
+def feedback_rollback(ctx, workflow_id, agent_id):
+    """Roll back an agent's persona to the previous version.
+
+    Example:
+        agenticom feedback rollback feature-dev planner
+    """
+    try:
+        from orchestration.self_improvement import get_improvement_loop
+
+        loop = get_improvement_loop()
+        result = loop.rollback(workflow_id, agent_id)
+        if "error" in result:
+            click.echo(f"❌ {result['error']}")
+        else:
+            click.echo(
+                f"✅ Rolled back {agent_id} to version {result['version_number']}"
+            )
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
+
+
+@feedback.command("status")
+@click.option("--workflow", "-w", default=None, help="Filter by workflow ID")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.pass_context
+def feedback_status(ctx, workflow, as_json):
+    """Show self-improvement status: pending patches, applied patches.
+
+    Example:
+        agenticom feedback status --workflow feature-dev
+    """
+    try:
+        from orchestration.self_improvement import get_improvement_loop
+
+        loop = get_improvement_loop()
+        result = loop.feedback_status(workflow_id=workflow)
+
+        if as_json:
+            click.echo(format_json(result))
+            return
+
+        click.echo("📊 Self-Improvement Status")
+        click.echo("=" * 40)
+        click.echo(f"⏳ Pending patches : {result['pending_patches']}")
+        click.echo(f"✅ Applied patches : {result['applied_patches']}")
+
+        if result["patches"]:
+            click.echo("\n📋 Recent patches:")
+            for p in result["patches"][:5]:
+                icon = {"pending": "⏳", "applied": "✅", "rejected": "❌"}.get(
+                    p["status"], "🔹"
+                )
+                click.echo(f"  {icon} {p['id'][:8]} | {p['agent_id']} | {p['status']}")
+        else:
+            click.echo("\nNo patches yet. Run a workflow to start learning.")
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
+
+
 # ============== Dashboard ==============
 
 

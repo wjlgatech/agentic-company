@@ -16,6 +16,7 @@ from orchestration.agents.team import (
     TeamConfig,
     WorkflowStep,
 )
+from orchestration.tools.skill_loader import SkillLoader
 
 
 @dataclass
@@ -28,6 +29,7 @@ class AgentDefinition:
     guardrails: list[str] = field(default_factory=list)
     workspace_files: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -247,6 +249,7 @@ class WorkflowParser:
                     guardrails=agent_data.get("guardrails", []),
                     workspace_files=agent_data.get("workspace_files", []),
                     tools=agent_data.get("tools", []),
+                    skills=agent_data.get("skills", []),
                 )
             )
 
@@ -278,7 +281,11 @@ class WorkflowParser:
             metadata=data.get("metadata", {}),
         )
 
-    def to_team(self, definition: WorkflowDefinition) -> AgentTeam:
+    def to_team(
+        self,
+        definition: WorkflowDefinition,
+        skill_loader: SkillLoader | None = None,
+    ) -> AgentTeam:
         """Convert WorkflowDefinition to executable AgentTeam"""
         # Create team config
         team_config = TeamConfig(
@@ -289,6 +296,7 @@ class WorkflowParser:
         )
 
         team = AgentTeam(team_config)
+        _loader = skill_loader or SkillLoader()
 
         # Create and add agents
         agent_map = {}
@@ -296,13 +304,21 @@ class WorkflowParser:
             # Use dynamic role resolution with fallback to CUSTOM
             role = self.resolve_role(agent_def.role)
 
+            # Phase 1 static skill injection: append skill bodies to persona
+            persona = agent_def.persona or ""
+            for skill_name in agent_def.skills:
+                skill_text = _loader.load(skill_name)
+                if skill_text:
+                    persona = persona + f"\n\n## Skill: {skill_name}\n{skill_text}"
+
             agent = create_agent(
                 role,
                 name=agent_def.name,
-                persona=agent_def.persona,
+                persona=persona,
                 guardrails=agent_def.guardrails,
                 workspace_files=agent_def.workspace_files,
                 tools=agent_def.tools,
+                skills=agent_def.skills,
             )
             team.add_agent(agent)
             agent_map[agent_def.role.lower()] = role

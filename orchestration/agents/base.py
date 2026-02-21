@@ -40,6 +40,7 @@ class AgentConfig:
     timeout_seconds: int = 300
     workspace_files: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
 
 
@@ -88,6 +89,9 @@ class Agent(ABC):
         self.role = config.role
         self.name = config.name
         self.persona = config.persona
+        # base_persona stores the original persona before any runtime updates
+        # (used by Phase 2 task-time skill routing to reset between runs)
+        self.base_persona = config.persona
         self._guardrail_pipeline = None
         self._executor: Callable[[str, AgentContext], Awaitable[str]] | None = None
 

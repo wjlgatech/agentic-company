@@ -48,6 +48,8 @@ agents:
   - id: criteria_builder
     name: Criteria Builder
     role: Success Criteria Definition
+    skills:
+      - lint-and-validate
     prompt: |
       You are a requirements analyst specializing in defining measurable success criteria.
 
@@ -71,6 +73,8 @@ agents:
   - id: planner
     name: Planner
     role: Requirements Analysis & Task Breakdown
+    skills:
+      - technical-planning
     prompt: |
       You are a senior technical planner.
 
@@ -91,6 +95,8 @@ agents:
   - id: developer
     name: Developer
     role: Implementation & Code Writing
+    skills:
+      - python-coding-standards
     prompt: |
       You are a senior developer.
 
@@ -109,6 +115,9 @@ agents:
   - id: verifier
     name: Verifier
     role: Cross-Verification Against Spec
+    skills:
+      - lint-and-validate
+      - security-code-review
     prompt: |
       You are a verification specialist.
 
@@ -132,6 +141,8 @@ agents:
   - id: tester
     name: Tester
     role: Test Creation & Execution
+    skills:
+      - tdd-patterns
     prompt: |
       You are a QA engineer.
 
@@ -146,6 +157,8 @@ agents:
   - id: reviewer
     name: Reviewer
     role: Code Review & Quality Assurance
+    skills:
+      - code-review-checklist
     prompt: |
       You are a senior code reviewer.
 
